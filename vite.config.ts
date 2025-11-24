@@ -24,6 +24,8 @@ const copyPWAFiles = () => ({
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
+      // Configure cache directory to avoid conflicts with Railway's mounted volumes
+      cacheDir: env.VITE_CACHE_DIR || 'node_modules/.vite',
       server: {
         port: 3000,
         host: '0.0.0.0',

@@ -8,9 +8,13 @@ cmds = [
 
 [phases.build]
 cmds = [
-  "rm -rf node_modules/.cache .vite",
   "npm run build"
 ]
+
+# Environment variables to override Vite cache location
+# Railway automatically mounts node_modules/.cache, so we use a different location
+[variables]
+VITE_CACHE_DIR = "/tmp/vite-cache"
 
 [start]
 cmd = "npx serve -s dist -l $PORT"
