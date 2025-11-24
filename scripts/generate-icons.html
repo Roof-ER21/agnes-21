@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agnes-21 Icon Generator</title>
+</head>
+<body>
+  <h1>Agnes-21 Icon Generator</h1>
+  <p>Click the button to generate PWA icons</p>
+  <button onclick="generateIcons()">Generate Icons</button>
+  <div id="output"></div>
+
+  <script>
+    const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+
+    function generateIcons() {
+      const output = document.getElementById('output');
+      output.innerHTML = '<h2>Generated Icons:</h2>';
+
+      sizes.forEach(size => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // Background gradient
+        const gradient = ctx.createLinearGradient(0, 0, size, size);
+        gradient.addColorStop(0, '#ef4444');
+        gradient.addColorStop(1, '#dc2626');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+
+        // Add text
+        ctx.fillStyle = 'white';
+        ctx.font = `bold ${size * 0.3}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('A21', size / 2, size / 2);
+
+        // Convert to blob and download
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `icon-${size}x${size}.png`;
+          link.textContent = `icon-${size}x${size}.png`;
+          link.style.display = 'block';
+          link.style.marginBottom = '10px';
+          output.appendChild(link);
+
+          // Auto download
+          link.click();
+        });
+      });
+
+      output.innerHTML += '<p><strong>Done! Check your downloads folder.</strong></p>';
+      output.innerHTML += '<p>Move all icon-*.png files to /public/icons/</p>';
+    }
+  </script>
+</body>
+</html>

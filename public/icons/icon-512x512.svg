@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ef4444;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="10.24" stdDeviation="15.36" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bg-gradient)" rx="76.8"/>
+
+  <!-- Text -->
+  <text
+    x="50%"
+    y="50%"
+    font-family="Arial, sans-serif"
+    font-size="179.2"
+    font-weight="bold"
+    fill="white"
+    text-anchor="middle"
+    dominant-baseline="central"
+    filter="url(#shadow)">
+    A21
+  </text>
+
+  <!-- Small subtitle -->
+  <text
+    x="50%"
+    y="384"
+    font-family="Arial, sans-serif"
+    font-size="61.44"
+    font-weight="normal"
+    fill="rgba(255,255,255,0.8)"
+    text-anchor="middle"
+    dominant-baseline="central">
+    TRAINING
+  </text>
+</svg>

@@ -1,0 +1,8 @@
+{
+  "name": "Agnes 21",
+  "description": "A real-time pitch coaching and roleplay application powered by Gemini Live.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
