@@ -98,10 +98,43 @@ const AppContent: React.FC = () => {
   const [showManagerDashboard, setShowManagerDashboard] = useState<boolean>(false);
   const [showAllUsers, setShowAllUsers] = useState<boolean>(false);
   const [selectedMode, setSelectedMode] = useState<PitchMode>(PitchMode.COACH);
-  const [selectedScriptType, setSelectedScriptType] = useState<'initial' | 'post' | 'phone' | 'custom'>('initial');
-  const [selectedPhoneScript, setSelectedPhoneScript] = useState<PhoneScript>(PHONE_SCRIPTS[0]);
+  const [selectedScriptId, setSelectedScriptId] = useState<string>('initial');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DifficultyLevel.PRO);
   const [customScript, setCustomScript] = useState<string>('');
+
+  // All available scripts with summaries
+  const allScripts = [
+    {
+      id: 'initial',
+      title: 'Initial Pitch',
+      category: 'Door-to-Door',
+      summary: 'The first pitch at the door. Covers the 5 non-negotiables: who you are, who we are, make it relatable, purpose (inspection), and going for the close. Includes both generic and specific storm approaches.',
+      content: INITIAL_PITCH
+    },
+    {
+      id: 'post',
+      title: 'Post-Inspection Pitch',
+      category: 'Follow-Up',
+      summary: 'After completing the inspection. Show damage photos, explain hail/wind damage, discuss insurance process, gather homeowner information, and explain next steps with iPad.',
+      content: POST_INSPECTION_PITCH
+    },
+    ...PHONE_SCRIPTS.map(script => ({
+      id: script.id,
+      title: script.title,
+      category: script.category,
+      summary: script.description,
+      content: script.content
+    })),
+    {
+      id: 'custom',
+      title: 'Custom Script',
+      category: 'Custom',
+      summary: 'Write or paste your own custom script for specialized training scenarios.',
+      content: customScript
+    }
+  ];
+
+  const selectedScript = allScripts.find(s => s.id === selectedScriptId) || allScripts[0];
 
   // Show loading while checking auth
   if (isLoading) {
@@ -121,13 +154,10 @@ const AppContent: React.FC = () => {
   }
 
   const getActiveScript = () => {
-    switch (selectedScriptType) {
-      case 'initial': return INITIAL_PITCH;
-      case 'post': return POST_INSPECTION_PITCH;
-      case 'phone': return selectedPhoneScript.content;
-      case 'custom': return customScript;
-      default: return '';
+    if (selectedScriptId === 'custom') {
+      return customScript;
     }
+    return selectedScript.content;
   };
 
   const startSession = () => {
@@ -340,45 +370,64 @@ const AppContent: React.FC = () => {
           <div className="space-y-6">
              <h2 className="text-xs font-bold text-red-500 uppercase tracking-[0.2em] ml-1">03 // Script</h2>
              <div className="flex flex-col h-[260px] bg-neutral-900/30 border border-neutral-800 rounded-xl overflow-hidden">
-                <div className="grid grid-cols-4 border-b border-neutral-800 bg-black">
-                    <button onClick={() => setSelectedScriptType('initial')} className={`py-3 text-xs font-medium uppercase tracking-wider ${selectedScriptType === 'initial' ? 'bg-red-900/20 text-white border-b-2 border-red-600' : 'text-neutral-500 hover:text-white'}`}>Initial</button>
-                    <button onClick={() => setSelectedScriptType('post')} className={`py-3 text-xs font-medium uppercase tracking-wider ${selectedScriptType === 'post' ? 'bg-red-900/20 text-white border-b-2 border-red-600' : 'text-neutral-500 hover:text-white'}`}>Post</button>
-                    <button onClick={() => setSelectedScriptType('phone')} className={`py-3 text-xs font-medium uppercase tracking-wider ${selectedScriptType === 'phone' ? 'bg-red-900/20 text-white border-b-2 border-red-600' : 'text-neutral-500 hover:text-white'}`}>
-                      <Phone className="w-3 h-3 inline mr-1" />Phone
-                    </button>
-                    <button onClick={() => setSelectedScriptType('custom')} className={`py-3 text-xs font-medium uppercase tracking-wider ${selectedScriptType === 'custom' ? 'bg-red-900/20 text-white border-b-2 border-red-600' : 'text-neutral-500 hover:text-white'}`}>Custom</button>
+                {/* Script Dropdown */}
+                <div className="border-b border-neutral-800 bg-black p-3">
+                  <select
+                    value={selectedScriptId}
+                    onChange={(e) => setSelectedScriptId(e.target.value)}
+                    className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-500"
+                  >
+                    <optgroup label="Door-to-Door">
+                      <option value="initial">Initial Pitch</option>
+                      <option value="post">Post-Inspection Pitch</option>
+                    </optgroup>
+                    <optgroup label="Phone Scripts">
+                      {PHONE_SCRIPTS.map(script => (
+                        <option key={script.id} value={script.id}>{script.title}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Custom">
+                      <option value="custom">Custom Script</option>
+                    </optgroup>
+                  </select>
                 </div>
+
+                {/* Script Preview/Editor */}
                 <div className="flex-1 p-4 overflow-y-auto scrollbar-hide bg-neutral-950">
-                    {selectedScriptType === 'phone' ? (
-                      <div className="space-y-2">
-                        <select
-                          value={selectedPhoneScript.id}
-                          onChange={(e) => {
-                            const script = PHONE_SCRIPTS.find(s => s.id === e.target.value);
-                            if (script) setSelectedPhoneScript(script);
-                          }}
-                          className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-red-500 mb-3"
-                        >
-                          {PHONE_SCRIPTS.map(script => (
-                            <option key={script.id} value={script.id}>{script.title}</option>
-                          ))}
-                        </select>
-                        <p className="text-neutral-400 text-xs whitespace-pre-wrap leading-relaxed font-mono">
-                          {selectedPhoneScript.content.substring(0, 300)}...
+                  {selectedScriptId === 'custom' ? (
+                    <textarea
+                      value={customScript}
+                      onChange={(e) => setCustomScript(e.target.value)}
+                      placeholder="Write or paste your custom script here..."
+                      className="w-full h-full bg-transparent text-neutral-300 placeholder-neutral-700 focus:outline-none resize-none text-xs font-mono leading-relaxed"
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Script Title */}
+                      <div className="flex items-center space-x-2 pb-2 border-b border-neutral-800">
+                        <FileText className="w-4 h-4 text-red-500" />
+                        <h3 className="text-sm font-bold text-white">{selectedScript.title}</h3>
+                      </div>
+
+                      {/* Category Badge */}
+                      <div className="inline-block px-2 py-1 bg-neutral-800 rounded text-xs text-neutral-400 uppercase tracking-wider">
+                        {selectedScript.category}
+                      </div>
+
+                      {/* Summary */}
+                      <p className="text-neutral-300 text-xs leading-relaxed">
+                        {selectedScript.summary}
+                      </p>
+
+                      {/* Full script hint */}
+                      <div className="pt-2 border-t border-neutral-800">
+                        <p className="text-neutral-500 text-xs italic flex items-center space-x-1">
+                          <Play className="w-3 h-3" />
+                          <span>Full script will be available during training session</span>
                         </p>
                       </div>
-                    ) : selectedScriptType === 'custom' ? (
-                      <textarea
-                        value={customScript}
-                        onChange={(e) => setCustomScript(e.target.value)}
-                        placeholder="Paste custom script..."
-                        className="w-full h-full bg-transparent text-neutral-300 placeholder-neutral-700 focus:outline-none resize-none text-xs font-mono leading-relaxed"
-                      />
-                    ) : (
-                      <p className="text-neutral-400 text-xs whitespace-pre-wrap leading-relaxed font-mono">
-                        {getActiveScript()}
-                      </p>
-                    )}
+                    </div>
+                  )}
                 </div>
              </div>
           </div>
