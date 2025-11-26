@@ -5,10 +5,12 @@ import PitchTrainer from './components/PitchTrainer';
 import SessionHistory from './components/SessionHistory';
 import TeamLeaderboard from './components/TeamLeaderboard';
 import ManagerDashboard from './components/ManagerDashboard';
+import AllUsersView from './components/AllUsersView';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
-import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon } from 'lucide-react';
+import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
+import { PHONE_SCRIPTS, PhoneScript } from './utils/phoneScripts';
 
 const INITIAL_PITCH = `Initial Pitch
 
@@ -94,8 +96,10 @@ const AppContent: React.FC = () => {
   const [showHistory, setShowHistory] = useState<boolean>(false);
   const [showLeaderboard, setShowLeaderboard] = useState<boolean>(false);
   const [showManagerDashboard, setShowManagerDashboard] = useState<boolean>(false);
+  const [showAllUsers, setShowAllUsers] = useState<boolean>(false);
   const [selectedMode, setSelectedMode] = useState<PitchMode>(PitchMode.COACH);
-  const [selectedScriptType, setSelectedScriptType] = useState<'initial' | 'post' | 'custom'>('initial');
+  const [selectedScriptType, setSelectedScriptType] = useState<'initial' | 'post' | 'phone' | 'custom'>('initial');
+  const [selectedPhoneScript, setSelectedPhoneScript] = useState<PhoneScript>(PHONE_SCRIPTS[0]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DifficultyLevel.PRO);
   const [customScript, setCustomScript] = useState<string>('');
 
@@ -120,6 +124,7 @@ const AppContent: React.FC = () => {
     switch (selectedScriptType) {
       case 'initial': return INITIAL_PITCH;
       case 'post': return POST_INSPECTION_PITCH;
+      case 'phone': return selectedPhoneScript.content;
       case 'custom': return customScript;
       default: return '';
     }
@@ -165,6 +170,10 @@ const AppContent: React.FC = () => {
     return <ManagerDashboard onBack={() => setShowManagerDashboard(false)} />;
   }
 
+  if (showAllUsers) {
+    return <AllUsersView onBack={() => setShowAllUsers(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-black text-neutral-100 flex flex-col items-center justify-center p-6 font-sans selection:bg-red-600/40 selection:text-white">
       {/* Skip to main content link - Accessibility */}
@@ -201,13 +210,22 @@ const AppContent: React.FC = () => {
               </button>
               {/* Manager Dashboard - Only for managers */}
               {user?.role === 'manager' && (
-                <button
-                  onClick={() => setShowManagerDashboard(true)}
-                  className="group flex items-center space-x-2 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-blue-500/50 rounded-full transition-all duration-300"
-                >
-                  <BarChart3 className="w-4 h-4 text-neutral-400 group-hover:text-blue-500" />
-                  <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">Manager</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => setShowManagerDashboard(true)}
+                    className="group flex items-center space-x-2 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-blue-500/50 rounded-full transition-all duration-300"
+                  >
+                    <BarChart3 className="w-4 h-4 text-neutral-400 group-hover:text-blue-500" />
+                    <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">Analytics</span>
+                  </button>
+                  <button
+                    onClick={() => setShowAllUsers(true)}
+                    className="group flex items-center space-x-2 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-green-500/50 rounded-full transition-all duration-300"
+                  >
+                    <Users className="w-4 h-4 text-neutral-400 group-hover:text-green-500" />
+                    <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">All Users</span>
+                  </button>
+                </>
               )}
               {/* User Profile & Logout */}
               <button
@@ -322,14 +340,35 @@ const AppContent: React.FC = () => {
           <div className="space-y-6">
              <h2 className="text-xs font-bold text-red-500 uppercase tracking-[0.2em] ml-1">03 // Script</h2>
              <div className="flex flex-col h-[260px] bg-neutral-900/30 border border-neutral-800 rounded-xl overflow-hidden">
-                <div className="grid grid-cols-3 border-b border-neutral-800 bg-black">
+                <div className="grid grid-cols-4 border-b border-neutral-800 bg-black">
                     <button onClick={() => setSelectedScriptType('initial')} className={`py-3 text-xs font-medium uppercase tracking-wider ${selectedScriptType === 'initial' ? 'bg-red-900/20 text-white border-b-2 border-red-600' : 'text-neutral-500 hover:text-white'}`}>Initial</button>
                     <button onClick={() => setSelectedScriptType('post')} className={`py-3 text-xs font-medium uppercase tracking-wider ${selectedScriptType === 'post' ? 'bg-red-900/20 text-white border-b-2 border-red-600' : 'text-neutral-500 hover:text-white'}`}>Post</button>
+                    <button onClick={() => setSelectedScriptType('phone')} className={`py-3 text-xs font-medium uppercase tracking-wider ${selectedScriptType === 'phone' ? 'bg-red-900/20 text-white border-b-2 border-red-600' : 'text-neutral-500 hover:text-white'}`}>
+                      <Phone className="w-3 h-3 inline mr-1" />Phone
+                    </button>
                     <button onClick={() => setSelectedScriptType('custom')} className={`py-3 text-xs font-medium uppercase tracking-wider ${selectedScriptType === 'custom' ? 'bg-red-900/20 text-white border-b-2 border-red-600' : 'text-neutral-500 hover:text-white'}`}>Custom</button>
                 </div>
                 <div className="flex-1 p-4 overflow-y-auto scrollbar-hide bg-neutral-950">
-                    {selectedScriptType === 'custom' ? (
-                      <textarea 
+                    {selectedScriptType === 'phone' ? (
+                      <div className="space-y-2">
+                        <select
+                          value={selectedPhoneScript.id}
+                          onChange={(e) => {
+                            const script = PHONE_SCRIPTS.find(s => s.id === e.target.value);
+                            if (script) setSelectedPhoneScript(script);
+                          }}
+                          className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-red-500 mb-3"
+                        >
+                          {PHONE_SCRIPTS.map(script => (
+                            <option key={script.id} value={script.id}>{script.title}</option>
+                          ))}
+                        </select>
+                        <p className="text-neutral-400 text-xs whitespace-pre-wrap leading-relaxed font-mono">
+                          {selectedPhoneScript.content.substring(0, 300)}...
+                        </p>
+                      </div>
+                    ) : selectedScriptType === 'custom' ? (
+                      <textarea
                         value={customScript}
                         onChange={(e) => setCustomScript(e.target.value)}
                         placeholder="Paste custom script..."

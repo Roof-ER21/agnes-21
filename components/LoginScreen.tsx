@@ -27,12 +27,17 @@ const LoginScreen: React.FC = () => {
   const [avatar, setAvatar] = useState(getRandomAvatar());
   const [showPin, setShowPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
+  const [accessCode, setAccessCode] = useState('');
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [locked, setLocked] = useState(false);
   const [lockTimeRemaining, setLockTimeRemaining] = useState(0);
+
+  // Manager access code
+  const MANAGER_ACCESS_CODE = '212124';
+  const isManagerUnlocked = accessCode === MANAGER_ACCESS_CODE;
 
   const nameInputRef = useRef<HTMLInputElement>(null);
   const pinInputRef = useRef<HTMLInputElement>(null);
@@ -135,6 +140,8 @@ const LoginScreen: React.FC = () => {
     setName('');
     setPin('');
     setConfirmPin('');
+    setAccessCode('');
+    setRole('trainee');
     setError('');
     setSuccess('');
   };
@@ -277,6 +284,38 @@ const LoginScreen: React.FC = () => {
               />
             </div>
 
+            {/* Access Code (register only) */}
+            {mode === 'register' && (
+              <div>
+                <label htmlFor="accessCode" className="block text-sm font-medium text-neutral-300 mb-2">
+                  Access Code
+                </label>
+                <input
+                  id="accessCode"
+                  type="text"
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  disabled={loading}
+                  placeholder="Enter 6-digit access code"
+                  inputMode="numeric"
+                  pattern="\d*"
+                  maxLength={6}
+                  className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed font-mono text-lg tracking-widest"
+                />
+                {isManagerUnlocked && (
+                  <p className="mt-2 text-xs text-green-400 flex items-center">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Manager access unlocked
+                  </p>
+                )}
+                {accessCode.length === 6 && !isManagerUnlocked && (
+                  <p className="mt-2 text-xs text-neutral-400">
+                    Regular access - Rep role only
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Role selection (register only) */}
             {mode === 'register' && (
               <div>
@@ -295,22 +334,31 @@ const LoginScreen: React.FC = () => {
                     } disabled:opacity-50`}
                   >
                     <div className="text-2xl mb-2">🎯</div>
-                    <div className="text-sm font-medium text-white">Trainee</div>
+                    <div className="text-sm font-medium text-white">Sales Rep</div>
                     <div className="text-xs text-neutral-400 mt-1">Practice pitches</div>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRole('manager')}
-                    disabled={loading}
-                    className={`p-4 rounded-lg border-2 transition-all ${
+                    disabled={loading || !isManagerUnlocked}
+                    className={`p-4 rounded-lg border-2 transition-all relative ${
                       role === 'manager'
                         ? 'border-red-500 bg-red-500/10'
-                        : 'border-neutral-700 bg-neutral-800 hover:border-neutral-600'
+                        : isManagerUnlocked
+                        ? 'border-neutral-700 bg-neutral-800 hover:border-neutral-600'
+                        : 'border-neutral-800 bg-neutral-900/50 cursor-not-allowed'
                     } disabled:opacity-50`}
                   >
+                    {!isManagerUnlocked && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-neutral-900/80 rounded-lg">
+                        <Lock className="w-6 h-6 text-neutral-600" />
+                      </div>
+                    )}
                     <div className="text-2xl mb-2">👔</div>
                     <div className="text-sm font-medium text-white">Manager</div>
-                    <div className="text-xs text-neutral-400 mt-1">View analytics</div>
+                    <div className="text-xs text-neutral-400 mt-1">
+                      {isManagerUnlocked ? 'View all analytics' : 'Enter access code'}
+                    </div>
                   </button>
                 </div>
               </div>
