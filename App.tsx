@@ -8,7 +8,7 @@ import ManagerDashboard from './components/ManagerDashboard';
 import AllUsersView from './components/AllUsersView';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
-import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone } from 'lucide-react';
+import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
 import { PHONE_SCRIPTS, PhoneScript } from './utils/phoneScripts';
 
@@ -319,8 +319,23 @@ const AppContent: React.FC = () => {
            <div className="space-y-6">
             <h2 className="text-xs font-bold text-red-500 uppercase tracking-[0.2em] ml-1">02 // Difficulty</h2>
             <div className="grid gap-3">
+              {/* Beginner */}
+              <button
+                onClick={() => setSelectedDifficulty(DifficultyLevel.BEGINNER)}
+                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.BEGINNER ? 'border-l-cyan-500 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
+              >
+                 <div>
+                   <div className="flex items-center space-x-2">
+                      <Sparkles className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.BEGINNER ? 'text-cyan-500' : 'text-neutral-500'}`} />
+                      <h3 className="font-bold text-sm text-white">BEGINNER</h3>
+                   </div>
+                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Learning • No Pressure • Guided</p>
+                 </div>
+                 {selectedDifficulty === DifficultyLevel.BEGINNER && <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>}
+              </button>
+
               {/* Rookie */}
-              <button 
+              <button
                 onClick={() => setSelectedDifficulty(DifficultyLevel.ROOKIE)}
                 className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.ROOKIE ? 'border-l-green-500 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
               >
@@ -350,7 +365,7 @@ const AppContent: React.FC = () => {
               </button>
 
               {/* Elite */}
-              <button 
+              <button
                 onClick={() => setSelectedDifficulty(DifficultyLevel.ELITE)}
                 className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.ELITE ? 'border-l-red-600 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
               >
@@ -362,6 +377,21 @@ const AppContent: React.FC = () => {
                    <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Skeptical • Rude • Hostile</p>
                  </div>
                  {selectedDifficulty === DifficultyLevel.ELITE && <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></div>}
+              </button>
+
+              {/* Nightmare */}
+              <button
+                onClick={() => setSelectedDifficulty(DifficultyLevel.NIGHTMARE)}
+                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.NIGHTMARE ? 'border-l-orange-600 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
+              >
+                 <div>
+                   <div className="flex items-center space-x-2">
+                      <AlertTriangle className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.NIGHTMARE ? 'text-orange-600' : 'text-neutral-500'}`} />
+                      <h3 className="font-bold text-sm text-white">NIGHTMARE</h3>
+                   </div>
+                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Hostile • Threatening • Expert Challenge</p>
+                 </div>
+                 {selectedDifficulty === DifficultyLevel.NIGHTMARE && <div className="w-2 h-2 rounded-full bg-orange-600 animate-pulse"></div>}
               </button>
             </div>
           </div>

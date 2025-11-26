@@ -4,9 +4,11 @@ export enum PitchMode {
 }
 
 export enum DifficultyLevel {
+  BEGINNER = 'BEGINNER',
   ROOKIE = 'ROOKIE',
   PRO = 'PRO',
-  ELITE = 'ELITE'
+  ELITE = 'ELITE',
+  NIGHTMARE = 'NIGHTMARE'
 }
 
 export interface SessionConfig {
