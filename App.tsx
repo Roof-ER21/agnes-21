@@ -8,9 +8,10 @@ import ManagerDashboard from './components/ManagerDashboard';
 import AllUsersView from './components/AllUsersView';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
-import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle } from 'lucide-react';
+import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
 import { PHONE_SCRIPTS, PhoneScript } from './utils/phoneScripts';
+import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty } from './utils/gamification';
 
 const INITIAL_PITCH = `Initial Pitch
 
@@ -99,8 +100,12 @@ const AppContent: React.FC = () => {
   const [showAllUsers, setShowAllUsers] = useState<boolean>(false);
   const [selectedMode, setSelectedMode] = useState<PitchMode>(PitchMode.COACH);
   const [selectedScriptId, setSelectedScriptId] = useState<string>('initial');
-  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DifficultyLevel.PRO);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DifficultyLevel.BEGINNER);
   const [customScript, setCustomScript] = useState<string>('');
+
+  // Get user progress for difficulty unlocking
+  const userProgress = getUserProgress(user?.id);
+  const currentLevel = userProgress.currentLevel;
 
   // All available scripts with summaries
   const allScripts = [
@@ -336,62 +341,138 @@ const AppContent: React.FC = () => {
 
               {/* Rookie */}
               <button
-                onClick={() => setSelectedDifficulty(DifficultyLevel.ROOKIE)}
-                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.ROOKIE ? 'border-l-green-500 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
+                onClick={() => {
+                  if (isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel)) {
+                    setSelectedDifficulty(DifficultyLevel.ROOKIE);
+                  }
+                }}
+                disabled={!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel)}
+                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${
+                  !isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel)
+                    ? 'border-l-neutral-800 bg-neutral-950 border-y border-r border-neutral-900 opacity-50 cursor-not-allowed'
+                    : selectedDifficulty === DifficultyLevel.ROOKIE
+                    ? 'border-l-green-500 bg-neutral-900 border-y border-r border-neutral-800'
+                    : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'
+                }`}
+                title={!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) ? `Unlock at Level ${getLevelRequiredForDifficulty(DifficultyLevel.ROOKIE)}` : ''}
               >
                  <div>
                    <div className="flex items-center space-x-2">
-                      <Shield className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.ROOKIE ? 'text-green-500' : 'text-neutral-500'}`} />
-                      <h3 className="font-bold text-sm text-white">ROOKIE</h3>
+                      {!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) ? (
+                        <Lock className="w-4 h-4 text-neutral-600" />
+                      ) : (
+                        <Shield className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.ROOKIE ? 'text-green-500' : 'text-neutral-500'}`} />
+                      )}
+                      <h3 className={`font-bold text-sm ${!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) ? 'text-neutral-600' : 'text-white'}`}>ROOKIE</h3>
+                      {!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) && (
+                        <span className="text-[9px] text-neutral-600 uppercase tracking-wider">Lvl {getLevelRequiredForDifficulty(DifficultyLevel.ROOKIE)}</span>
+                      )}
                    </div>
-                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Friendly • Patient • Helpful</p>
+                   <p className={`text-[10px] mt-1 uppercase tracking-wider ${!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) ? 'text-neutral-600' : 'text-neutral-400'}`}>Friendly • Patient • Helpful</p>
                  </div>
-                 {selectedDifficulty === DifficultyLevel.ROOKIE && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>}
+                 {selectedDifficulty === DifficultyLevel.ROOKIE && isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>}
               </button>
 
               {/* Pro */}
-              <button 
-                onClick={() => setSelectedDifficulty(DifficultyLevel.PRO)}
-                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.PRO ? 'border-l-yellow-500 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
+              <button
+                onClick={() => {
+                  if (isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel)) {
+                    setSelectedDifficulty(DifficultyLevel.PRO);
+                  }
+                }}
+                disabled={!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel)}
+                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${
+                  !isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel)
+                    ? 'border-l-neutral-800 bg-neutral-950 border-y border-r border-neutral-900 opacity-50 cursor-not-allowed'
+                    : selectedDifficulty === DifficultyLevel.PRO
+                    ? 'border-l-yellow-500 bg-neutral-900 border-y border-r border-neutral-800'
+                    : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'
+                }`}
+                title={!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) ? `Unlock at Level ${getLevelRequiredForDifficulty(DifficultyLevel.PRO)}` : ''}
               >
                  <div>
                    <div className="flex items-center space-x-2">
-                      <Zap className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.PRO ? 'text-yellow-500' : 'text-neutral-500'}`} />
-                      <h3 className="font-bold text-sm text-white">PRO</h3>
+                      {!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) ? (
+                        <Lock className="w-4 h-4 text-neutral-600" />
+                      ) : (
+                        <Zap className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.PRO ? 'text-yellow-500' : 'text-neutral-500'}`} />
+                      )}
+                      <h3 className={`font-bold text-sm ${!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) ? 'text-neutral-600' : 'text-white'}`}>PRO</h3>
+                      {!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) && (
+                        <span className="text-[9px] text-neutral-600 uppercase tracking-wider">Lvl {getLevelRequiredForDifficulty(DifficultyLevel.PRO)}</span>
+                      )}
                    </div>
-                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Busy • Realistic • Standard</p>
+                   <p className={`text-[10px] mt-1 uppercase tracking-wider ${!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) ? 'text-neutral-600' : 'text-neutral-400'}`}>Busy • Realistic • Standard</p>
                  </div>
-                 {selectedDifficulty === DifficultyLevel.PRO && <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>}
+                 {selectedDifficulty === DifficultyLevel.PRO && isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) && <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>}
               </button>
 
               {/* Elite */}
               <button
-                onClick={() => setSelectedDifficulty(DifficultyLevel.ELITE)}
-                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.ELITE ? 'border-l-red-600 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
+                onClick={() => {
+                  if (isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel)) {
+                    setSelectedDifficulty(DifficultyLevel.ELITE);
+                  }
+                }}
+                disabled={!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel)}
+                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${
+                  !isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel)
+                    ? 'border-l-neutral-800 bg-neutral-950 border-y border-r border-neutral-900 opacity-50 cursor-not-allowed'
+                    : selectedDifficulty === DifficultyLevel.ELITE
+                    ? 'border-l-red-600 bg-neutral-900 border-y border-r border-neutral-800'
+                    : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'
+                }`}
+                title={!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) ? `Unlock at Level ${getLevelRequiredForDifficulty(DifficultyLevel.ELITE)}` : ''}
               >
                  <div>
                    <div className="flex items-center space-x-2">
-                      <Skull className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.ELITE ? 'text-red-600' : 'text-neutral-500'}`} />
-                      <h3 className="font-bold text-sm text-white">ELITE</h3>
+                      {!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) ? (
+                        <Lock className="w-4 h-4 text-neutral-600" />
+                      ) : (
+                        <Skull className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.ELITE ? 'text-red-600' : 'text-neutral-500'}`} />
+                      )}
+                      <h3 className={`font-bold text-sm ${!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) ? 'text-neutral-600' : 'text-white'}`}>ELITE</h3>
+                      {!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) && (
+                        <span className="text-[9px] text-neutral-600 uppercase tracking-wider">Lvl {getLevelRequiredForDifficulty(DifficultyLevel.ELITE)}</span>
+                      )}
                    </div>
-                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Skeptical • Rude • Hostile</p>
+                   <p className={`text-[10px] mt-1 uppercase tracking-wider ${!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) ? 'text-neutral-600' : 'text-neutral-400'}`}>Skeptical • Rude • Hostile</p>
                  </div>
-                 {selectedDifficulty === DifficultyLevel.ELITE && <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></div>}
+                 {selectedDifficulty === DifficultyLevel.ELITE && isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) && <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></div>}
               </button>
 
               {/* Nightmare */}
               <button
-                onClick={() => setSelectedDifficulty(DifficultyLevel.NIGHTMARE)}
-                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.NIGHTMARE ? 'border-l-orange-600 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
+                onClick={() => {
+                  if (isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel)) {
+                    setSelectedDifficulty(DifficultyLevel.NIGHTMARE);
+                  }
+                }}
+                disabled={!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel)}
+                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${
+                  !isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel)
+                    ? 'border-l-neutral-800 bg-neutral-950 border-y border-r border-neutral-900 opacity-50 cursor-not-allowed'
+                    : selectedDifficulty === DifficultyLevel.NIGHTMARE
+                    ? 'border-l-orange-600 bg-neutral-900 border-y border-r border-neutral-800'
+                    : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'
+                }`}
+                title={!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) ? `Unlock at Level ${getLevelRequiredForDifficulty(DifficultyLevel.NIGHTMARE)}` : ''}
               >
                  <div>
                    <div className="flex items-center space-x-2">
-                      <AlertTriangle className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.NIGHTMARE ? 'text-orange-600' : 'text-neutral-500'}`} />
-                      <h3 className="font-bold text-sm text-white">NIGHTMARE</h3>
+                      {!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) ? (
+                        <Lock className="w-4 h-4 text-neutral-600" />
+                      ) : (
+                        <AlertTriangle className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.NIGHTMARE ? 'text-orange-600' : 'text-neutral-500'}`} />
+                      )}
+                      <h3 className={`font-bold text-sm ${!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) ? 'text-neutral-600' : 'text-white'}`}>NIGHTMARE</h3>
+                      {!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) && (
+                        <span className="text-[9px] text-neutral-600 uppercase tracking-wider">Lvl {getLevelRequiredForDifficulty(DifficultyLevel.NIGHTMARE)}</span>
+                      )}
                    </div>
-                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Hostile • Threatening • Expert Challenge</p>
+                   <p className={`text-[10px] mt-1 uppercase tracking-wider ${!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) ? 'text-neutral-600' : 'text-neutral-400'}`}>Hostile • Threatening • Expert Challenge</p>
                  </div>
-                 {selectedDifficulty === DifficultyLevel.NIGHTMARE && <div className="w-2 h-2 rounded-full bg-orange-600 animate-pulse"></div>}
+                 {selectedDifficulty === DifficultyLevel.NIGHTMARE && isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) && <div className="w-2 h-2 rounded-full bg-orange-600 animate-pulse"></div>}
               </button>
             </div>
           </div>

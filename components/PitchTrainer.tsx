@@ -8,6 +8,8 @@ import AgnesAvatar from './AgnesAvatar';
 import MicLevelMeter from './MicLevelMeter';
 import AgnesStateIndicator, { AgnesState } from './AgnesStateIndicator';
 import StreakCounter from './StreakCounter';
+import Confetti from './Confetti';
+import SparklesComponent from './Sparkles';
 import { SessionConfig, PitchMode, DifficultyLevel } from '../types';
 import {
   saveSession,
@@ -24,8 +26,13 @@ import {
   getSupportedMimeType,
   generateThumbnail
 } from '../utils/videoStorage';
+import { playSuccess, playPerfect, playLevelUp, toggleSounds, areSoundsEnabled } from '../utils/soundEffects';
 import { useAuth } from '../contexts/AuthContext';
-import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle, Sparkles, AlertTriangle } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle, Sparkles, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
+import XPBar from './XPBar';
+import LevelUpModal from './LevelUpModal';
+import { calculateSessionXP, awardXP, getUserProgress } from '../utils/gamification';
+import { getStreak } from '../utils/sessionStorage';
 
 interface PitchTrainerProps {
   config: SessionConfig;
@@ -80,6 +87,19 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession }) => 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [videoSaved, setVideoSaved] = useState(false);
   const [newAchievements, setNewAchievements] = useState<string[]>([]);
+
+  // NEW: Celebration states
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [showSparkles, setShowSparkles] = useState(false);
+  const [soundsOn, setSoundsOn] = useState(areSoundsEnabled());
+
+  // NEW: Level-up modal state
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+  const [levelUpData, setLevelUpData] = useState<{
+    previous: number;
+    new: number;
+    unlocks: string[];
+  }>({ previous: 1, new: 1, unlocks: [] });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -537,6 +557,19 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession }) => 
       console.log('💔 Streak was broken, but starting fresh!');
     }
 
+    // Calculate and award XP
+    const streakData = getStreak(user?.id);
+    const xpEarned = calculateSessionXP(sessionData, streakData);
+    const xpResult = awardXP(xpEarned, user?.id);
+
+    console.log('🎯 XP System:', {
+      xpEarned,
+      totalXP: xpResult.totalXP,
+      previousLevel: xpResult.previousLevel,
+      newLevel: xpResult.newLevel,
+      leveledUp: xpResult.leveledUp
+    });
+
     // Check for new achievements
     const newAchievementsUnlocked = checkAchievements(user?.id);
     const achievementNames: string[] = [];
@@ -553,6 +586,28 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession }) => 
 
     // Trigger StreakCounter reload
     setStreakKey(prev => prev + 1);
+
+    // Handle level-up
+    if (xpResult.leveledUp) {
+      setLevelUpData({
+        previous: xpResult.previousLevel,
+        new: xpResult.newLevel,
+        unlocks: xpResult.newUnlocks
+      });
+      setShowLevelUpModal(true);
+      playLevelUp();
+    }
+
+    // Trigger celebrations based on score
+    if (currentScore !== null && currentScore !== undefined) {
+      if (currentScore >= 100) {
+        setShowConfetti(true);
+        playPerfect();
+      } else if (currentScore >= 85) {
+        setShowSparkles(true);
+        playSuccess();
+      }
+    }
 
     // Show success modal
     setShowSuccessModal(true);
@@ -760,6 +815,28 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession }) => 
            <div className="hidden md:block">
              <StreakCounter key={streakKey} showCalendar={true} />
            </div>
+
+           {/* XP Bar */}
+           <div className="hidden md:block">
+             <XPBar userId={user?.id} compact={true} />
+           </div>
+
+           {/* Sound Toggle */}
+           <button
+             onClick={() => {
+               const newState = toggleSounds();
+               setSoundsOn(newState);
+             }}
+             className="p-2 rounded-full bg-neutral-900/50 border border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700 transition-all duration-300"
+             title={soundsOn ? 'Mute celebration sounds' : 'Enable celebration sounds'}
+             aria-label={soundsOn ? 'Mute celebration sounds' : 'Enable celebration sounds'}
+           >
+             {soundsOn ? (
+               <Volume2 className="w-5 h-5 text-yellow-500" />
+             ) : (
+               <VolumeX className="w-5 h-5 text-neutral-500" />
+             )}
+           </button>
 
            <button
              onClick={handleEndSession}
@@ -1148,6 +1225,26 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession }) => 
           </div>
         </div>
       )}
+
+      {/* Level Up Modal */}
+      <LevelUpModal
+        show={showLevelUpModal}
+        previousLevel={levelUpData.previous}
+        newLevel={levelUpData.new}
+        unlocksAtThisLevel={levelUpData.unlocks}
+        onClose={() => setShowLevelUpModal(false)}
+        userId={user?.id}
+      />
+
+      {/* Celebration Animations */}
+      <Confetti
+        show={showConfetti}
+        onComplete={() => setShowConfetti(false)}
+      />
+      <SparklesComponent
+        show={showSparkles}
+        intensity={currentScore && currentScore >= 95 ? 'high' : 'medium'}
+      />
     </div>
   );
 };
