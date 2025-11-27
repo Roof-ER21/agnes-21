@@ -212,9 +212,11 @@ export const getSessionStats = (userId?: string): {
     : 0;
 
   const sessionsPerDifficulty = {
+    [DifficultyLevel.BEGINNER]: sessions.filter(s => s.difficulty === DifficultyLevel.BEGINNER).length,
     [DifficultyLevel.ROOKIE]: sessions.filter(s => s.difficulty === DifficultyLevel.ROOKIE).length,
     [DifficultyLevel.PRO]: sessions.filter(s => s.difficulty === DifficultyLevel.PRO).length,
     [DifficultyLevel.ELITE]: sessions.filter(s => s.difficulty === DifficultyLevel.ELITE).length,
+    [DifficultyLevel.NIGHTMARE]: sessions.filter(s => s.difficulty === DifficultyLevel.NIGHTMARE).length,
   };
 
   return {
@@ -616,6 +618,14 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
 
   // Difficulty Achievements
   {
+    id: 'beginner_complete',
+    name: 'Learning the Ropes',
+    description: 'Complete 5 Beginner sessions',
+    icon: '🌱',
+    rarity: 'common',
+    condition: (stats) => stats.sessionsPerDifficulty?.BEGINNER >= 5
+  },
+  {
     id: 'rookie_graduate',
     name: 'Rookie Graduate',
     description: 'Complete 10 Rookie sessions',
@@ -638,6 +648,14 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     icon: '💎',
     rarity: 'epic',
     condition: (stats) => stats.sessionsPerDifficulty?.ELITE >= 10
+  },
+  {
+    id: 'nightmare_survivor',
+    name: 'Nightmare Survivor',
+    description: 'Complete 5 Nightmare sessions',
+    icon: '🔥',
+    rarity: 'legendary',
+    condition: (stats) => stats.sessionsPerDifficulty?.NIGHTMARE >= 5
   },
 
   // Improvement Achievements
@@ -861,9 +879,11 @@ export const getManagerAnalytics = (startDate?: Date, endDate?: Date, userId?: s
 
     // Sessions by difficulty
     const sessionsByDifficulty = {
+      [DifficultyLevel.BEGINNER]: sessions.filter(s => s.difficulty === DifficultyLevel.BEGINNER).length,
       [DifficultyLevel.ROOKIE]: sessions.filter(s => s.difficulty === DifficultyLevel.ROOKIE).length,
       [DifficultyLevel.PRO]: sessions.filter(s => s.difficulty === DifficultyLevel.PRO).length,
       [DifficultyLevel.ELITE]: sessions.filter(s => s.difficulty === DifficultyLevel.ELITE).length,
+      [DifficultyLevel.NIGHTMARE]: sessions.filter(s => s.difficulty === DifficultyLevel.NIGHTMARE).length,
     };
 
     // Sessions by mode
@@ -893,6 +913,11 @@ export const getManagerAnalytics = (startDate?: Date, endDate?: Date, userId?: s
 
     // Completion rate by difficulty
     const completionRateByDifficulty = {
+      [DifficultyLevel.BEGINNER]: {
+        completed: sessionsByDifficulty[DifficultyLevel.BEGINNER],
+        total: sessionsByDifficulty[DifficultyLevel.BEGINNER],
+        rate: 100
+      },
       [DifficultyLevel.ROOKIE]: {
         completed: sessionsByDifficulty[DifficultyLevel.ROOKIE],
         total: sessionsByDifficulty[DifficultyLevel.ROOKIE],
@@ -906,6 +931,11 @@ export const getManagerAnalytics = (startDate?: Date, endDate?: Date, userId?: s
       [DifficultyLevel.ELITE]: {
         completed: sessionsByDifficulty[DifficultyLevel.ELITE],
         total: sessionsByDifficulty[DifficultyLevel.ELITE],
+        rate: 100
+      },
+      [DifficultyLevel.NIGHTMARE]: {
+        completed: sessionsByDifficulty[DifficultyLevel.NIGHTMARE],
+        total: sessionsByDifficulty[DifficultyLevel.NIGHTMARE],
         rate: 100
       }
     };
@@ -941,9 +971,11 @@ export const getManagerAnalytics = (startDate?: Date, endDate?: Date, userId?: s
       totalTrainingHours: 0,
       activeUsers: 0,
       sessionsByDifficulty: {
+        [DifficultyLevel.BEGINNER]: 0,
         [DifficultyLevel.ROOKIE]: 0,
         [DifficultyLevel.PRO]: 0,
-        [DifficultyLevel.ELITE]: 0
+        [DifficultyLevel.ELITE]: 0,
+        [DifficultyLevel.NIGHTMARE]: 0
       },
       sessionsByMode: {
         [PitchMode.COACH]: 0,
@@ -955,9 +987,11 @@ export const getManagerAnalytics = (startDate?: Date, endDate?: Date, userId?: s
       mostImproved: [],
       mostActive: [],
       completionRateByDifficulty: {
+        [DifficultyLevel.BEGINNER]: { completed: 0, total: 0, rate: 0 },
         [DifficultyLevel.ROOKIE]: { completed: 0, total: 0, rate: 0 },
         [DifficultyLevel.PRO]: { completed: 0, total: 0, rate: 0 },
-        [DifficultyLevel.ELITE]: { completed: 0, total: 0, rate: 0 }
+        [DifficultyLevel.ELITE]: { completed: 0, total: 0, rate: 0 },
+        [DifficultyLevel.NIGHTMARE]: { completed: 0, total: 0, rate: 0 }
       },
       peakTrainingHours: [],
       peakTrainingDays: []

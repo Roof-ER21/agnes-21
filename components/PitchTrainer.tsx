@@ -25,7 +25,7 @@ import {
   generateThumbnail
 } from '../utils/videoStorage';
 import { useAuth } from '../contexts/AuthContext';
-import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle, Sparkles, AlertTriangle } from 'lucide-react';
 
 interface PitchTrainerProps {
   config: SessionConfig;
@@ -108,9 +108,11 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession }) => 
 
   const getDifficultyColor = () => {
     switch (config.difficulty) {
+      case DifficultyLevel.BEGINNER: return 'text-cyan-500';
       case DifficultyLevel.ROOKIE: return 'text-green-500';
       case DifficultyLevel.PRO: return 'text-yellow-500';
       case DifficultyLevel.ELITE: return 'text-red-600';
+      case DifficultyLevel.NIGHTMARE: return 'text-orange-600';
       default: return 'text-white';
     }
   };
@@ -744,9 +746,11 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession }) => 
         <div className="flex items-center space-x-4">
            {/* Gamification Badge */}
            <div className="hidden md:flex items-center space-x-2 px-3 py-1 rounded bg-neutral-900/80 border border-neutral-800 backdrop-blur">
+              {config.difficulty === DifficultyLevel.BEGINNER && <Sparkles className="w-4 h-4 text-cyan-500" />}
               {config.difficulty === DifficultyLevel.ROOKIE && <Shield className="w-4 h-4 text-green-500" />}
               {config.difficulty === DifficultyLevel.PRO && <Zap className="w-4 h-4 text-yellow-500" />}
               {config.difficulty === DifficultyLevel.ELITE && <Skull className="w-4 h-4 text-red-600" />}
+              {config.difficulty === DifficultyLevel.NIGHTMARE && <AlertTriangle className="w-4 h-4 text-orange-600" />}
               <span className={`font-mono text-xs font-bold ${getDifficultyColor()}`}>
                 LVL: {config.difficulty}
               </span>
