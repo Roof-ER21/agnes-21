@@ -11,7 +11,7 @@ import { SessionConfig, PitchMode, DifficultyLevel } from './types';
 import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
 import { PHONE_SCRIPTS, PhoneScript } from './utils/phoneScripts';
-import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty } from './utils/gamification';
+import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty, isManagerMode, activateManagerMode, deactivateManagerMode } from './utils/gamification';
 
 const INITIAL_PITCH = `Initial Pitch
 
@@ -102,6 +102,23 @@ const AppContent: React.FC = () => {
   const [selectedScriptId, setSelectedScriptId] = useState<string>('initial');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DifficultyLevel.BEGINNER);
   const [customScript, setCustomScript] = useState<string>('');
+  const [managerModeActive, setManagerModeActive] = useState<boolean>(isManagerMode());
+
+  // Handle manager mode toggle
+  const handleManagerLogin = () => {
+    const code = prompt('Enter manager access code:');
+    if (code && activateManagerMode(code)) {
+      setManagerModeActive(true);
+      alert('Manager mode activated! All difficulty levels are now unlocked.');
+    } else if (code) {
+      alert('Invalid access code.');
+    }
+  };
+
+  const handleManagerLogout = () => {
+    deactivateManagerMode();
+    setManagerModeActive(false);
+  };
 
   // Get user progress for difficulty unlocking
   const userProgress = getUserProgress(user?.id);
@@ -261,6 +278,27 @@ const AppContent: React.FC = () => {
                     <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">All Users</span>
                   </button>
                 </>
+              )}
+              {/* Manager Mode Toggle */}
+              {managerModeActive ? (
+                <button
+                  onClick={handleManagerLogout}
+                  className="group flex items-center space-x-2 px-4 py-2 bg-green-900/50 hover:bg-green-800/50 border border-green-500/50 rounded-full transition-all duration-300"
+                  title="Exit Manager Mode"
+                >
+                  <Shield className="w-4 h-4 text-green-400" />
+                  <span className="text-xs font-mono uppercase tracking-wider text-green-400">Manager Mode</span>
+                  <span className="text-xs text-green-300">Exit</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleManagerLogin}
+                  className="group flex items-center space-x-2 px-3 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-neutral-500 rounded-full transition-all duration-300"
+                  title="Manager Login"
+                >
+                  <Lock className="w-3 h-3 text-neutral-500 group-hover:text-neutral-300" />
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 group-hover:text-neutral-300">Manager</span>
+                </button>
               )}
               {/* User Profile & Logout */}
               <button

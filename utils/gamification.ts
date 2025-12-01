@@ -2,6 +2,38 @@ import { DifficultyLevel } from '../types';
 import { SessionData, StreakData } from './sessionStorage';
 
 // =====================================================
+// MANAGER MODE SYSTEM
+// =====================================================
+
+const MANAGER_CODE = 'roofer2024';
+const MANAGER_MODE_KEY = 'agnes_manager_mode';
+
+/**
+ * Check if manager mode is active
+ */
+export const isManagerMode = (): boolean => {
+  return localStorage.getItem(MANAGER_MODE_KEY) === 'true';
+};
+
+/**
+ * Activate manager mode with access code
+ */
+export const activateManagerMode = (code: string): boolean => {
+  if (code === MANAGER_CODE) {
+    localStorage.setItem(MANAGER_MODE_KEY, 'true');
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Deactivate manager mode
+ */
+export const deactivateManagerMode = (): void => {
+  localStorage.removeItem(MANAGER_MODE_KEY);
+};
+
+// =====================================================
 // XP AND LEVELS SYSTEM
 // =====================================================
 
@@ -80,8 +112,13 @@ export const getUnlockedDifficulties = (level: number): DifficultyLevel[] => {
 
 /**
  * Checks if a difficulty is unlocked at the current level
+ * Manager mode bypasses all locks
  */
 export const isDifficultyUnlocked = (difficulty: DifficultyLevel, level: number): boolean => {
+  // Managers have access to all difficulties
+  if (isManagerMode()) {
+    return true;
+  }
   return getUnlockedDifficulties(level).includes(difficulty);
 };
 
