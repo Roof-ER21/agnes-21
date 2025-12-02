@@ -55,12 +55,21 @@
 html {
   scroll-behavior: smooth;
   -webkit-tap-highlight-color: transparent;
+  height: 100%;
 }
 
-/* Prevent overscroll bounce on iOS */
+/* Prevent overscroll bounce on iOS and enable scrolling */
 body {
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
+  min-height: 100%;
+  overflow-y: auto;
+}
+
+/* Root element scrolling */
+#root {
+  min-height: 100vh;
+  overflow-y: auto;
 }
 
 /* PWA Install Prompt Animation */

@@ -97,7 +97,7 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
   // Detail view for selected user
   if (selectedUser) {
     return (
-      <div className="min-h-screen bg-black text-white p-8">
+      <div className="min-h-screen overflow-y-auto bg-black text-white p-8">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
@@ -249,7 +249,7 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
 
   // Main users list view
   return (
-    <div className="min-h-screen bg-black text-white p-8">
+    <div className="min-h-screen overflow-y-auto bg-black text-white p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

@@ -227,7 +227,7 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-neutral-100 flex flex-col items-center justify-center p-6 font-sans selection:bg-red-600/40 selection:text-white">
+    <div className="min-h-screen bg-black text-neutral-100 overflow-y-auto font-sans selection:bg-red-600/40 selection:text-white">
       {/* Skip to main content link - Accessibility */}
       <a
         href="#main-content"
@@ -236,7 +236,7 @@ const AppContent: React.FC = () => {
         Skip to main content
       </a>
 
-      <div id="main-content" className="max-w-6xl w-full space-y-12 my-10">
+      <div id="main-content" className="max-w-6xl w-full mx-auto space-y-12 py-10 px-6">
         {/* Header */}
         <div className="text-center space-y-6">
           <div className="flex items-center justify-between mb-4">
