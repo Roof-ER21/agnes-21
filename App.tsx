@@ -7,11 +7,13 @@ import TeamLeaderboard from './components/TeamLeaderboard';
 import ManagerDashboard from './components/ManagerDashboard';
 import AllUsersView from './components/AllUsersView';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import MiniModules, { MiniModule, MINI_MODULES } from './components/MiniModules';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
 import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
 import { PHONE_SCRIPTS, PhoneScript } from './utils/phoneScripts';
 import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty, isManagerMode, activateManagerMode, deactivateManagerMode } from './utils/gamification';
+import { getMiniModulePrompt } from './utils/miniModulePrompts';
 
 const INITIAL_PITCH = `Initial Pitch
 
@@ -103,6 +105,33 @@ const AppContent: React.FC = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DifficultyLevel.BEGINNER);
   const [customScript, setCustomScript] = useState<string>('');
   const [managerModeActive, setManagerModeActive] = useState<boolean>(isManagerMode());
+  const [completedMiniModulesToday, setCompletedMiniModulesToday] = useState<string[]>(() => {
+    // Load completed mini-modules from today
+    const today = new Date().toDateString();
+    const stored = localStorage.getItem(`agnes_mini_modules_${today}`);
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  // Handle mini-module selection
+  const handleMiniModuleSelect = (module: MiniModule) => {
+    // Start a mini-module session
+    const miniModulePrompt = getMiniModulePrompt(module.id, selectedDifficulty);
+    setSessionConfig({
+      mode: PitchMode.ROLEPLAY, // Mini-modules are roleplay style
+      script: miniModulePrompt,
+      difficulty: selectedDifficulty,
+      isMiniModule: true,
+      miniModuleId: module.id
+    });
+  };
+
+  // Mark mini-module as completed (called from PitchTrainer on session end)
+  const markMiniModuleComplete = (moduleId: string) => {
+    const today = new Date().toDateString();
+    const updated = [...completedMiniModulesToday, moduleId];
+    setCompletedMiniModulesToday(updated);
+    localStorage.setItem(`agnes_mini_modules_${today}`, JSON.stringify(updated));
+  };
 
   // Handle manager mode toggle
   const handleManagerLogin = () => {
@@ -195,7 +224,13 @@ const AppContent: React.FC = () => {
   };
 
   if (sessionConfig) {
-    return <PitchTrainer config={sessionConfig} onEndSession={resetSession} />;
+    return (
+      <PitchTrainer
+        config={sessionConfig}
+        onEndSession={resetSession}
+        onMiniModuleComplete={sessionConfig.isMiniModule ? markMiniModuleComplete : undefined}
+      />
+    );
   }
 
   if (showHistory) {
@@ -582,9 +617,24 @@ const AppContent: React.FC = () => {
           </div>
         </div>
 
+        {/* Quick Practice - Mini Modules */}
+        <div className="mt-8 px-4">
+          <MiniModules
+            onSelectModule={handleMiniModuleSelect}
+            completedToday={completedMiniModulesToday}
+          />
+        </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-4 pt-8 px-4">
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-neutral-700 to-transparent"></div>
+          <span className="text-neutral-600 text-xs uppercase tracking-widest">Or Full Session</span>
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-neutral-700 to-transparent"></div>
+        </div>
+
         {/* Start Button */}
         <div className="flex flex-col items-center pt-6">
-          <button 
+          <button
             onClick={startSession}
             className="group relative inline-flex items-center justify-center px-20 py-6 text-lg font-bold text-white transition-all duration-300 bg-gradient-to-r from-neutral-900 to-neutral-800 border border-neutral-700 rounded-full hover:from-red-700 hover:to-red-600 hover:border-red-500 hover:shadow-[0_0_50px_rgba(220,38,38,0.5)] hover:scale-105"
           >

@@ -15,6 +15,8 @@ export interface SessionConfig {
   mode: PitchMode;
   script?: string;
   difficulty: DifficultyLevel;
+  isMiniModule?: boolean;
+  miniModuleId?: string;
 }
 
 export type AudioVolumeCallback = (volume: number) => void;

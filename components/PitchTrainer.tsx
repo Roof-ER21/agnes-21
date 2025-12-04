@@ -37,6 +37,7 @@ import { getStreak } from '../utils/sessionStorage';
 interface PitchTrainerProps {
   config: SessionConfig;
   onEndSession: () => void;
+  onMiniModuleComplete?: (moduleId: string) => void;
 }
 
 interface TranscriptMessage {
@@ -46,7 +47,7 @@ interface TranscriptMessage {
   score?: number;
 }
 
-const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession }) => {
+const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMiniModuleComplete }) => {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -641,6 +642,10 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession }) => 
   // NEW: Return to home after success modal
   const returnToHome = () => {
     setShowSuccessModal(false);
+    // Mark mini-module as completed if applicable
+    if (config.isMiniModule && config.miniModuleId && onMiniModuleComplete) {
+      onMiniModuleComplete(config.miniModuleId);
+    }
     onEndSession();
   };
 
