@@ -8,6 +8,7 @@ import ManagerDashboard from './components/ManagerDashboard';
 import AllUsersView from './components/AllUsersView';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import MiniModules, { MiniModule, MINI_MODULES } from './components/MiniModules';
+import TrainingGoals from './components/TrainingGoals';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
 import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
@@ -623,6 +624,11 @@ const AppContent: React.FC = () => {
             onSelectModule={handleMiniModuleSelect}
             completedToday={completedMiniModulesToday}
           />
+        </div>
+
+        {/* Training Goals */}
+        <div className="mt-8 px-4">
+          <TrainingGoals userId={user?.id || 'guest'} />
         </div>
 
         {/* Divider */}
