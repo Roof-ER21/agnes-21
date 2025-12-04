@@ -10,6 +10,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import MiniModules, { MiniModule, MINI_MODULES } from './components/MiniModules';
 import TrainingGoals from './components/TrainingGoals';
 import TeamContests from './components/TeamContests';
+import SkillTree from './components/SkillTree';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
 import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
@@ -639,6 +640,11 @@ const AppContent: React.FC = () => {
             userName={user?.displayName || 'Guest'}
             isManager={managerModeActive}
           />
+        </div>
+
+        {/* Skill Tree */}
+        <div className="mt-8 px-4">
+          <SkillTree userId={user?.id || 'guest'} />
         </div>
 
         {/* Divider */}
