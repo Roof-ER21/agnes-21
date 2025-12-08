@@ -30,6 +30,10 @@ import {
   isSpeechRecognitionSupported,
 } from '../utils/speechUtils';
 import {
+  agnesVoiceSpeak,
+  agnesVoiceStop,
+} from '../utils/geminiTTS';
+import {
   getAgnesRepIntro,
   getAgnesAutoDetectIntro,
   getAgnesHomeownerIntro,
@@ -117,22 +121,19 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // Agnes Speech Function
   // ============================================
 
-  const agnesSpeak = useCallback((text: string, lang: SupportedLanguage = 'en'): Promise<void> => {
-    return new Promise((resolve) => {
-      setAgnesMessage(text);
-      console.log(`Agnes speaking in ${lang}: "${text.substring(0, 50)}..."`);
+  const agnesSpeak = useCallback(async (text: string, lang: SupportedLanguage = 'en'): Promise<void> => {
+    setAgnesMessage(text);
+    console.log(`Agnes speaking in ${lang}: "${text.substring(0, 50)}..."`);
 
-      speak(text, lang, {
-        onEnd: () => {
-          setAgnesMessage('');
-          resolve();
-        },
-        onError: (error) => {
-          console.error('Speech error:', error);
-          setAgnesMessage('');
-          resolve();
-        },
-      });
+    // Use unified Agnes voice - Gemini (Kore) for English, Web Speech for others
+    await agnesVoiceSpeak(text, lang, {
+      onEnd: () => {
+        setAgnesMessage('');
+      },
+      onError: (error) => {
+        console.error('Speech error:', error);
+        setAgnesMessage('');
+      },
     });
   }, []);
 
@@ -420,7 +421,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
   const endSession = useCallback(() => {
     sessionActiveRef.current = false;
-    stopSpeaking();
+    agnesVoiceStop(); // Stop Gemini + Web Speech
     stopListening();
     setAgnesState('ended');
     setInterimText('');
@@ -514,7 +515,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   useEffect(() => {
     return () => {
       sessionActiveRef.current = false;
-      stopSpeaking();
+      agnesVoiceStop(); // Stop Gemini + Web Speech
       stopListening();
     };
   }, []);
