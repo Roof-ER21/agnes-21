@@ -12,8 +12,9 @@ import TrainingGoals from './components/TrainingGoals';
 import TeamContests from './components/TeamContests';
 import SkillTree from './components/SkillTree';
 import PerfectWeekChallenge from './components/PerfectWeekChallenge';
+import FieldTranslator from './components/FieldTranslator';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
-import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock } from 'lucide-react';
+import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock, Globe } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
 import { PHONE_SCRIPTS, PhoneScript } from './utils/phoneScripts';
 import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty, isManagerMode, activateManagerMode, deactivateManagerMode } from './utils/gamification';
@@ -104,6 +105,7 @@ const AppContent: React.FC = () => {
   const [showLeaderboard, setShowLeaderboard] = useState<boolean>(false);
   const [showManagerDashboard, setShowManagerDashboard] = useState<boolean>(false);
   const [showAllUsers, setShowAllUsers] = useState<boolean>(false);
+  const [showTranslator, setShowTranslator] = useState<boolean>(false);
   const [selectedMode, setSelectedMode] = useState<PitchMode>(PitchMode.COACH);
   const [selectedScriptId, setSelectedScriptId] = useState<string>('initial');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DifficultyLevel.BEGINNER);
@@ -237,6 +239,10 @@ const AppContent: React.FC = () => {
     );
   }
 
+  if (showTranslator) {
+    return <FieldTranslator onBack={() => setShowTranslator(false)} />;
+  }
+
   if (showHistory) {
     return <SessionHistory onBack={() => setShowHistory(false)} />;
   }
@@ -284,7 +290,15 @@ const AppContent: React.FC = () => {
                <Sparkles className="w-4 h-4 text-red-500 mr-2" />
                <span className="text-red-200 font-mono text-xs tracking-widest uppercase">Agnes 21 // AI Trainer</span>
             </div>
-            <div className="flex-1 flex justify-end gap-2">
+            <div className="flex-1 flex justify-end gap-2 flex-wrap overflow-x-auto">
+              <button
+                onClick={() => setShowTranslator(true)}
+                className="group flex items-center space-x-2 px-3 py-2 bg-cyan-900/50 hover:bg-cyan-800/50 border border-cyan-500/50 rounded-full transition-all duration-300"
+                title="Field Translator"
+              >
+                <Globe className="w-4 h-4 text-cyan-400" />
+                <span className="text-xs font-mono uppercase tracking-wider text-cyan-300 hidden sm:inline">Translate</span>
+              </button>
               <button
                 onClick={() => setShowHistory(true)}
                 className="group flex items-center space-x-2 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-red-900/50 rounded-full transition-all duration-300"

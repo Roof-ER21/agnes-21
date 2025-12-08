@@ -76,34 +76,48 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For static assets, use cache-first
+  // For static assets, use cache-first with graceful error handling
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Return cached version and update cache in background
-        fetch(event.request).then((response) => {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, response);
+        // Return cached version and update cache in background (ignore errors)
+        fetch(event.request)
+          .then((response) => {
+            if (response && response.ok) {
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(event.request, response);
+              });
+            }
+          })
+          .catch(() => {
+            // Silently ignore background fetch errors in development
           });
-        });
         return cachedResponse;
       }
 
       // If not in cache, fetch from network
-      return fetch(event.request).then((response) => {
-        // Don't cache non-successful responses
-        if (!response || response.status !== 200 || response.type !== 'basic') {
+      return fetch(event.request)
+        .then((response) => {
+          // Don't cache non-successful responses
+          if (!response || response.status !== 200 || response.type !== 'basic') {
+            return response;
+          }
+
+          // Clone the response before caching
+          const responseToCache = response.clone();
+          caches.open(RUNTIME_CACHE).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+
           return response;
-        }
-
-        // Clone the response before caching
-        const responseToCache = response.clone();
-        caches.open(RUNTIME_CACHE).then((cache) => {
-          cache.put(event.request, responseToCache);
+        })
+        .catch((error) => {
+          // Return a basic offline response for navigation requests
+          if (event.request.mode === 'navigate') {
+            return caches.match('/');
+          }
+          throw error;
         });
-
-        return response;
-      });
     })
   );
 });
