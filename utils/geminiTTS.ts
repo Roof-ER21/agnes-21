@@ -1,26 +1,220 @@
 /**
- * Agnes Voice Utility
+ * Agnes Voice Utility - Hybrid Approach
  *
- * Provides a unified voice API for Agnes across all modes.
- * Uses Web Speech API with premium voice selection.
- *
- * Note: Gemini Live requires bidirectional audio (mic input) to work.
- * For TTS-only use in Field Translator, we use Web Speech API with
- * the best available voices for each language.
+ * Uses Gemini Live for English (consistent with roleplay/feedback)
+ * Falls back to Web Speech API for other languages
  */
 
+import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
+import { base64ToUint8Array, decodeAudioData } from './audioUtils';
 import { SupportedLanguage, SUPPORTED_LANGUAGES } from '../types';
 
 // ============================================
-// Voice Cache & Selection
+// Gemini Live TTS for English
+// ============================================
+
+class GeminiEnglishTTS {
+  private aiClient: GoogleGenAI | null = null;
+  private session: any = null;
+  private audioContext: AudioContext | null = null;
+  private audioQueue: AudioBufferSourceNode[] = [];
+  private resolveCallback: (() => void) | null = null;
+  private isInitialized: boolean = false;
+  private nextStartTime: number = 0;
+
+  async init(): Promise<boolean> {
+    if (this.isInitialized) return true;
+
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.warn('Gemini API key not found');
+        return false;
+      }
+
+      this.aiClient = new GoogleGenAI({ apiKey });
+
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      this.audioContext = new AudioContextClass({ sampleRate: 24000 });
+
+      this.isInitialized = true;
+      console.log('🎤 Gemini English TTS initialized');
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize Gemini TTS:', error);
+      return false;
+    }
+  }
+
+  private async connect(): Promise<boolean> {
+    if (!this.aiClient) return false;
+    if (this.session) return true;
+
+    try {
+      console.log('🔌 Connecting to Gemini Live for English TTS...');
+
+      const sessionPromise = this.aiClient.live.connect({
+        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        callbacks: {
+          onopen: () => {
+            console.log('✅ Gemini TTS session opened');
+          },
+          onmessage: async (message: LiveServerMessage) => {
+            const serverContent = message.serverContent;
+
+            // Handle audio
+            const base64Audio = serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+            if (base64Audio) {
+              await this.playAudioChunk(base64Audio);
+            }
+
+            // Check if done
+            if (serverContent?.turnComplete) {
+              setTimeout(() => {
+                this.resolveCallback?.();
+                this.resolveCallback = null;
+              }, 200);
+            }
+          },
+          onclose: () => {
+            console.log('Gemini TTS session closed');
+            this.session = null;
+          },
+          onerror: (error) => {
+            console.error('Gemini TTS error:', error);
+            this.session = null;
+            this.resolveCallback?.();
+          }
+        },
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+            languageCode: 'en-US'
+          },
+          systemInstruction: `You are Agnes, a warm and professional assistant.
+Your task is to read text aloud naturally.
+Do NOT add commentary - just speak the exact text given.
+Speak clearly and warmly like a professional translator.`
+        }
+      });
+
+      this.session = await sessionPromise;
+      return true;
+    } catch (error) {
+      console.error('Failed to connect Gemini session:', error);
+      return false;
+    }
+  }
+
+  private async playAudioChunk(base64Audio: string): Promise<void> {
+    if (!this.audioContext) return;
+
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+
+    try {
+      const audioBuffer = await decodeAudioData(
+        base64ToUint8Array(base64Audio),
+        this.audioContext
+      );
+
+      const source = this.audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.audioContext.destination);
+
+      const currentTime = this.audioContext.currentTime;
+      if (this.nextStartTime < currentTime) {
+        this.nextStartTime = currentTime;
+      }
+
+      source.start(this.nextStartTime);
+      this.nextStartTime += audioBuffer.duration;
+
+      this.audioQueue.push(source);
+      source.onended = () => {
+        const idx = this.audioQueue.indexOf(source);
+        if (idx > -1) this.audioQueue.splice(idx, 1);
+      };
+    } catch (error) {
+      console.error('Error playing audio:', error);
+    }
+  }
+
+  async speak(text: string): Promise<boolean> {
+    if (!this.isInitialized) {
+      const ok = await this.init();
+      if (!ok) return false;
+    }
+
+    const connected = await this.connect();
+    if (!connected || !this.session) {
+      console.warn('Gemini session not available');
+      return false;
+    }
+
+    console.log(`🔊 Gemini speaking: "${text.substring(0, 50)}..."`);
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        console.warn('Gemini speech timeout');
+        this.resolveCallback = null;
+        resolve(false);
+      }, 15000);
+
+      this.resolveCallback = () => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+
+      try {
+        this.session.send({
+          clientContent: {
+            turns: [{
+              role: 'user',
+              parts: [{ text: `Read this aloud: "${text}"` }]
+            }],
+            turnComplete: true
+          }
+        });
+      } catch (error) {
+        console.error('Error sending to Gemini:', error);
+        clearTimeout(timeout);
+        resolve(false);
+      }
+    });
+  }
+
+  stop(): void {
+    this.audioQueue.forEach(s => { try { s.stop(); } catch {} });
+    this.audioQueue = [];
+    this.nextStartTime = 0;
+    this.resolveCallback?.();
+    this.resolveCallback = null;
+  }
+
+  async cleanup(): Promise<void> {
+    this.stop();
+    this.session = null;
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      await this.audioContext.close();
+    }
+    this.audioContext = null;
+    this.isInitialized = false;
+  }
+}
+
+// Singleton for Gemini English
+const geminiEnglish = new GeminiEnglishTTS();
+
+// ============================================
+// Web Speech API for Other Languages
 // ============================================
 
 let voicesLoaded = false;
 let cachedVoices: SpeechSynthesisVoice[] = [];
 
-/**
- * Get all available voices, waiting for them to load if necessary
- */
 const getVoices = (): Promise<SpeechSynthesisVoice[]> => {
   return new Promise((resolve) => {
     if (voicesLoaded && cachedVoices.length > 0) {
@@ -32,161 +226,150 @@ const getVoices = (): Promise<SpeechSynthesisVoice[]> => {
       cachedVoices = speechSynthesis.getVoices();
       if (cachedVoices.length > 0) {
         voicesLoaded = true;
-        console.log(`🔊 Loaded ${cachedVoices.length} TTS voices`);
         resolve(cachedVoices);
       }
     };
 
-    // Try immediately
     loadVoices();
-
-    // Also listen for changes
     if (!voicesLoaded) {
       speechSynthesis.onvoiceschanged = loadVoices;
-      // Fallback timeout
       setTimeout(() => {
-        if (!voicesLoaded) {
-          loadVoices();
-          resolve(cachedVoices);
-        }
+        loadVoices();
+        resolve(cachedVoices);
       }, 1000);
     }
   });
 };
 
-/**
- * Premium voice preferences by language
- * Prioritizes Siri, Enhanced, and natural-sounding voices
- */
 const VOICE_PREFERENCES: Record<string, string[]> = {
-  en: ['samantha', 'siri', 'allison', 'ava', 'karen', 'moira', 'tessa', 'enhanced'],
-  es: ['paulina', 'mónica', 'monica', 'angélica', 'angelica', 'siri', 'enhanced'],
+  en: ['samantha', 'siri', 'allison', 'ava', 'karen', 'enhanced'],
+  es: ['paulina', 'mónica', 'monica', 'siri', 'enhanced'],
   zh: ['tingting', 'ting-ting', 'meijia', 'siri', 'enhanced'],
   vi: ['linh', 'siri', 'enhanced'],
   ko: ['yuna', 'sora', 'siri', 'enhanced'],
   pt: ['luciana', 'fernanda', 'siri', 'enhanced'],
   ar: ['laila', 'mariam', 'maged', 'siri', 'enhanced'],
-  fr: ['amélie', 'amelie', 'audrey', 'thomas', 'siri', 'enhanced'],
+  fr: ['amélie', 'amelie', 'audrey', 'siri', 'enhanced'],
   ru: ['milena', 'katya', 'yuri', 'siri', 'enhanced'],
-  tl: ['siri', 'enhanced', 'female'],
+  tl: ['siri', 'enhanced'],
   hi: ['lekha', 'siri', 'enhanced'],
   ja: ['kyoko', 'otoya', 'siri', 'enhanced'],
   de: ['anna', 'petra', 'helena', 'siri', 'enhanced'],
   it: ['alice', 'federica', 'elsa', 'siri', 'enhanced'],
   pl: ['zosia', 'ewa', 'siri', 'enhanced'],
-  uk: ['siri', 'enhanced', 'female'],
-  fa: ['siri', 'enhanced', 'female'],
+  uk: ['siri', 'enhanced'],
+  fa: ['siri', 'enhanced'],
   th: ['kanya', 'siri', 'enhanced'],
-  bn: ['siri', 'enhanced', 'female'],
-  ht: ['siri', 'enhanced', 'female'],
-  pa: ['siri', 'enhanced', 'female'],
+  bn: ['siri', 'enhanced'],
+  ht: ['siri', 'enhanced'],
+  pa: ['siri', 'enhanced'],
 };
 
-/**
- * Speech rates per language for natural rhythm
- */
 const SPEECH_RATES: Record<string, number> = {
-  en: 0.95,
-  es: 0.92,
-  zh: 0.85,
-  vi: 0.85,
-  ko: 0.90,
-  pt: 0.92,
-  ar: 0.85,
-  fr: 0.92,
-  ru: 0.90,
-  tl: 0.92,
-  hi: 0.88,
-  ja: 0.88,
-  de: 0.92,
-  it: 0.92,
-  pl: 0.90,
-  uk: 0.90,
-  fa: 0.85,
-  th: 0.85,
-  bn: 0.88,
-  ht: 0.90,
-  pa: 0.88,
+  en: 0.95, es: 0.92, zh: 0.85, vi: 0.85, ko: 0.90,
+  pt: 0.92, ar: 0.85, fr: 0.92, ru: 0.90, tl: 0.92,
+  hi: 0.88, ja: 0.88, de: 0.92, it: 0.92, pl: 0.90,
+  uk: 0.90, fa: 0.85, th: 0.85, bn: 0.88, ht: 0.90, pa: 0.88,
 };
 
-/**
- * Score a voice for quality
- */
 const scoreVoice = (voice: SpeechSynthesisVoice, lang: string): number => {
   const nameLower = voice.name.toLowerCase();
   let score = 0;
 
-  // Highest priority: Siri voices
-  if (nameLower.includes('siri')) {
-    score += 500;
+  if (nameLower.includes('siri')) score += 500;
+  if (nameLower.includes('enhanced') || nameLower.includes('premium')) score += 300;
+
+  const prefs = VOICE_PREFERENCES[lang] || VOICE_PREFERENCES.en;
+  for (let i = 0; i < prefs.length; i++) {
+    if (nameLower.includes(prefs[i])) score += 200 - i * 10;
   }
 
-  // Very high: Enhanced/Premium voices
-  if (nameLower.includes('enhanced') || nameLower.includes('premium')) {
-    score += 300;
-  }
-
-  // High: Preferred voice names for this language
-  const preferences = VOICE_PREFERENCES[lang] || VOICE_PREFERENCES.en;
-  for (let i = 0; i < preferences.length; i++) {
-    if (nameLower.includes(preferences[i])) {
-      score += 200 - i * 10; // Earlier in list = higher score
-    }
-  }
-
-  // Medium: Local/native voices
-  if (voice.localService) {
-    score += 50;
-  }
-
-  // Penalize: Google voices (often robotic)
-  if (nameLower.includes('google')) {
-    score -= 100;
-  }
+  if (voice.localService) score += 50;
+  if (nameLower.includes('google')) score -= 100;
 
   return score;
 };
 
-/**
- * Find the best voice for a language
- */
 const findBestVoice = async (lang: SupportedLanguage): Promise<SpeechSynthesisVoice | null> => {
   const voices = await getVoices();
   const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === lang);
   const voiceCode = langConfig?.voiceCode || 'en-US';
   const langPrefix = voiceCode.split('-')[0];
 
-  // Filter voices for this language
-  const matchingVoices = voices.filter(v => {
+  const matching = voices.filter(v => {
     const vLang = v.lang.toLowerCase();
-    return vLang.startsWith(langPrefix.toLowerCase()) ||
-           vLang.startsWith(lang.toLowerCase());
+    return vLang.startsWith(langPrefix.toLowerCase()) || vLang.startsWith(lang.toLowerCase());
   });
 
-  if (matchingVoices.length === 0) {
-    console.warn(`No voices found for ${lang}, using default`);
-    return voices[0] || null;
-  }
+  if (matching.length === 0) return voices[0] || null;
 
-  // Score and sort voices
-  const scoredVoices = matchingVoices
-    .map(v => ({ voice: v, score: scoreVoice(v, lang) }))
+  const scored = matching.map(v => ({ voice: v, score: scoreVoice(v, lang) }))
     .sort((a, b) => b.score - a.score);
 
-  const best = scoredVoices[0];
-  console.log(`🎤 Best voice for ${lang}: ${best.voice.name} (score: ${best.score})`);
+  return scored[0].voice;
+};
 
-  return best.voice;
+const speakWithWebSpeech = async (
+  text: string,
+  lang: SupportedLanguage,
+  onEnd?: () => void,
+  onError?: (error: string) => void
+): Promise<void> => {
+  speechSynthesis.cancel();
+
+  return new Promise(async (resolve) => {
+    try {
+      const voice = await findBestVoice(lang);
+      const utterance = new SpeechSynthesisUtterance(text);
+
+      if (voice) {
+        utterance.voice = voice;
+        console.log(`🎤 Using voice: ${voice.name}`);
+      }
+
+      const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === lang);
+      utterance.lang = langConfig?.voiceCode || 'en-US';
+      utterance.rate = SPEECH_RATES[lang] || 0.9;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+
+      const timeout = setTimeout(() => {
+        speechSynthesis.cancel();
+        onEnd?.();
+        resolve();
+      }, 30000);
+
+      utterance.onend = () => {
+        clearTimeout(timeout);
+        console.log('✅ Web Speech finished');
+        onEnd?.();
+        resolve();
+      };
+
+      utterance.onerror = (event) => {
+        clearTimeout(timeout);
+        if (event.error !== 'interrupted') {
+          console.error('Speech error:', event.error);
+          onError?.(event.error);
+        }
+        resolve();
+      };
+
+      speechSynthesis.speak(utterance);
+    } catch (error) {
+      console.error('Web Speech error:', error);
+      onError?.(error instanceof Error ? error.message : 'Unknown error');
+      resolve();
+    }
+  });
 };
 
 // ============================================
-// Speech Synthesis
+// Main Export - Hybrid Approach
 // ============================================
 
-let currentUtterance: SpeechSynthesisUtterance | null = null;
-
 /**
- * Agnes speaks using Web Speech API with premium voice
+ * Agnes speaks - uses Gemini for English, Web Speech for others
  */
 export const agnesVoiceSpeak = async (
   text: string,
@@ -199,104 +382,62 @@ export const agnesVoiceSpeak = async (
   const { onEnd, onError } = options || {};
 
   if (!text || text.trim().length === 0) {
-    console.warn('agnesVoiceSpeak: Empty text');
     onEnd?.();
     return;
   }
 
-  // Cancel any ongoing speech
-  speechSynthesis.cancel();
+  console.log(`🔊 Agnes speaking in ${lang}: "${text.substring(0, 50)}..."`);
 
-  return new Promise(async (resolve) => {
-    try {
-      const voice = await findBestVoice(lang);
-      const utterance = new SpeechSynthesisUtterance(text);
-
-      if (voice) {
-        utterance.voice = voice;
-      }
-
-      // Set language and rate
-      const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === lang);
-      utterance.lang = langConfig?.voiceCode || 'en-US';
-      utterance.rate = SPEECH_RATES[lang] || 0.9;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-
-      currentUtterance = utterance;
-
-      console.log(`🔊 Agnes speaking in ${lang}: "${text.substring(0, 50)}..."`);
-
-      // Set up timeout to prevent hanging
-      const timeout = setTimeout(() => {
-        console.warn('⚠️ Speech timeout');
-        speechSynthesis.cancel();
-        onEnd?.();
-        resolve();
-      }, 30000);
-
-      utterance.onend = () => {
-        clearTimeout(timeout);
-        currentUtterance = null;
-        console.log('✅ Agnes finished speaking');
-        onEnd?.();
-        resolve();
-      };
-
-      utterance.onerror = (event) => {
-        clearTimeout(timeout);
-        currentUtterance = null;
-        // Don't log "interrupted" errors - those are expected when canceling
-        if (event.error !== 'interrupted') {
-          console.error('❌ Speech error:', event.error);
-          onError?.(event.error);
-        }
-        resolve();
-      };
-
-      speechSynthesis.speak(utterance);
-
-    } catch (error) {
-      console.error('agnesVoiceSpeak error:', error);
-      onError?.(error instanceof Error ? error.message : 'Unknown error');
-      resolve();
+  // Try Gemini for English
+  if (lang === 'en') {
+    const success = await geminiEnglish.speak(text);
+    if (success) {
+      console.log('✅ Gemini English TTS success');
+      onEnd?.();
+      return;
     }
-  });
+    console.log('⚠️ Gemini failed, falling back to Web Speech');
+  }
+
+  // Use Web Speech for other languages or as fallback
+  await speakWithWebSpeech(text, lang, onEnd, onError);
 };
 
 /**
  * Stop Agnes from speaking
  */
 export const agnesVoiceStop = (): void => {
+  geminiEnglish.stop();
   speechSynthesis.cancel();
-  currentUtterance = null;
 };
 
 /**
- * Check if Agnes is currently speaking
+ * Check if speaking
  */
 export const isAgnesSpeaking = (): boolean => {
   return speechSynthesis.speaking;
 };
 
 /**
- * Initialize (pre-load voices)
+ * Initialize
  */
 export const initGeminiTTS = async (): Promise<void> => {
-  await getVoices();
-  console.log('Agnes voice system initialized');
+  await Promise.all([
+    geminiEnglish.init(),
+    getVoices()
+  ]);
+  console.log('🎤 Agnes voice system initialized (hybrid mode)');
 };
 
 /**
- * Cleanup (no-op for Web Speech API)
+ * Cleanup
  */
 export const cleanupGeminiTTS = async (): Promise<void> => {
   agnesVoiceStop();
+  await geminiEnglish.cleanup();
 };
 
-/**
- * Legacy exports for compatibility
- */
+// Legacy exports
 export const speakWithGemini = agnesVoiceSpeak;
 export const stopGeminiSpeaking = agnesVoiceStop;
 export const isGeminiAvailable = (): boolean => true;
