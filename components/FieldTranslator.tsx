@@ -23,8 +23,6 @@ import {
   getLanguageFlag,
 } from '../utils/translationUtils';
 import {
-  speak,
-  stopSpeaking,
   startListening,
   stopListening,
   isSpeechRecognitionSupported,
@@ -33,6 +31,8 @@ import {
 import {
   agnesVoiceSpeak,
   agnesVoiceStop,
+  initGeminiTTS,
+  cleanupGeminiTTS,
 } from '../utils/geminiTTS';
 import {
   getAgnesRepIntro,
@@ -113,14 +113,19 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // Track if voices are loaded
   const [voicesReady, setVoicesReady] = useState<boolean>(false);
 
-  // Load voices on mount
+  // Initialize Gemini TTS and load voices on mount
   useEffect(() => {
-    const loadVoices = async () => {
+    const initialize = async () => {
+      // Initialize Gemini TTS for high-quality native voice
+      await initGeminiTTS();
+      console.log('Gemini TTS initialized for Field Translator');
+
+      // Also load Web Speech voices as fallback
       const voices = await waitForVoices();
       console.log(`Loaded ${voices.length} TTS voices`);
       setVoicesReady(true);
     };
-    loadVoices();
+    initialize();
   }, []);
 
   // ============================================
@@ -142,32 +147,23 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
     }
 
     setAgnesMessage(text);
-    console.log(`🔊 Agnes speaking in ${lang}: "${text.substring(0, 80)}..."`);
+    console.log(`🔊 Agnes speaking in ${lang} (Gemini Kore): "${text.substring(0, 80)}..."`);
 
-    return new Promise((resolve) => {
-      // Set a maximum timeout to prevent hanging
-      const maxTimeout = setTimeout(() => {
-        console.warn('⚠️ Agnes speech timeout - resolving anyway');
-        setAgnesMessage('');
-        resolve();
-      }, 30000); // 30 second max
-
-      // Use the speak function directly for more control
-      speak(text, lang, {
+    try {
+      // Use Gemini Live TTS for high-quality natural voice
+      await agnesVoiceSpeak(text, lang, {
         onEnd: () => {
-          clearTimeout(maxTimeout);
-          console.log('✅ Agnes finished speaking');
-          setAgnesMessage('');
-          resolve();
+          console.log('✅ Agnes finished speaking (Gemini)');
         },
         onError: (error) => {
-          clearTimeout(maxTimeout);
-          console.error('❌ Speech error:', error);
-          setAgnesMessage('');
-          resolve(); // Resolve anyway to continue the flow
+          console.error('❌ Gemini TTS error:', error);
         },
       });
-    });
+    } catch (error) {
+      console.error('❌ Agnes speak error:', error);
+    } finally {
+      setAgnesMessage('');
+    }
   }, []);
 
   // ============================================
@@ -542,7 +538,8 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // ============================================
 
   const handleSpeakTranslation = useCallback((text: string, lang: SupportedLanguage) => {
-    speak(text, lang);
+    // Use Gemini TTS for consistent high-quality voice
+    agnesVoiceSpeak(text, lang);
   }, []);
 
   // ============================================
@@ -563,8 +560,10 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   useEffect(() => {
     return () => {
       sessionActiveRef.current = false;
-      agnesVoiceStop(); // Stop Gemini + Web Speech
+      agnesVoiceStop(); // Stop any playing audio
       stopListening();
+      // Cleanup Gemini TTS resources
+      cleanupGeminiTTS().catch(console.error);
     };
   }, []);
 
