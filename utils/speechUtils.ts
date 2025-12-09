@@ -27,16 +27,52 @@ export const getVoicesForLanguage = (langCode: SupportedLanguage): SpeechSynthes
 };
 
 /**
- * Premium voice names by language - Apple's best voices
+ * Premium voice names by language - Apple's best Siri & Enhanced voices
+ * PRIORITY ORDER: Siri voices > Enhanced > Premium > Standard
  */
 const PREMIUM_VOICES_BY_LANG: Record<string, string[]> = {
-  en: ['samantha', 'alex', 'daniel', 'karen', 'moira', 'tessa', 'allison', 'ava', 'susan', 'tom', 'zoe', 'nicky', 'aaron'],
-  es: ['paulina', 'mónica', 'jorge', 'diego', 'juan', 'marisol', 'angélica', 'isabela'],
-  zh: ['tingting', 'ting-ting', 'meijia', 'mei-jia', 'sinji', 'li-mu', 'yu-shu'],
-  vi: ['linh'],
-  ko: ['yuna', 'sora'],
-  pt: ['luciana', 'felipe', 'catarina', 'joana', 'fernanda'],
-  ar: ['maged', 'majed', 'laila', 'mariam', 'tarik'],
+  // English - prioritize Siri voices for most natural sound
+  en: ['siri', 'samantha', 'karen', 'daniel', 'moira', 'tessa', 'allison', 'ava', 'alex', 'susan', 'tom', 'zoe', 'nicky', 'aaron', 'martha', 'oliver'],
+  // Spanish - Latin American for US context
+  es: ['siri', 'paulina', 'mónica', 'monica', 'jorge', 'diego', 'juan', 'marisol', 'angélica', 'angelica', 'isabela'],
+  // Chinese - natural voices
+  zh: ['siri', 'tingting', 'ting-ting', 'meijia', 'mei-jia', 'sinji', 'li-mu', 'yu-shu'],
+  // Vietnamese
+  vi: ['siri', 'linh'],
+  // Korean
+  ko: ['siri', 'yuna', 'sora'],
+  // Portuguese - Brazilian
+  pt: ['siri', 'luciana', 'felipe', 'catarina', 'joana', 'fernanda'],
+  // Arabic - Egyptian voices
+  ar: ['siri', 'maged', 'majed', 'laila', 'mariam', 'tarik', 'hoda'],
+  // French
+  fr: ['siri', 'amélie', 'amelie', 'thomas', 'audrey', 'marie'],
+  // Russian
+  ru: ['siri', 'milena', 'katya', 'yuri'],
+  // Tagalog
+  tl: ['siri'],
+  // Hindi
+  hi: ['siri', 'lekha', 'rishi'],
+  // Japanese
+  ja: ['siri', 'kyoko', 'otoya', 'hattori'],
+  // German
+  de: ['siri', 'anna', 'petra', 'helena', 'markus'],
+  // Italian
+  it: ['siri', 'alice', 'federica', 'luca', 'paola'],
+  // Polish
+  pl: ['siri', 'zosia', 'ewa'],
+  // Ukrainian
+  uk: ['siri', 'lesya'],
+  // Persian
+  fa: ['siri'],
+  // Thai
+  th: ['siri', 'kanya', 'narisa'],
+  // Bengali
+  bn: ['siri'],
+  // Haitian Creole
+  ht: [],
+  // Punjabi
+  pa: ['siri'],
 };
 
 /**
@@ -71,19 +107,24 @@ export const getBestVoice = (langCode: SupportedLanguage): SpeechSynthesisVoice 
     let score = 0;
     const nameLower = voice.name.toLowerCase();
 
-    // HIGHEST PRIORITY: Language-specific premium voice names
+    // HIGHEST PRIORITY: Siri voices are the most natural
+    if (nameLower.includes('siri')) {
+      score += 500; // Siri is always best choice
+    }
+
+    // VERY HIGH: Enhanced/Premium marked voices
+    if (nameLower.includes('enhanced') || nameLower.includes('premium')) {
+      score += 300;
+    }
+
+    // HIGH: Language-specific premium voice names
     if (langPremiumVoices.some(pv => nameLower.includes(pv))) {
       score += 200;
     }
 
-    // Premium/enhanced keywords
-    if (nameLower.includes('enhanced') || nameLower.includes('premium')) {
+    // MEDIUM: General premium keywords (neural, natural)
+    if (nameLower.includes('neural') || nameLower.includes('natural')) {
       score += 150;
-    }
-
-    // Siri voices are very high quality
-    if (nameLower.includes('siri')) {
-      score += 140;
     }
 
     // General premium keywords
@@ -91,30 +132,35 @@ export const getBestVoice = (langCode: SupportedLanguage): SpeechSynthesisVoice 
       score += 100;
     }
 
-    // PENALIZE Google voices - they tend to sound more robotic
-    if (nameLower.startsWith('google')) {
-      score -= 50;
-    }
-
-    // HEAVILY PENALIZE novelty/unprofessional voices
-    if (NOVELTY_VOICES.some(nv => nameLower.includes(nv))) {
-      score -= 200;
-    }
-
-    // Prefer non-compact voices (fuller sound)
+    // Prefer non-compact voices (fuller, more natural sound)
     if (!nameLower.includes('compact')) {
-      score += 20;
+      score += 50;
     }
 
     // Prefer local Apple voices over network Google voices
     if (voice.localService && !nameLower.startsWith('google')) {
-      score += 30;
+      score += 40;
     }
 
     // Prefer voices that match the exact locale
     const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === langCode);
     if (langConfig && voice.lang === langConfig.voiceCode) {
-      score += 15;
+      score += 25;
+    }
+
+    // PENALIZE Google voices - they tend to sound more robotic
+    if (nameLower.startsWith('google')) {
+      score -= 100;
+    }
+
+    // HEAVILY PENALIZE novelty/unprofessional voices
+    if (NOVELTY_VOICES.some(nv => nameLower.includes(nv))) {
+      score -= 500;
+    }
+
+    // PENALIZE compact voices (lower quality)
+    if (nameLower.includes('compact')) {
+      score -= 75;
     }
 
     return { voice, score };
@@ -284,7 +330,30 @@ export const isSpeechRecognitionSupported = (): boolean => {
 };
 
 /**
+ * Minimum confidence threshold to filter out noise
+ * Lower = more sensitive but more noise
+ * Higher = less noise but might miss quiet speech
+ */
+const MIN_CONFIDENCE_THRESHOLD = 0.3; // Very sensitive - accept most speech
+
+/**
+ * Clean transcript by removing common noise artifacts
+ */
+const cleanTranscript = (text: string): string => {
+  return text
+    .trim()
+    // Remove common noise words that get picked up
+    .replace(/^(um|uh|hmm|ah|oh|er)\s*/gi, '')
+    // Remove trailing noise
+    .replace(/\s*(um|uh|hmm|ah|oh|er)$/gi, '')
+    // Normalize whitespace
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+/**
  * Start listening for speech input
+ * Enhanced with better sensitivity and noise filtering
  */
 export const startListening = (
   langCode: SupportedLanguage,
@@ -294,6 +363,7 @@ export const startListening = (
     continuous?: boolean;
     interimResults?: boolean;
     onEnd?: () => void;
+    sensitivityBoost?: boolean; // Enable extra sensitivity
   }
 ): void => {
   if (!isSpeechRecognitionSupported()) {
@@ -309,21 +379,48 @@ export const startListening = (
 
   const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === langCode);
 
+  // Configure for maximum sensitivity
   recognition.lang = langConfig?.voiceCode || 'en-US';
-  recognition.continuous = options?.continuous ?? false;
+  recognition.continuous = options?.continuous ?? true; // Keep listening
   recognition.interimResults = options?.interimResults ?? true;
-  recognition.maxAlternatives = 1;
+  recognition.maxAlternatives = 3; // Get multiple alternatives for better accuracy
 
   recognition.onresult = (event) => {
     const result = event.results[event.results.length - 1];
+    const transcript = result[0].transcript;
+    const confidence = result[0].confidence;
+
+    // Clean the transcript
+    const cleanedTranscript = cleanTranscript(transcript);
+
+    // Only filter by confidence for final results
+    // Always pass interim results so user sees feedback
+    if (result.isFinal) {
+      // Check confidence threshold for final results
+      if (confidence < MIN_CONFIDENCE_THRESHOLD && cleanedTranscript.length < 3) {
+        console.log(`Filtered low-confidence noise: "${transcript}" (${(confidence * 100).toFixed(1)}%)`);
+        return; // Skip this result
+      }
+    }
+
+    // Skip empty results
+    if (!cleanedTranscript && result.isFinal) {
+      return;
+    }
+
     onResult({
-      transcript: result[0].transcript,
-      confidence: result[0].confidence,
+      transcript: result.isFinal ? cleanedTranscript : transcript,
+      confidence: confidence,
       isFinal: result.isFinal,
     });
   };
 
   recognition.onerror = (event) => {
+    // Don't report 'no-speech' or 'aborted' as errors - these are normal
+    if (event.error === 'no-speech' || event.error === 'aborted') {
+      console.log(`Speech recognition: ${event.error}`);
+      return;
+    }
     onError(event.error);
   };
 
@@ -332,7 +429,15 @@ export const startListening = (
     options?.onEnd?.();
   };
 
-  recognition.start();
+  // Use a slight delay to ensure audio context is ready
+  setTimeout(() => {
+    try {
+      recognition?.start();
+      console.log(`Started listening in ${langConfig?.voiceCode || 'en-US'}`);
+    } catch (e) {
+      console.error('Failed to start recognition:', e);
+    }
+  }, 100);
 };
 
 /**

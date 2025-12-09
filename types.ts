@@ -49,7 +49,7 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
   { code: 'ko', name: 'Korean', nativeName: '한국어', voiceCode: 'ko-KR', flag: '🇰🇷' },
   { code: 'tl', name: 'Tagalog', nativeName: 'Tagalog', voiceCode: 'fil-PH', flag: '🇵🇭' },
   { code: 'fr', name: 'French', nativeName: 'Français', voiceCode: 'fr-FR', flag: '🇫🇷' },
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية', voiceCode: 'ar-SA', flag: '🇸🇦' },
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية', voiceCode: 'ar-EG', flag: '🇪🇬' },
   { code: 'ru', name: 'Russian', nativeName: 'Русский', voiceCode: 'ru-RU', flag: '🇷🇺' },
   { code: 'pt', name: 'Portuguese', nativeName: 'Português', voiceCode: 'pt-BR', flag: '🇧🇷' },
   { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', voiceCode: 'hi-IN', flag: '🇮🇳' },

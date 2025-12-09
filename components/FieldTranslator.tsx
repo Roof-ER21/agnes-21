@@ -28,6 +28,7 @@ import {
   startListening,
   stopListening,
   isSpeechRecognitionSupported,
+  waitForVoices,
 } from '../utils/speechUtils';
 import {
   agnesVoiceSpeak,
@@ -109,6 +110,19 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
   const speechSupported = isSpeechRecognitionSupported();
 
+  // Track if voices are loaded
+  const [voicesReady, setVoicesReady] = useState<boolean>(false);
+
+  // Load voices on mount
+  useEffect(() => {
+    const loadVoices = async () => {
+      const voices = await waitForVoices();
+      console.log(`Loaded ${voices.length} TTS voices`);
+      setVoicesReady(true);
+    };
+    loadVoices();
+  }, []);
+
   // ============================================
   // Natural Pause Helper
   // ============================================
@@ -122,18 +136,37 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // ============================================
 
   const agnesSpeak = useCallback(async (text: string, lang: SupportedLanguage = 'en'): Promise<void> => {
-    setAgnesMessage(text);
-    console.log(`Agnes speaking in ${lang}: "${text.substring(0, 50)}..."`);
+    if (!text || text.trim().length === 0) {
+      console.warn('agnesSpeak called with empty text');
+      return;
+    }
 
-    // Use unified Agnes voice - Gemini (Kore) for English, Web Speech for others
-    await agnesVoiceSpeak(text, lang, {
-      onEnd: () => {
+    setAgnesMessage(text);
+    console.log(`🔊 Agnes speaking in ${lang}: "${text.substring(0, 80)}..."`);
+
+    return new Promise((resolve) => {
+      // Set a maximum timeout to prevent hanging
+      const maxTimeout = setTimeout(() => {
+        console.warn('⚠️ Agnes speech timeout - resolving anyway');
         setAgnesMessage('');
-      },
-      onError: (error) => {
-        console.error('Speech error:', error);
-        setAgnesMessage('');
-      },
+        resolve();
+      }, 30000); // 30 second max
+
+      // Use the speak function directly for more control
+      speak(text, lang, {
+        onEnd: () => {
+          clearTimeout(maxTimeout);
+          console.log('✅ Agnes finished speaking');
+          setAgnesMessage('');
+          resolve();
+        },
+        onError: (error) => {
+          clearTimeout(maxTimeout);
+          console.error('❌ Speech error:', error);
+          setAgnesMessage('');
+          resolve(); // Resolve anyway to continue the flow
+        },
+      });
     });
   }, []);
 
@@ -283,10 +316,15 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // ============================================
 
   const handleSingleTurn = useCallback(async () => {
-    if (!sessionActiveRef.current || !selectedLangRef.current) return;
+    if (!sessionActiveRef.current || !selectedLangRef.current) {
+      console.log('handleSingleTurn: session not active or no language selected');
+      return;
+    }
 
     const speaker = currentSpeakerRef.current;
     const homeownerLang = selectedLangRef.current;
+
+    console.log(`\n📍 === NEW TURN: Waiting for ${speaker} ===`);
 
     try {
       setAgnesState('listening');
@@ -295,17 +333,23 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       await naturalPause(300);
 
       // Listen for current speaker
+      console.log(`👂 Listening for ${speaker}...`);
       const text = await listenForSpeaker(speaker);
 
       if (!sessionActiveRef.current) return;
+
+      console.log(`💬 ${speaker} said: "${text}"`);
 
       // Determine translation direction
       const sourceLang = speaker === 'rep' ? 'en' : homeownerLang;
       const targetLang = speaker === 'rep' ? homeownerLang : 'en';
 
       // Translate
+      console.log(`🔄 Translating from ${sourceLang} to ${targetLang}...`);
       setAgnesState('translating');
       const translation = await translateWithCache(text, targetLang, sourceLang);
+
+      console.log(`📝 Translation: "${translation}"`);
 
       if (!sessionActiveRef.current) return;
 
@@ -313,11 +357,14 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       addToTranscript(speaker, text, sourceLang, translation, targetLang);
 
       // Speak translation if auto-speak is on
+      console.log(`🔊 Auto-speak is ${autoSpeak ? 'ON' : 'OFF'}`);
       if (autoSpeak) {
         setAgnesState('speaking');
         // Natural pause before speaking
         await naturalPause(200);
+        console.log(`🗣️ Speaking translation in ${targetLang}...`);
         await agnesSpeak(translation, targetLang);
+        console.log(`✅ Done speaking`);
       }
 
       // Switch speaker for next turn
@@ -332,9 +379,10 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       }
 
     } catch (error) {
-      console.error('Turn error:', error);
+      console.error('❌ Turn error:', error);
       // On timeout or error, retry listening for same speaker
       if (sessionActiveRef.current) {
+        console.log('🔄 Retrying...');
         await naturalPause(800);
         handleSingleTurn();
       }
