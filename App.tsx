@@ -13,8 +13,9 @@ import TeamContests from './components/TeamContests';
 import SkillTree from './components/SkillTree';
 import PerfectWeekChallenge from './components/PerfectWeekChallenge';
 import FieldTranslator from './components/FieldTranslator';
+import RoleplayDemo from './components/RoleplayDemo';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
-import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock, Globe } from 'lucide-react';
+import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock, Globe, Video } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
 import { PHONE_SCRIPTS, PhoneScript } from './utils/phoneScripts';
 import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty, isManagerMode, activateManagerMode, deactivateManagerMode } from './utils/gamification';
@@ -106,6 +107,7 @@ const AppContent: React.FC = () => {
   const [showManagerDashboard, setShowManagerDashboard] = useState<boolean>(false);
   const [showAllUsers, setShowAllUsers] = useState<boolean>(false);
   const [showTranslator, setShowTranslator] = useState<boolean>(false);
+  const [showRoleplayDemo, setShowRoleplayDemo] = useState<boolean>(false);
   const [selectedMode, setSelectedMode] = useState<PitchMode>(PitchMode.COACH);
   const [selectedScriptId, setSelectedScriptId] = useState<string>('initial');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DifficultyLevel.BEGINNER);
@@ -243,6 +245,10 @@ const AppContent: React.FC = () => {
     return <FieldTranslator onBack={() => setShowTranslator(false)} />;
   }
 
+  if (showRoleplayDemo) {
+    return <RoleplayDemo onBack={() => setShowRoleplayDemo(false)} />;
+  }
+
   if (showHistory) {
     return <SessionHistory onBack={() => setShowHistory(false)} />;
   }
@@ -298,6 +304,14 @@ const AppContent: React.FC = () => {
               >
                 <Globe className="w-4 h-4 text-cyan-400" />
                 <span className="text-xs font-mono uppercase tracking-wider text-cyan-300 hidden sm:inline">Translate</span>
+              </button>
+              <button
+                onClick={() => setShowRoleplayDemo(true)}
+                className="group flex items-center space-x-2 px-3 py-2 bg-purple-900/50 hover:bg-purple-800/50 border border-purple-500/50 rounded-full transition-all duration-300"
+                title="Watch Roleplay Demos"
+              >
+                <Video className="w-4 h-4 text-purple-400" />
+                <span className="text-xs font-mono uppercase tracking-wider text-purple-300 hidden sm:inline">Demos</span>
               </button>
               <button
                 onClick={() => setShowHistory(true)}

@@ -28,7 +28,8 @@ import {
 } from '../utils/videoStorage';
 import { playSuccess, playPerfect, playLevelUp, toggleSounds, areSoundsEnabled } from '../utils/soundEffects';
 import { useAuth } from '../contexts/AuthContext';
-import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle, Sparkles, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
+import { checkTTSHealth, generateSpeech, DEFAULT_FEEDBACK_VOICE, speakWithChatterbox } from '../utils/chatterboxTTS';
+import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle, Sparkles, AlertTriangle, Volume2, VolumeX, Wand2 } from 'lucide-react';
 import XPBar from './XPBar';
 import LevelUpModal from './LevelUpModal';
 import { calculateSessionXP, awardXP, getUserProgress } from '../utils/gamification';
@@ -94,6 +95,11 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const [showSparkles, setShowSparkles] = useState(false);
   const [soundsOn, setSoundsOn] = useState(areSoundsEnabled());
 
+  // NEW: Custom Voice Mode (Chatterbox TTS with Reeses Piecies)
+  const [useCustomVoice, setUseCustomVoice] = useState(false);
+  const [ttsAvailable, setTtsAvailable] = useState<boolean | null>(null);
+  const [isSpeakingCustom, setIsSpeakingCustom] = useState(false);
+
   // NEW: Level-up modal state
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [levelUpData, setLevelUpData] = useState<{
@@ -127,6 +133,9 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   // CRITICAL: Session active flag to prevent audio playback after cleanup starts
   const sessionActiveRef = useRef<boolean>(true);
 
+  // Ref for custom voice mode (to avoid stale closures in callbacks)
+  const useCustomVoiceRef = useRef<boolean>(false);
+
   const getDifficultyColor = () => {
     switch (config.difficulty) {
       case DifficultyLevel.BEGINNER: return 'text-cyan-500';
@@ -159,6 +168,11 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         case 't':
           setIsTranscriptExpanded(prev => !prev);
           break;
+        case 'c':
+          if (ttsAvailable) {
+            setUseCustomVoice(prev => !prev);
+          }
+          break;
         case 'escape':
           if (confirm('Are you sure you want to end this session?')) {
             handleEndSession();
@@ -181,14 +195,37 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
   // NEW: Update Agnes state based on activity
   useEffect(() => {
-    if (aiSpeaking) {
+    if (aiSpeaking || isSpeakingCustom) {
       setAgnesState(AgnesState.RESPONDING);
     } else if (isSpeaking) {
       setAgnesState(AgnesState.LISTENING);
     } else if (isConnected) {
       setAgnesState(AgnesState.IDLE);
     }
-  }, [aiSpeaking, isSpeaking, isConnected]);
+  }, [aiSpeaking, isSpeaking, isConnected, isSpeakingCustom]);
+
+  // NEW: Check Chatterbox TTS availability
+  useEffect(() => {
+    const checkTTS = async () => {
+      try {
+        const available = await checkTTSHealth();
+        setTtsAvailable(available);
+        if (available) {
+          console.log('✅ Chatterbox TTS is available');
+        } else {
+          console.log('⚠️ Chatterbox TTS is not available, custom voice disabled');
+        }
+      } catch {
+        setTtsAvailable(false);
+      }
+    };
+    checkTTS();
+  }, []);
+
+  // Sync custom voice ref with state
+  useEffect(() => {
+    useCustomVoiceRef.current = useCustomVoice;
+  }, [useCustomVoice]);
 
   useEffect(() => {
     const initSession = async () => {
@@ -274,7 +311,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                 return;
               }
 
-              // Handle Text Output (for transcript)
+              // Handle Text Output (for transcript and custom voice)
               const textContent = serverContent?.modelTurn?.parts?.[0]?.text;
               if (textContent) {
                 // Parse score if present
@@ -292,11 +329,17 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   timestamp: new Date(),
                   score: score || undefined
                 }]);
+
+                // If custom voice enabled, speak with Chatterbox TTS (Reeses Piecies)
+                if (useCustomVoiceRef.current && sessionActiveRef.current) {
+                  // Don't wait for this, let it play asynchronously
+                  speakWithCustomVoice(textContent);
+                }
               }
 
-              // Handle Audio Output (only if session is still active)
+              // Handle Audio Output (only if session is still active AND custom voice is disabled)
               const base64Audio = serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-              if (base64Audio && sessionActiveRef.current) {
+              if (base64Audio && sessionActiveRef.current && !useCustomVoiceRef.current) {
                 await playAudioChunk(base64Audio);
               }
             },
@@ -788,6 +831,67 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     }
   };
 
+  // NEW: Speak text with Chatterbox TTS (Reeses Piecies voice)
+  const speakWithCustomVoice = async (text: string) => {
+    if (!sessionActiveRef.current) return;
+    if (!ttsAvailable) {
+      console.warn('Chatterbox TTS not available, falling back to no audio');
+      return;
+    }
+
+    setIsSpeakingCustom(true);
+    try {
+      // Clean up the text (remove score markers, etc.)
+      const cleanText = text
+        .replace(/AGNES SCORE:?\s*\d+/gi, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+
+      if (!cleanText) {
+        setIsSpeakingCustom(false);
+        return;
+      }
+
+      // Generate audio with Chatterbox TTS using Reeses Piecies voice
+      const audioBuffer = await generateSpeech(cleanText, {
+        voice: DEFAULT_FEEDBACK_VOICE, // 'reeses_piecies'
+        exaggeration: 0.4
+      });
+
+      // Play the audio
+      if (outputAudioContextRef.current && sessionActiveRef.current) {
+        const ctx = outputAudioContextRef.current;
+        if (ctx.state === 'closed') {
+          setIsSpeakingCustom(false);
+          return;
+        }
+
+        const audioData = await ctx.decodeAudioData(audioBuffer.slice(0));
+        const source = ctx.createBufferSource();
+        source.buffer = audioData;
+
+        // Route through analyser for visualization
+        if (analyserRef.current) {
+          source.connect(analyserRef.current);
+          analyserRef.current.connect(ctx.destination);
+        } else {
+          source.connect(ctx.destination);
+        }
+
+        source.start();
+        audioSourcesRef.current.add(source);
+
+        source.onended = () => {
+          setIsSpeakingCustom(false);
+          audioSourcesRef.current.delete(source);
+        };
+      }
+    } catch (error) {
+      console.error('Error speaking with custom voice:', error);
+      setIsSpeakingCustom(false);
+    }
+  };
+
   return (
     <div className="relative h-screen w-full bg-black flex flex-col overflow-hidden">
       {/* Header */}
@@ -842,6 +946,22 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                <VolumeX className="w-5 h-5 text-neutral-500" />
              )}
            </button>
+
+           {/* Custom Voice Toggle (Chatterbox TTS) */}
+           {ttsAvailable && (
+             <button
+               onClick={() => setUseCustomVoice(!useCustomVoice)}
+               className={`p-2 rounded-full transition-all duration-300 ${
+                 useCustomVoice
+                   ? 'bg-purple-600/30 border border-purple-500 text-purple-400 hover:bg-purple-600/50'
+                   : 'bg-neutral-900/50 border border-neutral-800 text-neutral-500 hover:bg-neutral-800 hover:border-neutral-700 hover:text-white'
+               }`}
+               title={useCustomVoice ? 'Using Reeses Piecies voice (click for standard)' : 'Switch to Reeses Piecies custom voice'}
+               aria-label={useCustomVoice ? 'Switch to standard Gemini voice' : 'Switch to Reeses Piecies custom voice'}
+             >
+               <Wand2 className="w-5 h-5" />
+             </button>
+           )}
 
            <button
              onClick={handleEndSession}
@@ -1053,6 +1173,12 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
               <span className="text-neutral-400">Toggle Transcript</span>
               <kbd className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-white font-mono text-xs">T</kbd>
             </div>
+            {ttsAvailable && (
+              <div className="flex items-center justify-between py-2 border-b border-neutral-800">
+                <span className="text-neutral-400">Toggle Custom Voice</span>
+                <kbd className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-white font-mono text-xs">C</kbd>
+              </div>
+            )}
             <div className="flex items-center justify-between py-2 border-b border-neutral-800">
               <span className="text-neutral-400">End Session</span>
               <kbd className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-white font-mono text-xs">ESC</kbd>

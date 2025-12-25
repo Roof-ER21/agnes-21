@@ -1,0 +1,12 @@
+# Chatterbox TTS Backend Dependencies
+fastapi>=0.109.0
+uvicorn>=0.27.0
+pydantic>=2.0.0
+python-multipart>=0.0.6
+
+# TTS Dependencies (from chatterbox-env)
+torch>=2.0.0
+torchaudio>=2.0.0
+# chatterbox-tts is installed in ~/chatterbox-env
+
+# Note: Run with source ~/chatterbox-env/bin/activate

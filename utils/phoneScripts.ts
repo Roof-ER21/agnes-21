@@ -6,9 +6,10 @@
 export interface PhoneScript {
   id: string;
   title: string;
-  category: 'estimate' | 'objection' | 'authorization' | 'pushback';
+  category: 'estimate' | 'objection' | 'authorization' | 'pushback' | 'retail';
   content: string;
   description: string;
+  voice?: 'agnes_21' | '21' | 'reeses_piecies'; // Optional voice selection for TTS
 }
 
 export const PHONE_SCRIPTS: PhoneScript[] = [
@@ -151,6 +152,45 @@ Detailed Email: To whom it may concern, While you noted the roof is "still funct
 [Continue with remaining Q&A points as needed...]
 
 For full playbook with all 100 questions, refer to the complete Pushback PDF document.`
+  },
+  {
+    id: 'retail-pitch',
+    title: 'Retail Store Approach',
+    category: 'retail',
+    description: 'Big-box store neighbor notification pitch for lead generation',
+    voice: 'agnes_21',
+    content: `Retail Pitch
+
+Hello, how are you?
+
+"Eh, you know, working lol"
+
+"You look ________, I'll be quick"
+
+My name is ___________.
+
+I'm just giving the neighbors a heads up
+
+Our company is about to do the (product) for one of your neighbors. (POINT)
+
+So, before we get going, we are going to come by, and we are going to do free quotes.
+
+So far, we're coming by for everybody in the afternoons, or are the evenings better for you?
+
+Great! My job is simple.
+1. I get your name
+2. I'll find a time that works best for you
+3. Leave you with a flyer
+
+---
+
+Key Points:
+- Keep it quick and friendly
+- Use the neighbor angle to create social proof
+- Get commitment on timing preference
+- Leave with contact info collected
+
+Voice Selection: This script works best with Agnes 21 or 21 voice for TTS playback.`
   }
 ];
 
@@ -172,5 +212,5 @@ export const getScriptsByCategory = (category: PhoneScript['category']): PhoneSc
  * Get all script categories
  */
 export const getScriptCategories = (): PhoneScript['category'][] => {
-  return ['estimate', 'objection', 'authorization', 'pushback'];
+  return ['estimate', 'objection', 'authorization', 'pushback', 'retail'];
 };
