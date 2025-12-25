@@ -6,7 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import { getUsers, User } from '../utils/auth';
 import { getSessions, SessionData } from '../utils/sessionStorage';
-import { ArrowLeft, Users as UsersIcon, Video, MessageSquare, Trophy, Calendar, Clock, Search } from 'lucide-react';
+import { analyticsApi, sessionsApi } from '../utils/apiClient';
+import { ArrowLeft, Users as UsersIcon, Video, MessageSquare, Trophy, Calendar, Clock, Search, Loader2, AlertCircle } from 'lucide-react';
 import { DifficultyLevel, PitchMode } from '../types';
 
 interface AllUsersViewProps {
@@ -26,37 +27,78 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserWithSessions | null>(null);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
     loadAllUsersData();
   }, []);
 
-  const loadAllUsersData = () => {
+  const loadAllUsersData = async () => {
     setLoading(true);
-    const users = getUsers();
+    setApiError(null);
 
-    const usersData: UserWithSessions[] = users.map(user => {
-      const sessions = getSessions(user.id);
-      const sessionsWithScores = sessions.filter(s => s.finalScore !== undefined);
-      const averageScore = sessionsWithScores.length > 0
-        ? Math.round(sessionsWithScores.reduce((sum, s) => sum + (s.finalScore || 0), 0) / sessionsWithScores.length)
-        : 0;
-      const totalMinutes = Math.round(sessions.reduce((sum, s) => sum + (s.duration || 0), 0) / 60);
+    try {
+      // Try to fetch from API first
+      const apiUsers = await analyticsApi.getAllUsers();
 
-      return {
-        user,
-        sessions,
-        totalSessions: sessions.length,
-        averageScore,
-        totalMinutes
-      };
-    });
+      const usersData: UserWithSessions[] = apiUsers.map(apiUser => {
+        // Transform API user to local User type
+        const user: User = {
+          id: apiUser.id,
+          name: apiUser.name,
+          role: apiUser.role as 'trainee' | 'manager',
+          avatar: apiUser.avatar,
+          totalXp: apiUser.totalXp,
+          currentLevel: apiUser.currentLevel,
+          currentStreak: apiUser.currentStreak,
+          longestStreak: apiUser.longestStreak,
+        };
 
-    // Sort by most active (most sessions)
-    usersData.sort((a, b) => b.totalSessions - a.totalSessions);
+        // For now, sessions will be empty - we'll fetch them when user is selected
+        return {
+          user,
+          sessions: [],
+          totalSessions: 0, // Will be updated when sessions are fetched
+          averageScore: 0,
+          totalMinutes: 0
+        };
+      });
 
-    setUsersWithSessions(usersData);
-    setLoading(false);
+      // Sort by XP (most active)
+      usersData.sort((a, b) => (b.user.totalXp || 0) - (a.user.totalXp || 0));
+
+      setUsersWithSessions(usersData);
+    } catch (error) {
+      console.warn('Failed to fetch users from API, using localStorage:', error);
+      setApiError('Using offline data');
+
+      // Fallback to localStorage
+      const users = getUsers();
+
+      const usersData: UserWithSessions[] = users.map(user => {
+        const sessions = getSessions(user.id);
+        const sessionsWithScores = sessions.filter(s => s.finalScore !== undefined);
+        const averageScore = sessionsWithScores.length > 0
+          ? Math.round(sessionsWithScores.reduce((sum, s) => sum + (s.finalScore || 0), 0) / sessionsWithScores.length)
+          : 0;
+        const totalMinutes = Math.round(sessions.reduce((sum, s) => sum + (s.duration || 0), 0) / 60);
+
+        return {
+          user,
+          sessions,
+          totalSessions: sessions.length,
+          averageScore,
+          totalMinutes
+        };
+      });
+
+      // Sort by most active (most sessions)
+      usersData.sort((a, b) => b.totalSessions - a.totalSessions);
+
+      setUsersWithSessions(usersData);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredUsers = usersWithSessions.filter(({ user }) =>
@@ -87,7 +129,7 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500 mx-auto mb-4"></div>
+          <Loader2 className="w-12 h-12 text-red-500 mx-auto mb-4 animate-spin" />
           <p className="text-neutral-400">Loading users...</p>
         </div>
       </div>
@@ -268,7 +310,13 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
               <span>All Users</span>
             </h1>
             <p className="text-neutral-400 text-lg mt-2">
-              {usersWithSessions.length} total users • {usersWithSessions.filter(u => u.totalSessions > 0).length} active
+              {usersWithSessions.length} total users • {usersWithSessions.filter(u => u.totalSessions > 0 || u.user.totalXp).length} active
+              {apiError && (
+                <span className="ml-2 text-yellow-500 text-sm">
+                  <AlertCircle className="w-4 h-4 inline mr-1" />
+                  {apiError}
+                </span>
+              )}
             </p>
           </div>
 

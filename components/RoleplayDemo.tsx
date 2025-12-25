@@ -382,6 +382,14 @@ interface Props {
   onBack?: () => void;
 }
 
+// Audio files only exist for quality demos (excellent, good, bad, awful)
+const QUALITY_DEMO_IDS = ['excellent', 'good', 'bad', 'awful'];
+
+// Helper to check if audio is available for a demo
+const hasAudioFiles = (level: string): boolean => {
+  return QUALITY_DEMO_IDS.includes(level);
+};
+
 // Helper to get audio file path for a script line
 const getAudioPath = (level: string, speaker: 'salesperson' | 'homeowner', index: number): string => {
   return `/demos/${level}_${speaker}_${index + 1}.wav`;
@@ -418,7 +426,7 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
     setAudioError(null);
   };
 
-  // Play audio for current line
+  // Play audio for current line (or advance without audio for objection demos)
   const playCurrentLine = (lineIndex: number) => {
     if (!selectedLevel || lineIndex >= script.length) {
       setIsPlaying(false);
@@ -427,6 +435,25 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
 
     const line = script[lineIndex];
     const speaker = line.speaker;
+
+    // For objection demos (no audio files), just auto-advance through lines
+    if (!hasAudioFiles(selectedLevel)) {
+      setCurrentLine(lineIndex);
+      setProgress(((lineIndex + 1) / script.length) * 100);
+
+      // Auto-advance to next line after a delay (simulating reading time)
+      const readingTime = Math.max(2000, line.text.length * 50); // ~50ms per character, min 2s
+      setTimeout(() => {
+        const nextLine = lineIndex + 1;
+        if (nextLine < script.length) {
+          playCurrentLine(nextLine);
+        } else {
+          setIsPlaying(false);
+          setProgress(100);
+        }
+      }, readingTime);
+      return;
+    }
 
     // Count how many times this speaker has spoken (for file indexing)
     let speakerIndex = 0;

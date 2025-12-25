@@ -75,11 +75,16 @@ const PWAInstallPrompt: React.FC = () => {
         <div className="relative p-6">
           {/* Close button */}
           <button
-            onClick={handleDismiss}
-            className="absolute top-3 right-3 p-2 hover:bg-white/10 rounded-full transition-colors"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleDismiss();
+            }}
+            className="absolute top-3 right-3 p-3 hover:bg-white/20 rounded-full transition-colors z-10 min-w-[44px] min-h-[44px] flex items-center justify-center"
             aria-label="Dismiss install prompt"
           >
-            <X className="w-5 h-5 text-white" />
+            <X className="w-6 h-6 text-white" />
           </button>
 
           {/* Content */}

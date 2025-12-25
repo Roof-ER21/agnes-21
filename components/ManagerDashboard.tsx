@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getManagerAnalytics, ManagerAnalytics, getSessions } from '../utils/sessionStorage';
+import { analyticsApi } from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { DifficultyLevel, PitchMode } from '../types';
 import {
@@ -13,7 +14,9 @@ import {
   BarChart3,
   PieChart,
   Download,
-  Filter
+  Filter,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 
 interface ManagerDashboardProps {
@@ -25,22 +28,92 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onBack }) => {
   const [dateRange, setDateRange] = useState<'7' | '30' | '90' | 'all'>('30');
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyLevel | 'all'>('all');
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
     loadAnalytics();
   }, [dateRange]);
 
-  const loadAnalytics = () => {
-    const endDate = new Date();
-    let startDate: Date | undefined;
+  const loadAnalytics = async () => {
+    setIsLoading(true);
+    setApiError(null);
 
-    if (dateRange !== 'all') {
-      startDate = new Date();
-      startDate.setDate(endDate.getDate() - parseInt(dateRange));
+    try {
+      // Try to fetch from API first
+      const [teamStats, sessionStats, trends] = await Promise.all([
+        analyticsApi.getTeamStats(),
+        analyticsApi.getSessionStats(),
+        analyticsApi.getTrends()
+      ]);
+
+      // Transform API data to ManagerAnalytics format
+      const apiAnalytics: ManagerAnalytics = {
+        totalSessions: teamStats.totalSessions,
+        averageScore: teamStats.averageScore,
+        totalTrainingHours: 0, // Will be calculated from sessions if needed
+        activeUsers: teamStats.activeUsersLast7Days,
+        sessionsByDifficulty: {
+          [DifficultyLevel.BEGINNER]: sessionStats.byDifficulty.find(d => d.difficulty === 'BEGINNER')?.count || 0,
+          [DifficultyLevel.ROOKIE]: sessionStats.byDifficulty.find(d => d.difficulty === 'ROOKIE')?.count || 0,
+          [DifficultyLevel.PRO]: sessionStats.byDifficulty.find(d => d.difficulty === 'PRO')?.count || 0,
+          [DifficultyLevel.ELITE]: sessionStats.byDifficulty.find(d => d.difficulty === 'ELITE')?.count || 0,
+          [DifficultyLevel.NIGHTMARE]: sessionStats.byDifficulty.find(d => d.difficulty === 'NIGHTMARE')?.count || 0,
+        },
+        sessionsByMode: {
+          [PitchMode.COACH]: sessionStats.byMode.find(m => m.mode === 'COACH')?.count || 0,
+          [PitchMode.ROLEPLAY]: sessionStats.byMode.find(m => m.mode === 'ROLEPLAY')?.count || 0,
+        },
+        scoresByDate: trends.dailySessions.map(d => ({
+          date: d.date,
+          averageScore: d.avgScore,
+          count: d.count
+        })),
+        sessionsOverTime: trends.dailySessions.map(d => ({
+          date: d.date,
+          count: d.count
+        })),
+        topPerformers: trends.topPerformers.map(p => ({
+          userId: p.userId,
+          averageScore: p.avgScore,
+          sessionCount: p.sessionsCount
+        })),
+        mostImproved: [],
+        mostActive: trends.topPerformers.map(p => ({
+          userId: p.userId,
+          sessionCount: p.sessionsCount,
+          totalHours: 0 // Not available from API
+        })),
+        completionRateByDifficulty: {
+          [DifficultyLevel.BEGINNER]: { completed: 0, total: 0, rate: 100 },
+          [DifficultyLevel.ROOKIE]: { completed: 0, total: 0, rate: 100 },
+          [DifficultyLevel.PRO]: { completed: 0, total: 0, rate: 100 },
+          [DifficultyLevel.ELITE]: { completed: 0, total: 0, rate: 100 },
+          [DifficultyLevel.NIGHTMARE]: { completed: 0, total: 0, rate: 100 },
+        },
+        peakTrainingHours: [],
+        peakTrainingDays: []
+      };
+
+      setAnalytics(apiAnalytics);
+    } catch (error) {
+      console.warn('Failed to fetch analytics from API, using localStorage:', error);
+      setApiError('Using offline data');
+
+      // Fallback to localStorage
+      const endDate = new Date();
+      let startDate: Date | undefined;
+
+      if (dateRange !== 'all') {
+        startDate = new Date();
+        startDate.setDate(endDate.getDate() - parseInt(dateRange));
+      }
+
+      const data = getManagerAnalytics(startDate, endDate, user?.id);
+      setAnalytics(data);
+    } finally {
+      setIsLoading(false);
     }
-
-    const data = getManagerAnalytics(startDate, endDate, user?.id);
-    setAnalytics(data);
   };
 
   const filteredAnalytics = useMemo(() => {
@@ -145,11 +218,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onBack }) => {
     window.print();
   };
 
-  if (!analytics) {
+  if (isLoading || !analytics) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-500 mx-auto mb-4"></div>
+          <Loader2 className="w-12 h-12 text-red-500 mx-auto mb-4 animate-spin" />
           <p className="text-neutral-400">Loading analytics...</p>
         </div>
       </div>
@@ -195,6 +268,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onBack }) => {
         </h1>
         <p className="text-neutral-400 text-lg print:text-base">
           Team performance overview and insights
+          {apiError && (
+            <span className="ml-2 text-yellow-500 text-sm">
+              <AlertCircle className="w-4 h-4 inline mr-1" />
+              {apiError}
+            </span>
+          )}
         </p>
       </div>
 
