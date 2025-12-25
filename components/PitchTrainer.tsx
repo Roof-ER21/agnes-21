@@ -105,6 +105,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const [isRequestingScore, setIsRequestingScore] = useState(false);
   const isRequestingScoreRef = useRef(false); // Ref to track in async callbacks
   const isPlayingScoreAudioRef = useRef(false); // Ref to track when score audio is playing (prevents session end)
+  const scoreCleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Delayed cleanup for multi-chunk scores
 
   // NEW: Silence timeout tracking
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -333,45 +334,75 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
               // Handle Text Output (for transcript and custom voice)
               const textContent = serverContent?.modelTurn?.parts?.[0]?.text;
               if (textContent) {
+                // CRITICAL: Capture score request state BEFORE any changes
+                // This ensures we know if this message is part of a score response
+                const wasRequestingScore = isRequestingScoreRef.current;
+
                 // Parse score ONLY if we explicitly requested it (prevents interim scores)
                 const scoreMatch = textContent.match(/AGNES SCORE:?\s*(\d+)/i);
                 const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
 
                 // Only update currentScore if we explicitly requested scoring
-                if (score !== null && isRequestingScoreRef.current) {
+                if (score !== null && wasRequestingScore) {
                   setCurrentScore(score);
-                  // Clear the score request flag immediately after receiving score
-                  isRequestingScoreRef.current = false;
-                  setIsRequestingScore(false);
+                  // DON'T clear flags here - clear them AFTER audio finishes
+                  console.log('Score received:', score);
                 }
 
-                // Add to transcript (always add, but only mark with score if it was final)
+                // Add to transcript (always add, mark with score if detected)
                 setTranscript(prev => [...prev, {
                   role: 'agnes',
                   text: textContent,
                   timestamp: new Date(),
-                  score: (score !== null && !isRequestingScoreRef.current) ? score : undefined
+                  score: score !== null ? score : undefined
                 }]);
+
+                // Helper function to schedule score cleanup (with delay for multi-chunk responses)
+                const scheduleScoreCleanup = () => {
+                  // Clear any existing timeout
+                  if (scoreCleanupTimeoutRef.current) {
+                    clearTimeout(scoreCleanupTimeoutRef.current);
+                  }
+
+                  // Schedule cleanup after 1.5 seconds of no new score chunks
+                  scoreCleanupTimeoutRef.current = setTimeout(() => {
+                    console.log('Score cleanup: clearing flags after delay');
+                    isRequestingScoreRef.current = false;
+                    setIsRequestingScore(false);
+                    setAgnesState(AgnesState.LISTENING);
+
+                    // Resume microphone
+                    if (inputAudioContextRef.current?.state === 'suspended') {
+                      inputAudioContextRef.current.resume().catch(e => console.warn('Failed to resume mic:', e));
+                      console.log('Microphone resumed after score cleanup');
+                    }
+                  }, 1500);
+                };
 
                 // If custom voice enabled, speak with Chatterbox TTS (Reeses Piecies)
                 if (useCustomVoiceRef.current && sessionActiveRef.current) {
                   // For score requests, await the audio to ensure it completes before session can end
-                  if (isRequestingScoreRef.current) {
+                  // Use captured state (wasRequestingScore) since we haven't cleared it yet
+                  if (wasRequestingScore) {
                     isPlayingScoreAudioRef.current = true;
                     try {
                       await speakWithCustomVoice(textContent);
                     } finally {
                       isPlayingScoreAudioRef.current = false;
-                      // Resume microphone after score audio finishes
-                      if (inputAudioContextRef.current?.state === 'suspended') {
-                        inputAudioContextRef.current.resume().catch(e => console.warn('Failed to resume mic:', e));
-                        console.log('Microphone resumed after scoring');
-                      }
+
+                      // Schedule delayed cleanup for ALL score chunks (not just the one with score number)
+                      // This handles multi-chunk responses - each chunk extends the timeout
+                      console.log('Score chunk audio complete, scheduling/rescheduling cleanup');
+                      scheduleScoreCleanup();
                     }
                   } else {
                     // For regular messages, don't block
                     speakWithCustomVoice(textContent);
                   }
+                } else if (wasRequestingScore && score !== null) {
+                  // Not using custom voice but got a score - schedule delayed cleanup
+                  console.log('Score received (no custom voice), scheduling cleanup');
+                  scheduleScoreCleanup();
                 }
               }
 
@@ -430,6 +461,12 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const cleanup = () => {
     // CRITICAL: Disable session FIRST to prevent new audio from playing
     sessionActiveRef.current = false;
+
+    // Clear score cleanup timeout if pending
+    if (scoreCleanupTimeoutRef.current) {
+      clearTimeout(scoreCleanupTimeoutRef.current);
+      scoreCleanupTimeoutRef.current = null;
+    }
 
     // Stop all audio sources SECOND (before closing contexts)
     audioSourcesRef.current.forEach(source => {
