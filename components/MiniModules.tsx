@@ -12,7 +12,8 @@ export interface MiniModule {
   xpBonus: number;
 }
 
-export const MINI_MODULES: MiniModule[] = [
+// Insurance-specific mini-module metadata
+const INSURANCE_MINI_MODULES: MiniModule[] = [
   {
     id: 'opening',
     title: 'Just Opening',
@@ -26,7 +27,7 @@ export const MINI_MODULES: MiniModule[] = [
   {
     id: 'objection-gauntlet',
     title: 'Objection Gauntlet',
-    description: 'Rapid-fire objection handling practice',
+    description: 'Handle insurance objections rapid-fire',
     duration: '2 min',
     icon: <Flame className="w-5 h-5" />,
     color: 'orange',
@@ -35,8 +36,8 @@ export const MINI_MODULES: MiniModule[] = [
   },
   {
     id: 'closing',
-    title: 'Closing Practice',
-    description: 'Focus on closing techniques and commitment',
+    title: 'Close the Inspection',
+    description: 'Get the homeowner to agree to the inspection',
     duration: '1 min',
     icon: <Target className="w-5 h-5" />,
     color: 'green',
@@ -46,7 +47,7 @@ export const MINI_MODULES: MiniModule[] = [
   {
     id: 'rapport',
     title: 'Build Rapport',
-    description: 'Practice making it relatable and connecting',
+    description: 'Connect with homeowners about storm damage',
     duration: '45 sec',
     icon: <MessageSquare className="w-5 h-5" />,
     color: 'purple',
@@ -55,12 +56,66 @@ export const MINI_MODULES: MiniModule[] = [
   }
 ];
 
+// Retail-specific mini-module metadata
+const RETAIL_MINI_MODULES: MiniModule[] = [
+  {
+    id: 'opening',
+    title: 'Retail Opening',
+    description: 'Nail your introduction and value prop',
+    duration: '30 sec',
+    icon: <Zap className="w-5 h-5" />,
+    color: 'cyan',
+    focusArea: 'opening',
+    xpBonus: 25
+  },
+  {
+    id: 'objection-gauntlet',
+    title: 'Retail Objections',
+    description: 'Handle customer pushback rapid-fire',
+    duration: '2 min',
+    icon: <Flame className="w-5 h-5" />,
+    color: 'orange',
+    focusArea: 'objections',
+    xpBonus: 50
+  },
+  {
+    id: 'closing',
+    title: 'Set the Appointment',
+    description: 'Get the customer to commit to a time',
+    duration: '1 min',
+    icon: <Target className="w-5 h-5" />,
+    color: 'green',
+    focusArea: 'closing',
+    xpBonus: 35
+  },
+  {
+    id: 'rapport',
+    title: 'Quick Connect',
+    description: 'Build instant rapport at the door',
+    duration: '45 sec',
+    icon: <MessageSquare className="w-5 h-5" />,
+    color: 'purple',
+    focusArea: 'rapport',
+    xpBonus: 30
+  }
+];
+
+// Legacy export for backwards compatibility
+export const MINI_MODULES = INSURANCE_MINI_MODULES;
+
+// Get mini-modules by division
+export const getMiniModulesByDivision = (division: 'insurance' | 'retail'): MiniModule[] => {
+  return division === 'retail' ? RETAIL_MINI_MODULES : INSURANCE_MINI_MODULES;
+};
+
 interface MiniModulesProps {
   onSelectModule: (module: MiniModule) => void;
   completedToday: string[];
+  division?: 'insurance' | 'retail';
 }
 
-const MiniModules: React.FC<MiniModulesProps> = ({ onSelectModule, completedToday }) => {
+const MiniModules: React.FC<MiniModulesProps> = ({ onSelectModule, completedToday, division = 'insurance' }) => {
+  const modules = getMiniModulesByDivision(division);
   const getColorClasses = (color: string, isCompleted: boolean) => {
     if (isCompleted) {
       return {
@@ -108,12 +163,12 @@ const MiniModules: React.FC<MiniModulesProps> = ({ onSelectModule, completedToda
         </h3>
         <div className="flex items-center space-x-2 text-xs text-neutral-500">
           <Award className="w-3 h-3" />
-          <span>{completedToday.length}/4 today</span>
+          <span>{completedToday.length}/{modules.length} today</span>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {MINI_MODULES.map((module) => {
+        {modules.map((module) => {
           const isCompleted = completedToday.includes(module.id);
           const colors = getColorClasses(module.color, isCompleted);
 
@@ -149,7 +204,7 @@ const MiniModules: React.FC<MiniModulesProps> = ({ onSelectModule, completedToda
         })}
       </div>
 
-      {completedToday.length === 4 && (
+      {completedToday.length === modules.length && (
         <div className="p-3 bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border border-yellow-500/30 rounded-lg text-center">
           <span className="text-yellow-400 text-sm font-medium">
             🎉 All quick practices completed today! +100 Bonus XP

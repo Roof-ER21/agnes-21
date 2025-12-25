@@ -1,10 +1,11 @@
 import React from 'react';
-import { Mic, Brain, MessageCircle } from 'lucide-react';
+import { Mic, Brain, MessageCircle, Award } from 'lucide-react';
 
 enum AgnesState {
   IDLE = 'IDLE',
   LISTENING = 'LISTENING',
   THINKING = 'THINKING',
+  SCORING = 'SCORING',
   RESPONDING = 'RESPONDING'
 }
 
@@ -35,6 +36,16 @@ const AgnesStateIndicator: React.FC<AgnesStateIndicatorProps> = ({ state, classN
           borderColor: 'border-purple-500/30',
           pulseColor: 'bg-purple-500',
           emoji: '💭'
+        };
+      case AgnesState.SCORING:
+        return {
+          icon: <Award className="w-4 h-4" />,
+          text: 'Scoring your pitch...',
+          color: 'text-yellow-400',
+          bgColor: 'bg-yellow-500/20',
+          borderColor: 'border-yellow-500/30',
+          pulseColor: 'bg-yellow-500',
+          emoji: '🎯'
         };
       case AgnesState.RESPONDING:
         return {

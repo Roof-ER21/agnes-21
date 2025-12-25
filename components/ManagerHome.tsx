@@ -14,7 +14,10 @@ import {
   History,
   Settings,
   Mic,
-  Sparkles
+  Sparkles,
+  Home,
+  ShoppingCart,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -115,11 +118,37 @@ const ManagerHome: React.FC<ManagerHomeProps> = ({ onNavigate }) => {
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
-          <div className="flex justify-center">
+          <div className="flex justify-center items-center gap-3">
             <div className="inline-flex items-center px-4 py-2 bg-neutral-900/80 rounded-full border border-yellow-500/30">
               <Sparkles className="w-4 h-4 text-yellow-400 mr-2" />
               <span className="text-yellow-300 font-mono text-xs tracking-widest uppercase">Manager Dashboard</span>
             </div>
+
+            {/* Division Badge */}
+            {user?.role === 'manager' ? (
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm uppercase tracking-wider shadow-lg bg-gradient-to-r from-yellow-600 to-amber-500 text-white shadow-yellow-500/25">
+                <Shield className="w-4 h-4" />
+                <span>All Divisions</span>
+              </div>
+            ) : (
+              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm uppercase tracking-wider shadow-lg ${
+                user?.division === 'retail' || user?.role === 'retail_manager'
+                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-emerald-500/25'
+                  : 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-red-500/25'
+              }`}>
+                {user?.division === 'retail' || user?.role === 'retail_manager' ? (
+                  <>
+                    <ShoppingCart className="w-4 h-4" />
+                    <span>Retail</span>
+                  </>
+                ) : (
+                  <>
+                    <Home className="w-4 h-4" />
+                    <span>Insurance</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">

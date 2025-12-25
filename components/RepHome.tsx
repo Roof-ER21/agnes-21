@@ -15,7 +15,9 @@ import {
   Flame,
   Award,
   ChevronRight,
-  Calendar
+  Calendar,
+  Home,
+  ShoppingCart
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserProgress } from '../utils/gamification';
@@ -127,8 +129,28 @@ const RepHome: React.FC<RepHomeProps> = ({ onNavigate }) => {
     <div className="min-h-screen bg-black text-white p-6">
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Welcome Header */}
-        <div className="space-y-2">
-          <p className="text-neutral-400 text-sm">{getGreeting()}</p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-neutral-400 text-sm">{getGreeting()}</p>
+            {/* Division Badge */}
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm uppercase tracking-wider shadow-lg ${
+              user?.division === 'retail'
+                ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-emerald-500/25'
+                : 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-red-500/25'
+            }`}>
+              {user?.division === 'retail' ? (
+                <>
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>Retail</span>
+                </>
+              ) : (
+                <>
+                  <Home className="w-4 h-4" />
+                  <span>Insurance</span>
+                </>
+              )}
+            </div>
+          </div>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
             Welcome back, <span className="text-red-500">{user?.name}</span>!
           </h1>

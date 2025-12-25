@@ -103,6 +103,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   // NEW: Score Me functionality
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [isRequestingScore, setIsRequestingScore] = useState(false);
+  const isRequestingScoreRef = useRef(false); // Ref to track in async callbacks
 
   // NEW: Silence timeout tracking
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -329,20 +330,24 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
               // Handle Text Output (for transcript and custom voice)
               const textContent = serverContent?.modelTurn?.parts?.[0]?.text;
               if (textContent) {
-                // Parse score if present
+                // Parse score ONLY if we explicitly requested it (prevents interim scores)
                 const scoreMatch = textContent.match(/AGNES SCORE:?\s*(\d+)/i);
                 const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
 
-                if (score !== null) {
+                // Only update currentScore if we explicitly requested scoring
+                if (score !== null && isRequestingScoreRef.current) {
                   setCurrentScore(score);
+                  // Clear the score request flag immediately after receiving score
+                  isRequestingScoreRef.current = false;
+                  setIsRequestingScore(false);
                 }
 
-                // Add to transcript
+                // Add to transcript (always add, but only mark with score if it was final)
                 setTranscript(prev => [...prev, {
                   role: 'agnes',
                   text: textContent,
                   timestamp: new Date(),
-                  score: score || undefined
+                  score: (score !== null && !isRequestingScoreRef.current) ? score : undefined
                 }]);
 
                 // If custom voice enabled, speak with Chatterbox TTS (Reeses Piecies)
@@ -534,7 +539,12 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const handleScoreMe = async () => {
     if (!sessionPromiseRef.current || isRequestingScore) return;
 
+    // Set both state and ref for score request tracking
     setIsRequestingScore(true);
+    isRequestingScoreRef.current = true;
+
+    // Update Agnes state to SCORING (dedicated scoring state)
+    setAgnesState(AgnesState.SCORING);
 
     try {
       // Send a text message to Gemini asking for scoring
@@ -559,16 +569,18 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
     } catch (error) {
       console.error('Error requesting score:', error);
-    } finally {
-      // Reset after a delay to allow response
-      setTimeout(() => setIsRequestingScore(false), 5000);
+      // Reset on error
+      setIsRequestingScore(false);
+      isRequestingScoreRef.current = false;
     }
+    // Note: Flag is cleared when score is received in the message handler
   };
 
   // NEW: Handle end session with auto-score option
   const handleEndWithScore = async () => {
     setShowScoreModal(false);
     setIsRequestingScore(true);
+    isRequestingScoreRef.current = true;
 
     try {
       if (sessionPromiseRef.current) {
@@ -589,6 +601,10 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     } catch (error) {
       console.error('Error getting final score:', error);
     }
+
+    // Clear the score request flag
+    isRequestingScoreRef.current = false;
+    setIsRequestingScore(false);
 
     // Now end the session
     confirmEndSession();
@@ -1299,6 +1315,38 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 backdrop-blur text-white px-6 py-3 rounded-lg shadow-xl font-medium border border-red-500 flex items-center space-x-2 animate-bounce z-50">
           <X className="w-5 h-5" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* Scoring Overlay - Shows when Agnes is scoring */}
+      {isRequestingScore && (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center">
+          <div className="bg-neutral-900/95 border border-yellow-500/30 rounded-2xl p-8 shadow-2xl shadow-yellow-500/10 max-w-md text-center animate-pulse">
+            <div className="flex justify-center mb-4">
+              <div className="relative">
+                <div className="absolute inset-0 w-16 h-16 bg-yellow-500/30 rounded-full animate-ping" />
+                <Trophy className="w-16 h-16 text-yellow-400 relative z-10" />
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Agnes is Scoring</h3>
+            <p className="text-neutral-400 text-sm mb-4">
+              Analyzing your performance...
+            </p>
+            <div className="space-y-2 text-xs text-neutral-500">
+              <div className="flex items-center justify-center space-x-2">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span>Evaluating delivery</span>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span>Checking non-negotiables</span>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span>Assessing objection handling</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

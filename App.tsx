@@ -7,7 +7,7 @@ import TeamLeaderboard from './components/TeamLeaderboard';
 import ManagerDashboard from './components/ManagerDashboard';
 import AllUsersView from './components/AllUsersView';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
-import MiniModules, { MiniModule, MINI_MODULES } from './components/MiniModules';
+import MiniModules, { MiniModule } from './components/MiniModules';
 import TrainingGoals from './components/TrainingGoals';
 import TeamContests from './components/TeamContests';
 import SkillTree from './components/SkillTree';
@@ -19,7 +19,7 @@ import RepHome from './components/RepHome';
 import ScriptEditor from './components/ScriptEditor';
 import RepHistory from './components/RepHistory';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
-import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock, Globe, Video, ArrowLeft } from 'lucide-react';
+import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock, Globe, Video, ArrowLeft, Home, ShoppingCart } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
 import { PHONE_SCRIPTS, PhoneScript, getScriptsByDivision } from './utils/phoneScripts';
 import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty, isManagerMode, activateManagerMode, deactivateManagerMode } from './utils/gamification';
@@ -118,7 +118,7 @@ const AppContent: React.FC = () => {
   const [showTranslator, setShowTranslator] = useState<boolean>(false);
   const [showRoleplayDemo, setShowRoleplayDemo] = useState<boolean>(false);
   const [selectedMode, setSelectedMode] = useState<PitchMode>(PitchMode.COACH);
-  const [selectedScriptId, setSelectedScriptId] = useState<string>('initial');
+  const [selectedScriptId, setSelectedScriptId] = useState<string>('');  // Will be set by useEffect based on division
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DifficultyLevel.BEGINNER);
   const [customScript, setCustomScript] = useState<string>('');
   const [managerModeActive, setManagerModeActive] = useState<boolean>(isManagerMode());
@@ -270,6 +270,17 @@ const AppContent: React.FC = () => {
   ];
 
   const selectedScript = allScripts.find(s => s.id === selectedScriptId) || allScripts[0];
+
+  // Set default script based on user's division (only once when first loading or division changes)
+  useEffect(() => {
+    if (!selectedScriptId && allScripts.length > 0) {
+      // Set default to first available script for user's division
+      const defaultScript = allScripts[0];
+      if (defaultScript) {
+        setSelectedScriptId(defaultScript.id);
+      }
+    }
+  }, [selectedScriptId, allScripts]);
 
   // Show loading while checking auth
   if (isLoading) {
@@ -432,11 +443,29 @@ const AppContent: React.FC = () => {
       <div id="main-content" className="max-w-6xl w-full mx-auto space-y-12 py-10 px-6">
         {/* Header */}
         <div className="text-center space-y-6">
-          {/* Centered Badge */}
-          <div className="flex justify-center">
+          {/* Centered Badge with Division */}
+          <div className="flex justify-center items-center gap-3">
             <div className="inline-flex items-center justify-center px-4 py-1.5 bg-neutral-900 rounded-full border border-red-900/50 shadow-[0_0_20px_rgba(220,38,38,0.15)]">
                <Sparkles className="w-4 h-4 text-red-500 mr-2" />
                <span className="text-red-200 font-mono text-xs tracking-widest uppercase">Agnes 21 // AI Trainer</span>
+            </div>
+            {/* Division Badge */}
+            <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full font-bold text-sm uppercase tracking-wider shadow-lg ${
+              user?.division === 'retail'
+                ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-emerald-500/25'
+                : 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-red-500/25'
+            }`}>
+              {user?.division === 'retail' ? (
+                <>
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>Retail</span>
+                </>
+              ) : (
+                <>
+                  <Home className="w-4 h-4" />
+                  <span>Insurance</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -644,6 +673,7 @@ const AppContent: React.FC = () => {
           <MiniModules
             onSelectModule={handleMiniModuleSelect}
             completedToday={completedMiniModulesToday}
+            division={user?.division as 'insurance' | 'retail' || 'insurance'}
           />
         </div>
 
