@@ -22,6 +22,7 @@ import {
   getAchievementProgress,
   SessionData
 } from '../utils/sessionStorage';
+import { leaderboardApi } from '../utils/apiClient';
 
 // ============================================
 // TYPES & INTERFACES
@@ -563,6 +564,39 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
   const [category, setCategory] = useState<LeaderboardCategory>('overall');
   const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(null);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [apiUsers, setApiUsers] = useState<LeaderboardUser[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch leaderboard from API
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        const data = await leaderboardApi.get();
+        // Transform API data to LeaderboardUser format
+        const transformedUsers: LeaderboardUser[] = data.map((u, index) => ({
+          id: u.id,
+          name: u.name,
+          avatar: u.avatar,
+          totalSessions: 0, // Will be populated if available
+          avgScore: Math.round(u.totalXp / Math.max(u.currentLevel, 1)), // Estimate from XP
+          currentStreak: u.currentStreak,
+          achievementCount: 0,
+          recentSessions: [],
+          scoreImprovement: 0,
+          rank: u.rank || index + 1,
+          weekScore: u.totalXp
+        }));
+        setApiUsers(transformedUsers);
+      } catch (error) {
+        console.warn('Failed to fetch leaderboard from API, using mock data:', error);
+        setApiUsers(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [lastUpdate]);
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -573,8 +607,14 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
     return () => clearInterval(interval);
   }, []);
 
-  // Get or generate mock users
+  // Get users from API or generate mock users as fallback
   const users = useMemo(() => {
+    // Use API data if available
+    if (apiUsers && apiUsers.length > 0) {
+      return apiUsers;
+    }
+
+    // Fallback to mock data
     const mockUsers = generateMockUsers();
 
     // Add current user's real data if available
@@ -608,7 +648,7 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
     }
 
     return mockUsers;
-  }, [lastUpdate, currentUserId]);
+  }, [lastUpdate, currentUserId, apiUsers]);
 
   // Sort users by category
   const sortedUsers = useMemo(() => {

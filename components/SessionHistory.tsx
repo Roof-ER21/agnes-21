@@ -9,6 +9,7 @@ import AchievementsPanel from './AchievementsPanel';
 import VideoStorageStats from './VideoStorageStats';
 import { VideoPlayer } from './VideoPlayer';
 import { Calendar, Clock, Trophy, Trash2, ChevronDown, ChevronUp, MessageSquare, X, ArrowLeft, FileDown, Video } from 'lucide-react';
+import { sessionsApi } from '../utils/apiClient';
 
 interface SessionHistoryProps {
   onBack: () => void;
@@ -22,6 +23,8 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({ onBack }) => {
   const [sessionToExport, setSessionToExport] = useState<SessionData | null>(null);
   const [sessionsWithVideo, setSessionsWithVideo] = useState<Set<string>>(new Set());
   const [sessionToPlay, setSessionToPlay] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   // Filters
   const [difficultyFilter, setDifficultyFilter] = useState<string>('all');
@@ -32,14 +35,12 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({ onBack }) => {
 
   useEffect(() => {
     loadSessions();
-    checkVideoAvailability();
-  }, []);
+  }, [user]);
 
-  const checkVideoAvailability = async () => {
-    const loadedSessions = getSessions(user?.id);
+  const checkVideoAvailability = async (sessionsToCheck: SessionData[]) => {
     const videoSet = new Set<string>();
 
-    for (const session of loadedSessions) {
+    for (const session of sessionsToCheck) {
       const hasVideo = await hasVideoRecording(session.sessionId, user?.id);
       if (hasVideo) {
         videoSet.add(session.sessionId);
@@ -53,9 +54,42 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({ onBack }) => {
     applyFilters();
   }, [sessions, difficultyFilter, modeFilter, scoreFilter, sortBy, sortOrder]);
 
-  const loadSessions = () => {
-    const loadedSessions = getSessions(user?.id);
-    setSessions(loadedSessions);
+  const loadSessions = async () => {
+    setIsLoading(true);
+    setApiError(null);
+
+    try {
+      // Try to fetch from API first
+      const apiSessions = await sessionsApi.list();
+
+      // Transform API response to SessionData format
+      const transformedSessions: SessionData[] = apiSessions.map((s: any) => ({
+        sessionId: s.sessionId,
+        mode: s.mode as PitchMode,
+        difficulty: s.difficulty as DifficultyLevel,
+        scriptId: s.scriptId,
+        scriptName: s.scriptName,
+        isMiniModule: s.isMiniModule,
+        timestamp: new Date(s.createdAt),
+        duration: s.duration,
+        finalScore: s.finalScore,
+        xpEarned: s.xpEarned,
+        transcript: s.transcript || []
+      }));
+
+      setSessions(transformedSessions);
+      checkVideoAvailability(transformedSessions);
+    } catch (error) {
+      console.warn('Failed to fetch sessions from API, using localStorage:', error);
+      setApiError('Using offline data');
+
+      // Fallback to localStorage
+      const loadedSessions = getSessions(user?.id);
+      setSessions(loadedSessions);
+      checkVideoAvailability(loadedSessions);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const applyFilters = () => {
@@ -157,7 +191,14 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({ onBack }) => {
           <span>Session History</span>
         </h1>
         <p className="text-neutral-400 text-lg">
-          {sessions.length} total sessions • {filteredSessions.length} displayed
+          {isLoading ? (
+            'Loading sessions...'
+          ) : (
+            <>
+              {sessions.length} total sessions • {filteredSessions.length} displayed
+              {apiError && <span className="text-yellow-500 ml-2">({apiError})</span>}
+            </>
+          )}
         </p>
       </div>
 

@@ -1,4 +1,5 @@
 import { PitchMode, DifficultyLevel } from '../types';
+import { sessionsApi } from './apiClient';
 
 export interface TranscriptMessage {
   role: 'user' | 'agnes';
@@ -13,9 +14,14 @@ export interface SessionData {
   difficulty: DifficultyLevel;
   mode: PitchMode;
   script: string;
+  scriptId?: string;
+  scriptName?: string;
+  isMiniModule?: boolean;
   transcript: TranscriptMessage[];
   finalScore?: number;
+  xpEarned?: number;
   duration?: number; // in seconds
+  synced?: boolean; // Whether synced to backend
 }
 
 /**
@@ -60,30 +66,109 @@ export const generateSessionId = (): string => {
 };
 
 /**
- * Saves a session to localStorage
+ * Saves a session to localStorage and syncs to API
  * @param sessionData - Session data to save
  * @param userId - Optional user ID to scope the session to (defaults to current user from auth)
  */
-export const saveSession = (sessionData: SessionData, userId?: string): boolean => {
+export const saveSession = async (sessionData: SessionData, userId?: string): Promise<boolean> => {
   try {
     // Migrate legacy data if needed
     if (userId) {
       migrateLegacyData(userId);
     }
 
+    // Mark as not synced initially
+    const sessionToSave = { ...sessionData, synced: false };
+
+    // Save to localStorage first (offline-first approach)
     const existingSessions = getSessions(userId);
-    const updatedSessions = [...existingSessions, sessionData];
+    const updatedSessions = [...existingSessions, sessionToSave];
 
     // Keep only last 50 sessions to prevent localStorage overflow
     const limitedSessions = updatedSessions.slice(-50);
 
     const storageKey = getStorageKey(userId);
     localStorage.setItem(storageKey, JSON.stringify(limitedSessions));
+
+    // Try to sync with API
+    try {
+      await sessionsApi.create({
+        sessionId: sessionData.sessionId,
+        mode: sessionData.mode,
+        difficulty: sessionData.difficulty,
+        scriptId: sessionData.scriptId || sessionData.script,
+        scriptName: sessionData.scriptName || sessionData.script,
+        isMiniModule: sessionData.isMiniModule || false,
+        duration: sessionData.duration || 0,
+        finalScore: sessionData.finalScore,
+        xpEarned: sessionData.xpEarned || 0,
+        transcript: sessionData.transcript
+      });
+
+      // Mark as synced in localStorage
+      markSessionSynced(sessionData.sessionId, userId);
+    } catch (apiError) {
+      console.warn('Failed to sync session to API, will retry later:', apiError);
+      // Session saved locally, will be synced later
+    }
+
     return true;
   } catch (error) {
     console.error('Failed to save session:', error);
     return false;
   }
+};
+
+/**
+ * Marks a session as synced in localStorage
+ */
+const markSessionSynced = (sessionId: string, userId?: string): void => {
+  try {
+    const sessions = getSessions(userId);
+    const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
+    if (sessionIndex !== -1) {
+      sessions[sessionIndex].synced = true;
+      const storageKey = getStorageKey(userId);
+      localStorage.setItem(storageKey, JSON.stringify(sessions));
+    }
+  } catch (error) {
+    console.error('Failed to mark session as synced:', error);
+  }
+};
+
+/**
+ * Syncs all unsynced sessions to the API
+ */
+export const syncPendingSessions = async (userId?: string): Promise<{ synced: number; failed: number }> => {
+  const sessions = getSessions(userId);
+  const unsyncedSessions = sessions.filter(s => !s.synced);
+
+  let synced = 0;
+  let failed = 0;
+
+  for (const session of unsyncedSessions) {
+    try {
+      await sessionsApi.create({
+        sessionId: session.sessionId,
+        mode: session.mode,
+        difficulty: session.difficulty,
+        scriptId: session.scriptId || session.script,
+        scriptName: session.scriptName || session.script,
+        isMiniModule: session.isMiniModule || false,
+        duration: session.duration || 0,
+        finalScore: session.finalScore,
+        xpEarned: session.xpEarned || 0,
+        transcript: session.transcript
+      });
+      markSessionSynced(session.sessionId, userId);
+      synced++;
+    } catch (error) {
+      console.warn(`Failed to sync session ${session.sessionId}:`, error);
+      failed++;
+    }
+  }
+
+  return { synced, failed };
 };
 
 /**
@@ -134,7 +219,7 @@ export const getSessionById = (sessionId: string, userId?: string): SessionData 
  * @param updates - Partial session data to update
  * @param userId - Optional user ID to scope the update to
  */
-export const updateSession = (sessionId: string, updates: Partial<SessionData>, userId?: string): boolean => {
+export const updateSession = async (sessionId: string, updates: Partial<SessionData>, userId?: string): Promise<boolean> => {
   try {
     const sessions = getSessions(userId);
     const sessionIndex = sessions.findIndex(s => s.sessionId === sessionId);
@@ -143,11 +228,26 @@ export const updateSession = (sessionId: string, updates: Partial<SessionData>, 
 
     sessions[sessionIndex] = {
       ...sessions[sessionIndex],
-      ...updates
+      ...updates,
+      synced: false // Mark as needing sync
     };
 
     const storageKey = getStorageKey(userId);
     localStorage.setItem(storageKey, JSON.stringify(sessions));
+
+    // Try to sync update to API
+    try {
+      await sessionsApi.update(sessionId, {
+        duration: updates.duration,
+        finalScore: updates.finalScore,
+        xpEarned: updates.xpEarned,
+        transcript: updates.transcript
+      });
+      markSessionSynced(sessionId, userId);
+    } catch (apiError) {
+      console.warn('Failed to sync session update to API:', apiError);
+    }
+
     return true;
   } catch (error) {
     console.error('Failed to update session:', error);

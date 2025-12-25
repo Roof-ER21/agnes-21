@@ -86,14 +86,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [user]);
 
   const login = useCallback(async (name: string, pin: string) => {
-    const result = loginUser(name, pin);
+    try {
+      const result = await loginUser(name, pin);
 
-    if (result.success && result.user) {
-      setUser(result.user);
-      return { success: true };
+      if (result.success && result.user) {
+        setUser(result.user);
+        return { success: true };
+      }
+
+      return { success: false, error: result.error };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Login failed' };
     }
-
-    return { success: false, error: result.error };
   }, []);
 
   const logout = useCallback(() => {

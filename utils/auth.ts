@@ -1,18 +1,23 @@
 /**
  * Authentication Utilities for Agnes-21
- * Handles PIN-based authentication with localStorage
+ * Handles PIN-based authentication with backend API + localStorage fallback
  */
 
 import CryptoJS from 'crypto-js';
+import { authApi, getAuthToken, setAuthToken } from './apiClient';
 
 export interface User {
   id: string;
   name: string;
   role: 'trainee' | 'manager';
-  pinHash: string;
-  avatar: string; // emoji
-  createdAt: Date;
+  pinHash?: string;
+  avatar: string;
+  createdAt?: Date;
   lastLogin?: Date;
+  totalXp?: number;
+  currentLevel?: number;
+  currentStreak?: number;
+  longestStreak?: number;
 }
 
 interface LoginAttempt {
@@ -54,17 +59,14 @@ export const verifyPIN = (pin: string, storedHash: string): boolean => {
  * Validate PIN format (4-6 digits, no sequential/repeated)
  */
 export const validatePIN = (pin: string): { valid: boolean; error?: string } => {
-  // Check length
   if (pin.length < 4 || pin.length > 6) {
     return { valid: false, error: 'PIN must be 4-6 digits' };
   }
 
-  // Check numeric only
   if (!/^\d+$/.test(pin)) {
     return { valid: false, error: 'PIN must contain only numbers' };
   }
 
-  // Check for sequential patterns (1234, 9876)
   const isSequential = (str: string): boolean => {
     for (let i = 0; i < str.length - 1; i++) {
       const diff = parseInt(str[i + 1]) - parseInt(str[i]);
@@ -77,7 +79,6 @@ export const validatePIN = (pin: string): { valid: boolean; error?: string } => 
     return { valid: false, error: 'PIN cannot be sequential (1234, 4321, etc.)' };
   }
 
-  // Check for repeated digits (1111, 0000)
   if (new Set(pin).size === 1) {
     return { valid: false, error: 'PIN cannot be all the same digit' };
   }
@@ -96,7 +97,6 @@ export const checkRateLimit = (): { allowed: boolean; timeRemaining?: number } =
 
   const now = Date.now();
 
-  // Reset if lockout expired
   if (now - attempts.lastAttempt > LOCKOUT_DURATION) {
     attempts.count = 0;
     localStorage.setItem(LOGIN_ATTEMPTS_KEY, JSON.stringify(attempts));
@@ -133,7 +133,7 @@ export const resetLoginAttempts = (): void => {
 };
 
 /**
- * Get all users
+ * Get all users from localStorage (for offline/fallback)
  */
 export const getUsers = (): User[] => {
   try {
@@ -153,42 +153,11 @@ export const getUsers = (): User[] => {
 };
 
 /**
- * Find user by name
+ * Find user by name in localStorage
  */
 export const findUserByName = (name: string): User | null => {
   const users = getUsers();
   return users.find(u => u.name.toLowerCase() === name.toLowerCase()) || null;
-};
-
-/**
- * Create new user
- */
-export const createUser = (name: string, pin: string, role: 'trainee' | 'manager', avatar: string): User => {
-  const users = getUsers();
-
-  // Check if name already exists
-  if (findUserByName(name)) {
-    throw new Error('Username already exists');
-  }
-
-  const pinValidation = validatePIN(pin);
-  if (!pinValidation.valid) {
-    throw new Error(pinValidation.error);
-  }
-
-  const newUser: User = {
-    id: generateUserId(),
-    name,
-    role,
-    pinHash: hashPIN(pin),
-    avatar,
-    createdAt: new Date(),
-  };
-
-  users.push(newUser);
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-
-  return newUser;
 };
 
 /**
@@ -199,9 +168,76 @@ const generateUserId = (): string => {
 };
 
 /**
- * Login user with name and PIN
+ * Create new user - tries API first, falls back to localStorage
  */
-export const login = (name: string, pin: string): { success: boolean; user?: User; error?: string } => {
+export const createUser = async (
+  name: string,
+  pin: string,
+  role: 'trainee' | 'manager',
+  avatar: string
+): Promise<User> => {
+  const pinValidation = validatePIN(pin);
+  if (!pinValidation.valid) {
+    throw new Error(pinValidation.error);
+  }
+
+  // Try API first
+  try {
+    const result = await authApi.register(name, pin, role, avatar);
+    const user: User = {
+      id: result.user.id,
+      name: result.user.name,
+      role: result.user.role as 'trainee' | 'manager',
+      avatar: result.user.avatar,
+      totalXp: result.user.totalXp,
+      currentLevel: result.user.currentLevel,
+      currentStreak: result.user.currentStreak,
+      longestStreak: result.user.longestStreak,
+      createdAt: new Date(),
+    };
+
+    // Also save to localStorage for offline access
+    const users = getUsers();
+    users.push({ ...user, pinHash: hashPIN(pin) });
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+
+    // Save current user
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    localStorage.setItem(SESSION_EXPIRY_KEY, (Date.now() + SESSION_TIMEOUT).toString());
+
+    return user;
+  } catch (apiError) {
+    console.warn('API registration failed, using localStorage:', apiError);
+
+    // Fallback to localStorage
+    const users = getUsers();
+    if (findUserByName(name)) {
+      throw new Error('Username already exists');
+    }
+
+    const newUser: User = {
+      id: generateUserId(),
+      name,
+      role,
+      pinHash: hashPIN(pin),
+      avatar,
+      createdAt: new Date(),
+    };
+
+    users.push(newUser);
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+
+    return newUser;
+  }
+};
+
+/**
+ * Login user - tries API first, falls back to localStorage
+ */
+export const login = async (
+  name: string,
+  pin: string
+): Promise<{ success: boolean; user?: User; error?: string }> => {
   // Check rate limit
   const rateLimit = checkRateLimit();
   if (!rateLimit.allowed) {
@@ -211,42 +247,63 @@ export const login = (name: string, pin: string): { success: boolean; user?: Use
     };
   }
 
-  // Find user
-  const user = findUserByName(name);
-  if (!user) {
-    recordFailedAttempt();
-    return { success: false, error: 'Invalid username or PIN' };
+  // Try API first
+  try {
+    const result = await authApi.login(name, pin);
+    const user: User = {
+      id: result.user.id,
+      name: result.user.name,
+      role: result.user.role as 'trainee' | 'manager',
+      avatar: result.user.avatar,
+      totalXp: result.user.totalXp,
+      currentLevel: result.user.currentLevel,
+      currentStreak: result.user.currentStreak,
+      longestStreak: result.user.longestStreak,
+      lastLogin: new Date(),
+    };
+
+    resetLoginAttempts();
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    localStorage.setItem(SESSION_EXPIRY_KEY, (Date.now() + SESSION_TIMEOUT).toString());
+
+    return { success: true, user };
+  } catch (apiError: any) {
+    console.warn('API login failed, trying localStorage:', apiError);
+
+    // Fallback to localStorage
+    const user = findUserByName(name);
+    if (!user) {
+      recordFailedAttempt();
+      return { success: false, error: 'Invalid username or PIN' };
+    }
+
+    if (!user.pinHash || !verifyPIN(pin, user.pinHash)) {
+      recordFailedAttempt();
+      return { success: false, error: 'Invalid username or PIN' };
+    }
+
+    // Update last login
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.id === user.id);
+    if (userIndex !== -1) {
+      users[userIndex].lastLogin = new Date();
+      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+      user.lastLogin = new Date();
+    }
+
+    resetLoginAttempts();
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    localStorage.setItem(SESSION_EXPIRY_KEY, (Date.now() + SESSION_TIMEOUT).toString());
+
+    return { success: true, user };
   }
-
-  // Verify PIN
-  if (!verifyPIN(pin, user.pinHash)) {
-    recordFailedAttempt();
-    return { success: false, error: 'Invalid username or PIN' };
-  }
-
-  // Update last login
-  const users = getUsers();
-  const userIndex = users.findIndex(u => u.id === user.id);
-  if (userIndex !== -1) {
-    users[userIndex].lastLogin = new Date();
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    user.lastLogin = new Date();
-  }
-
-  // Reset login attempts
-  resetLoginAttempts();
-
-  // Set current user and session expiry
-  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-  localStorage.setItem(SESSION_EXPIRY_KEY, (Date.now() + SESSION_TIMEOUT).toString());
-
-  return { success: true, user };
 };
 
 /**
  * Logout current user
  */
 export const logout = (): void => {
+  authApi.logout(); // Clear API token
   localStorage.removeItem(CURRENT_USER_KEY);
   localStorage.removeItem(SESSION_EXPIRY_KEY);
 };
@@ -270,7 +327,7 @@ export const getCurrentUser = (): User | null => {
 
     return {
       ...user,
-      createdAt: new Date(user.createdAt),
+      createdAt: user.createdAt ? new Date(user.createdAt) : undefined,
       lastLogin: user.lastLogin ? new Date(user.lastLogin) : undefined
     };
   } catch (error) {
@@ -296,6 +353,13 @@ export const isSessionExpired = (): boolean => {
   const expiryStr = localStorage.getItem(SESSION_EXPIRY_KEY);
   if (!expiryStr) return true;
   return Date.now() > parseInt(expiryStr);
+};
+
+/**
+ * Check if user is authenticated with valid API token
+ */
+export const hasValidToken = (): boolean => {
+  return !!getAuthToken();
 };
 
 /**
