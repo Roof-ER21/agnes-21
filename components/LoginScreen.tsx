@@ -76,11 +76,19 @@ const LoginScreen: React.FC = () => {
       return;
     }
 
-    // Validate PIN
-    const pinValidation = validatePIN(pin);
-    if (!pinValidation.valid) {
-      setError(pinValidation.error || 'Invalid PIN');
-      return;
+    // Validate PIN - only enforce strict rules during registration
+    if (mode === 'register') {
+      const pinValidation = validatePIN(pin);
+      if (!pinValidation.valid) {
+        setError(pinValidation.error || 'Invalid PIN');
+        return;
+      }
+    } else {
+      // For login, just check length
+      if (pin.length < 4 || pin.length > 6) {
+        setError('PIN must be 4-6 digits');
+        return;
+      }
     }
 
     setLoading(true);

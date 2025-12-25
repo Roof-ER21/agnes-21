@@ -24,28 +24,28 @@ const generateId = (): string => {
 const defaultUsers = [
   {
     name: 'Admin',
-    pin: '1234',
+    pin: '2121',
     role: 'manager' as const,
     avatar: '👔',
     email: 'admin@theroofdocs.com',
   },
   {
     name: 'Manager',
-    pin: '1234',
+    pin: '2121',
     role: 'manager' as const,
     avatar: '👨‍💼',
     email: 'manager@theroofdocs.com',
   },
   {
     name: 'Trainee',
-    pin: '5678',
+    pin: '1357',
     role: 'trainee' as const,
     avatar: '🎓',
     email: null,
   },
   {
-    name: 'Demo User',
-    pin: '0000',
+    name: 'Demo',
+    pin: '0101',
     role: 'trainee' as const,
     avatar: '⭐',
     email: null,
@@ -90,10 +90,10 @@ async function seedUsers() {
 
   console.log('\n🎉 Seed complete!\n');
   console.log('Default logins:');
-  console.log('  Admin    / 1234 (manager)');
-  console.log('  Manager  / 1234 (manager)');
-  console.log('  Trainee  / 5678 (trainee)');
-  console.log('  Demo User / 0000 (trainee)');
+  console.log('  Admin    / 2121 (manager)');
+  console.log('  Manager  / 2121 (manager)');
+  console.log('  Trainee  / 1357 (trainee)');
+  console.log('  Demo     / 0101 (trainee)');
 }
 
 // Run the seed
