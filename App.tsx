@@ -290,102 +290,117 @@ const AppContent: React.FC = () => {
       <div id="main-content" className="max-w-6xl w-full mx-auto space-y-12 py-10 px-6">
         {/* Header */}
         <div className="text-center space-y-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex-1"></div>
+          {/* Centered Badge */}
+          <div className="flex justify-center">
             <div className="inline-flex items-center justify-center px-4 py-1.5 bg-neutral-900 rounded-full border border-red-900/50 shadow-[0_0_20px_rgba(220,38,38,0.15)]">
                <Sparkles className="w-4 h-4 text-red-500 mr-2" />
                <span className="text-red-200 font-mono text-xs tracking-widest uppercase">Agnes 21 // AI Trainer</span>
             </div>
-            <div className="flex-1 flex justify-end gap-2 flex-wrap overflow-x-auto">
-              <button
-                onClick={() => setShowTranslator(true)}
-                className="group flex items-center space-x-2 px-3 py-2 bg-cyan-900/50 hover:bg-cyan-800/50 border border-cyan-500/50 rounded-full transition-all duration-300"
-                title="Field Translator"
-              >
-                <Globe className="w-4 h-4 text-cyan-400" />
-                <span className="text-xs font-mono uppercase tracking-wider text-cyan-300 hidden sm:inline">Translate</span>
-              </button>
-              <button
-                onClick={() => setShowRoleplayDemo(true)}
-                className="group flex items-center space-x-2 px-3 py-2 bg-purple-900/50 hover:bg-purple-800/50 border border-purple-500/50 rounded-full transition-all duration-300"
-                title="Watch Roleplay Demos"
-              >
-                <Video className="w-4 h-4 text-purple-400" />
-                <span className="text-xs font-mono uppercase tracking-wider text-purple-300 hidden sm:inline">Demos</span>
-              </button>
-              <button
-                onClick={() => setShowHistory(true)}
-                className="group flex items-center space-x-2 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-red-900/50 rounded-full transition-all duration-300"
-              >
-                <History className="w-4 h-4 text-neutral-400 group-hover:text-red-500" />
-                <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">History</span>
-              </button>
-              <button
-                onClick={() => setShowLeaderboard(true)}
-                className="group flex items-center space-x-2 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-yellow-500/50 rounded-full transition-all duration-300"
-              >
-                <Trophy className="w-4 h-4 text-neutral-400 group-hover:text-yellow-500" />
-                <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">Leaderboard</span>
-              </button>
-              {/* Manager Dashboard - Only for managers */}
-              {user?.role === 'manager' && (
-                <>
-                  <button
-                    onClick={() => setShowManagerDashboard(true)}
-                    className="group flex items-center space-x-2 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-blue-500/50 rounded-full transition-all duration-300"
-                  >
-                    <BarChart3 className="w-4 h-4 text-neutral-400 group-hover:text-blue-500" />
-                    <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">Analytics</span>
-                  </button>
-                  <button
-                    onClick={() => setShowAllUsers(true)}
-                    className="group flex items-center space-x-2 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-green-500/50 rounded-full transition-all duration-300"
-                  >
-                    <Users className="w-4 h-4 text-neutral-400 group-hover:text-green-500" />
-                    <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">All Users</span>
-                  </button>
-                </>
-              )}
-              {/* Manager Mode Toggle */}
-              {managerModeActive ? (
-                <button
-                  onClick={handleManagerLogout}
-                  className="group flex items-center space-x-2 px-4 py-2 bg-green-900/50 hover:bg-green-800/50 border border-green-500/50 rounded-full transition-all duration-300"
-                  title="Exit Manager Mode"
-                >
-                  <Shield className="w-4 h-4 text-green-400" />
-                  <span className="text-xs font-mono uppercase tracking-wider text-green-400">Manager Mode</span>
-                  <span className="text-xs text-green-300">Exit</span>
-                </button>
-              ) : (
-                <button
-                  onClick={handleManagerLogin}
-                  className="group flex items-center space-x-2 px-3 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-neutral-500 rounded-full transition-all duration-300"
-                  title="Manager Login"
-                >
-                  <Lock className="w-3 h-3 text-neutral-500 group-hover:text-neutral-300" />
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 group-hover:text-neutral-300">Manager</span>
-                </button>
-              )}
-              {/* User Profile & Logout */}
-              <button
-                onClick={logout}
-                className="group flex items-center space-x-2 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-red-500/50 rounded-full transition-all duration-300"
-                title="Logout"
-              >
-                <span className="text-lg">{user?.avatar}</span>
-                <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">{user?.name}</span>
-                <LogOut className="w-4 h-4 text-neutral-400 group-hover:text-red-500" />
-              </button>
-            </div>
           </div>
+
+          {/* Title */}
           <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white">
-            PITCH<span className="text-red-600">PERFECT</span>
+            TRD <span className="text-red-600">AGNES 21</span>
           </h1>
           <p className="text-xl text-neutral-400 max-w-2xl mx-auto font-light">
             Master your delivery with Agnes 21. <br/>
             <span className="text-neutral-500 text-base">Real-time analysis. Brutally honest feedback.</span>
           </p>
+
+          {/* Navigation Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto pt-4">
+            <button
+              onClick={() => setShowTranslator(true)}
+              className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-cyan-900/30 border border-neutral-800 hover:border-cyan-500/50 rounded-xl transition-all duration-300"
+            >
+              <Globe className="w-6 h-6 text-cyan-400 mb-2" />
+              <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-cyan-300">Translate</span>
+            </button>
+
+            <button
+              onClick={() => setShowRoleplayDemo(true)}
+              className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-purple-900/30 border border-neutral-800 hover:border-purple-500/50 rounded-xl transition-all duration-300"
+            >
+              <Video className="w-6 h-6 text-purple-400 mb-2" />
+              <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-purple-300">Demos</span>
+            </button>
+
+            <button
+              onClick={() => setShowHistory(true)}
+              className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-red-900/20 border border-neutral-800 hover:border-red-500/50 rounded-xl transition-all duration-300"
+            >
+              <History className="w-6 h-6 text-red-400 mb-2" />
+              <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-red-300">History</span>
+            </button>
+
+            <button
+              onClick={() => setShowLeaderboard(true)}
+              className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-yellow-900/20 border border-neutral-800 hover:border-yellow-500/50 rounded-xl transition-all duration-300"
+            >
+              <Trophy className="w-6 h-6 text-yellow-400 mb-2" />
+              <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-yellow-300">Leaderboard</span>
+            </button>
+
+            {/* Analytics - Only for managers */}
+            {user?.role === 'manager' && (
+              <button
+                onClick={() => setShowManagerDashboard(true)}
+                className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-blue-900/20 border border-neutral-800 hover:border-blue-500/50 rounded-xl transition-all duration-300"
+              >
+                <BarChart3 className="w-6 h-6 text-blue-400 mb-2" />
+                <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-blue-300">Analytics</span>
+              </button>
+            )}
+
+            {/* All Users - Only for managers */}
+            {user?.role === 'manager' && (
+              <button
+                onClick={() => setShowAllUsers(true)}
+                className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-green-900/20 border border-neutral-800 hover:border-green-500/50 rounded-xl transition-all duration-300"
+              >
+                <Users className="w-6 h-6 text-green-400 mb-2" />
+                <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-green-300">All Users</span>
+              </button>
+            )}
+          </div>
+
+          {/* User Bar */}
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <div className="flex items-center space-x-2 px-3 py-2 bg-neutral-900/50 rounded-full border border-neutral-800">
+              <span className="text-lg">{user?.avatar}</span>
+              <span className="text-xs font-mono uppercase tracking-wider text-neutral-400">{user?.name}</span>
+            </div>
+
+            {/* Manager Mode Toggle */}
+            {managerModeActive ? (
+              <button
+                onClick={handleManagerLogout}
+                className="flex items-center space-x-2 px-3 py-2 bg-green-900/50 hover:bg-green-800/50 border border-green-500/50 rounded-full transition-all duration-300"
+                title="Exit Manager Mode"
+              >
+                <Shield className="w-4 h-4 text-green-400" />
+                <span className="text-xs font-mono uppercase tracking-wider text-green-400">Exit</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleManagerLogin}
+                className="flex items-center space-x-2 px-3 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-neutral-500 rounded-full transition-all duration-300"
+                title="Manager Login"
+              >
+                <Lock className="w-3 h-3 text-neutral-500" />
+                <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Manager</span>
+              </button>
+            )}
+
+            <button
+              onClick={logout}
+              className="flex items-center space-x-2 px-3 py-2 bg-neutral-900 hover:bg-red-900/30 border border-neutral-700 hover:border-red-500/50 rounded-full transition-all duration-300"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4 text-neutral-400 hover:text-red-500" />
+              <span className="text-xs font-mono uppercase tracking-wider text-neutral-400">Logout</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -446,138 +461,62 @@ const AppContent: React.FC = () => {
 
               {/* Rookie */}
               <button
-                onClick={() => {
-                  if (isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel)) {
-                    setSelectedDifficulty(DifficultyLevel.ROOKIE);
-                  }
-                }}
-                disabled={!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel)}
-                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${
-                  !isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel)
-                    ? 'border-l-neutral-800 bg-neutral-950 border-y border-r border-neutral-900 opacity-50 cursor-not-allowed'
-                    : selectedDifficulty === DifficultyLevel.ROOKIE
-                    ? 'border-l-green-500 bg-neutral-900 border-y border-r border-neutral-800'
-                    : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'
-                }`}
-                title={!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) ? `Unlock at Level ${getLevelRequiredForDifficulty(DifficultyLevel.ROOKIE)}` : ''}
+                onClick={() => setSelectedDifficulty(DifficultyLevel.ROOKIE)}
+                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.ROOKIE ? 'border-l-green-500 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
               >
                  <div>
                    <div className="flex items-center space-x-2">
-                      {!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) ? (
-                        <Lock className="w-4 h-4 text-neutral-600" />
-                      ) : (
-                        <Shield className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.ROOKIE ? 'text-green-500' : 'text-neutral-500'}`} />
-                      )}
-                      <h3 className={`font-bold text-sm ${!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) ? 'text-neutral-600' : 'text-white'}`}>ROOKIE</h3>
-                      {!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) && (
-                        <span className="text-[9px] text-neutral-600 uppercase tracking-wider">Lvl {getLevelRequiredForDifficulty(DifficultyLevel.ROOKIE)}</span>
-                      )}
+                      <Shield className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.ROOKIE ? 'text-green-500' : 'text-neutral-500'}`} />
+                      <h3 className="font-bold text-sm text-white">ROOKIE</h3>
                    </div>
-                   <p className={`text-[10px] mt-1 uppercase tracking-wider ${!isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) ? 'text-neutral-600' : 'text-neutral-400'}`}>Friendly • Patient • Helpful</p>
+                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Friendly • Patient • Helpful</p>
                  </div>
-                 {selectedDifficulty === DifficultyLevel.ROOKIE && isDifficultyUnlocked(DifficultyLevel.ROOKIE, currentLevel) && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>}
+                 {selectedDifficulty === DifficultyLevel.ROOKIE && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>}
               </button>
 
               {/* Pro */}
               <button
-                onClick={() => {
-                  if (isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel)) {
-                    setSelectedDifficulty(DifficultyLevel.PRO);
-                  }
-                }}
-                disabled={!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel)}
-                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${
-                  !isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel)
-                    ? 'border-l-neutral-800 bg-neutral-950 border-y border-r border-neutral-900 opacity-50 cursor-not-allowed'
-                    : selectedDifficulty === DifficultyLevel.PRO
-                    ? 'border-l-yellow-500 bg-neutral-900 border-y border-r border-neutral-800'
-                    : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'
-                }`}
-                title={!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) ? `Unlock at Level ${getLevelRequiredForDifficulty(DifficultyLevel.PRO)}` : ''}
+                onClick={() => setSelectedDifficulty(DifficultyLevel.PRO)}
+                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.PRO ? 'border-l-yellow-500 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
               >
                  <div>
                    <div className="flex items-center space-x-2">
-                      {!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) ? (
-                        <Lock className="w-4 h-4 text-neutral-600" />
-                      ) : (
-                        <Zap className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.PRO ? 'text-yellow-500' : 'text-neutral-500'}`} />
-                      )}
-                      <h3 className={`font-bold text-sm ${!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) ? 'text-neutral-600' : 'text-white'}`}>PRO</h3>
-                      {!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) && (
-                        <span className="text-[9px] text-neutral-600 uppercase tracking-wider">Lvl {getLevelRequiredForDifficulty(DifficultyLevel.PRO)}</span>
-                      )}
+                      <Zap className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.PRO ? 'text-yellow-500' : 'text-neutral-500'}`} />
+                      <h3 className="font-bold text-sm text-white">PRO</h3>
                    </div>
-                   <p className={`text-[10px] mt-1 uppercase tracking-wider ${!isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) ? 'text-neutral-600' : 'text-neutral-400'}`}>Busy • Realistic • Standard</p>
+                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Busy • Realistic • Standard</p>
                  </div>
-                 {selectedDifficulty === DifficultyLevel.PRO && isDifficultyUnlocked(DifficultyLevel.PRO, currentLevel) && <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>}
+                 {selectedDifficulty === DifficultyLevel.PRO && <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>}
               </button>
 
               {/* Elite */}
               <button
-                onClick={() => {
-                  if (isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel)) {
-                    setSelectedDifficulty(DifficultyLevel.ELITE);
-                  }
-                }}
-                disabled={!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel)}
-                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${
-                  !isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel)
-                    ? 'border-l-neutral-800 bg-neutral-950 border-y border-r border-neutral-900 opacity-50 cursor-not-allowed'
-                    : selectedDifficulty === DifficultyLevel.ELITE
-                    ? 'border-l-red-600 bg-neutral-900 border-y border-r border-neutral-800'
-                    : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'
-                }`}
-                title={!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) ? `Unlock at Level ${getLevelRequiredForDifficulty(DifficultyLevel.ELITE)}` : ''}
+                onClick={() => setSelectedDifficulty(DifficultyLevel.ELITE)}
+                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.ELITE ? 'border-l-red-600 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
               >
                  <div>
                    <div className="flex items-center space-x-2">
-                      {!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) ? (
-                        <Lock className="w-4 h-4 text-neutral-600" />
-                      ) : (
-                        <Skull className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.ELITE ? 'text-red-600' : 'text-neutral-500'}`} />
-                      )}
-                      <h3 className={`font-bold text-sm ${!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) ? 'text-neutral-600' : 'text-white'}`}>ELITE</h3>
-                      {!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) && (
-                        <span className="text-[9px] text-neutral-600 uppercase tracking-wider">Lvl {getLevelRequiredForDifficulty(DifficultyLevel.ELITE)}</span>
-                      )}
+                      <Skull className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.ELITE ? 'text-red-600' : 'text-neutral-500'}`} />
+                      <h3 className="font-bold text-sm text-white">ELITE</h3>
                    </div>
-                   <p className={`text-[10px] mt-1 uppercase tracking-wider ${!isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) ? 'text-neutral-600' : 'text-neutral-400'}`}>Skeptical • Rude • Hostile</p>
+                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Skeptical • Rude • Hostile</p>
                  </div>
-                 {selectedDifficulty === DifficultyLevel.ELITE && isDifficultyUnlocked(DifficultyLevel.ELITE, currentLevel) && <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></div>}
+                 {selectedDifficulty === DifficultyLevel.ELITE && <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></div>}
               </button>
 
               {/* Nightmare */}
               <button
-                onClick={() => {
-                  if (isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel)) {
-                    setSelectedDifficulty(DifficultyLevel.NIGHTMARE);
-                  }
-                }}
-                disabled={!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel)}
-                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${
-                  !isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel)
-                    ? 'border-l-neutral-800 bg-neutral-950 border-y border-r border-neutral-900 opacity-50 cursor-not-allowed'
-                    : selectedDifficulty === DifficultyLevel.NIGHTMARE
-                    ? 'border-l-orange-600 bg-neutral-900 border-y border-r border-neutral-800'
-                    : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'
-                }`}
-                title={!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) ? `Unlock at Level ${getLevelRequiredForDifficulty(DifficultyLevel.NIGHTMARE)}` : ''}
+                onClick={() => setSelectedDifficulty(DifficultyLevel.NIGHTMARE)}
+                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.NIGHTMARE ? 'border-l-orange-600 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
               >
                  <div>
                    <div className="flex items-center space-x-2">
-                      {!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) ? (
-                        <Lock className="w-4 h-4 text-neutral-600" />
-                      ) : (
-                        <AlertTriangle className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.NIGHTMARE ? 'text-orange-600' : 'text-neutral-500'}`} />
-                      )}
-                      <h3 className={`font-bold text-sm ${!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) ? 'text-neutral-600' : 'text-white'}`}>NIGHTMARE</h3>
-                      {!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) && (
-                        <span className="text-[9px] text-neutral-600 uppercase tracking-wider">Lvl {getLevelRequiredForDifficulty(DifficultyLevel.NIGHTMARE)}</span>
-                      )}
+                      <AlertTriangle className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.NIGHTMARE ? 'text-orange-600' : 'text-neutral-500'}`} />
+                      <h3 className="font-bold text-sm text-white">NIGHTMARE</h3>
                    </div>
-                   <p className={`text-[10px] mt-1 uppercase tracking-wider ${!isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) ? 'text-neutral-600' : 'text-neutral-400'}`}>Hostile • Threatening • Expert Challenge</p>
+                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Hostile • Threatening • Expert Challenge</p>
                  </div>
-                 {selectedDifficulty === DifficultyLevel.NIGHTMARE && isDifficultyUnlocked(DifficultyLevel.NIGHTMARE, currentLevel) && <div className="w-2 h-2 rounded-full bg-orange-600 animate-pulse"></div>}
+                 {selectedDifficulty === DifficultyLevel.NIGHTMARE && <div className="w-2 h-2 rounded-full bg-orange-600 animate-pulse"></div>}
               </button>
             </div>
           </div>

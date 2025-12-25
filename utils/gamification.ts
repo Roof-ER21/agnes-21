@@ -98,48 +98,35 @@ export const getLevelForXP = (totalXP: number): number => {
 
 /**
  * Gets difficulties unlocked at a specific level
+ * NOTE: All difficulties are now unlocked for all users
  */
 export const getUnlockedDifficulties = (level: number): DifficultyLevel[] => {
-  const unlocked: DifficultyLevel[] = [DifficultyLevel.BEGINNER];
-
-  if (level >= 3) unlocked.push(DifficultyLevel.ROOKIE);
-  if (level >= 7) unlocked.push(DifficultyLevel.PRO);
-  if (level >= 12) unlocked.push(DifficultyLevel.ELITE);
-  if (level >= 20) unlocked.push(DifficultyLevel.NIGHTMARE);
-
-  return unlocked;
+  // All difficulties unlocked for everyone
+  return [
+    DifficultyLevel.BEGINNER,
+    DifficultyLevel.ROOKIE,
+    DifficultyLevel.PRO,
+    DifficultyLevel.ELITE,
+    DifficultyLevel.NIGHTMARE
+  ];
 };
 
 /**
  * Checks if a difficulty is unlocked at the current level
- * Manager mode bypasses all locks
+ * NOTE: All difficulties are now unlocked for all users
  */
 export const isDifficultyUnlocked = (difficulty: DifficultyLevel, level: number): boolean => {
-  // Managers have access to all difficulties
-  if (isManagerMode()) {
-    return true;
-  }
-  return getUnlockedDifficulties(level).includes(difficulty);
+  // All difficulties unlocked for everyone
+  return true;
 };
 
 /**
  * Gets the level requirement for a difficulty
+ * NOTE: All difficulties now available at level 1
  */
 export const getLevelRequiredForDifficulty = (difficulty: DifficultyLevel): number => {
-  switch (difficulty) {
-    case DifficultyLevel.BEGINNER:
-      return 1;
-    case DifficultyLevel.ROOKIE:
-      return 3;
-    case DifficultyLevel.PRO:
-      return 7;
-    case DifficultyLevel.ELITE:
-      return 12;
-    case DifficultyLevel.NIGHTMARE:
-      return 20;
-    default:
-      return 1;
-  }
+  // All difficulties available from level 1
+  return 1;
 };
 
 /**

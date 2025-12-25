@@ -30,8 +30,8 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
         proxy: {
-          '/api/tts': {
-            target: 'http://localhost:8000',
+          '/api': {
+            target: 'http://localhost:5001',
             changeOrigin: true,
           }
         }
