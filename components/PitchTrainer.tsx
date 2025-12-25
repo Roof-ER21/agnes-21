@@ -104,6 +104,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [isRequestingScore, setIsRequestingScore] = useState(false);
   const isRequestingScoreRef = useRef(false); // Ref to track in async callbacks
+  const isPlayingScoreAudioRef = useRef(false); // Ref to track when score audio is playing (prevents session end)
 
   // NEW: Silence timeout tracking
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -295,11 +296,13 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         micAnalyser.smoothingTimeConstant = 0.8;
         micAnalyserRef.current = micAnalyser;
 
-        // 4. Build improved system instruction
+        // 4. Build improved system instruction with division-awareness
+        const userDivision = (user?.division as 'insurance' | 'retail') || 'insurance';
         const systemInstruction = buildSystemInstruction(
           config.mode,
           config.difficulty,
-          config.script || "No specific script provided"
+          config.script || "No specific script provided",
+          userDivision
         );
 
         // 5. Connect to Gemini Live
@@ -352,8 +355,23 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
                 // If custom voice enabled, speak with Chatterbox TTS (Reeses Piecies)
                 if (useCustomVoiceRef.current && sessionActiveRef.current) {
-                  // Don't wait for this, let it play asynchronously
-                  speakWithCustomVoice(textContent);
+                  // For score requests, await the audio to ensure it completes before session can end
+                  if (isRequestingScoreRef.current) {
+                    isPlayingScoreAudioRef.current = true;
+                    try {
+                      await speakWithCustomVoice(textContent);
+                    } finally {
+                      isPlayingScoreAudioRef.current = false;
+                      // Resume microphone after score audio finishes
+                      if (inputAudioContextRef.current?.state === 'suspended') {
+                        inputAudioContextRef.current.resume().catch(e => console.warn('Failed to resume mic:', e));
+                        console.log('Microphone resumed after scoring');
+                      }
+                    }
+                  } else {
+                    // For regular messages, don't block
+                    speakWithCustomVoice(textContent);
+                  }
                 }
               }
 
@@ -546,6 +564,16 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     // Update Agnes state to SCORING (dedicated scoring state)
     setAgnesState(AgnesState.SCORING);
 
+    // Suspend microphone input during scoring to prevent voice interference
+    if (inputAudioContextRef.current?.state === 'running') {
+      try {
+        await inputAudioContextRef.current.suspend();
+        console.log('Microphone suspended for scoring');
+      } catch (e) {
+        console.warn('Failed to suspend mic:', e);
+      }
+    }
+
     try {
       // Send a text message to Gemini asking for scoring
       const session = await sessionPromiseRef.current;
@@ -619,6 +647,25 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   // NEW: Confirm and save session
   const confirmEndSession = async () => {
     setShowEndSessionModal(false);
+
+    // Wait for score audio to complete if playing (up to 15 seconds)
+    if (isPlayingScoreAudioRef.current) {
+      console.log('Waiting for score audio to finish before ending session...');
+      await new Promise<void>((resolve) => {
+        const checkInterval = setInterval(() => {
+          if (!isPlayingScoreAudioRef.current) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, 100);
+        // Timeout after 15 seconds to prevent infinite wait
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          console.log('Score audio timeout - proceeding with session end');
+          resolve();
+        }, 15000);
+      });
+    }
 
     // CRITICAL: Disable session to prevent audio race conditions
     sessionActiveRef.current = false;
@@ -958,7 +1005,8 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   };
 
   // NEW: Speak text with Chatterbox TTS (Reeses Piecies voice)
-  const speakWithCustomVoice = async (text: string) => {
+  // Returns a Promise that resolves when audio finishes playing
+  const speakWithCustomVoice = async (text: string): Promise<void> => {
     if (!sessionActiveRef.current) return;
     if (!ttsAvailable) {
       console.warn('Chatterbox TTS not available, falling back to no audio');
@@ -966,56 +1014,71 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     }
 
     setIsSpeakingCustom(true);
-    try {
-      // Clean up the text (remove score markers, etc.)
-      const cleanText = text
-        .replace(/AGNES SCORE:?\s*\d+/gi, '')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
 
-      if (!cleanText) {
-        setIsSpeakingCustom(false);
-        return;
-      }
+    return new Promise<void>(async (resolve) => {
+      try {
+        // Clean up the text (remove score markers, etc.)
+        const cleanText = text
+          .replace(/AGNES SCORE:?\s*\d+/gi, '')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
 
-      // Generate audio with Chatterbox TTS using Reeses Piecies voice
-      const audioBuffer = await generateSpeech(cleanText, {
-        voice: DEFAULT_FEEDBACK_VOICE, // 'reeses_piecies'
-        exaggeration: 0.4
-      });
-
-      // Play the audio
-      if (outputAudioContextRef.current && sessionActiveRef.current) {
-        const ctx = outputAudioContextRef.current;
-        if (ctx.state === 'closed') {
+        if (!cleanText) {
           setIsSpeakingCustom(false);
+          resolve();
           return;
         }
 
-        const audioData = await ctx.decodeAudioData(audioBuffer.slice(0));
-        const source = ctx.createBufferSource();
-        source.buffer = audioData;
+        // Generate audio with Chatterbox TTS using Reeses Piecies voice
+        const audioBuffer = await generateSpeech(cleanText, {
+          voice: DEFAULT_FEEDBACK_VOICE, // 'reeses_piecies'
+          exaggeration: 0.4
+        });
 
-        // Route through analyser for visualization
-        if (analyserRef.current) {
-          source.connect(analyserRef.current);
-          analyserRef.current.connect(ctx.destination);
+        // Play the audio
+        if (outputAudioContextRef.current && sessionActiveRef.current) {
+          const ctx = outputAudioContextRef.current;
+          if (ctx.state === 'closed') {
+            setIsSpeakingCustom(false);
+            resolve();
+            return;
+          }
+
+          // Resume context if suspended
+          if (ctx.state === 'suspended') {
+            await ctx.resume();
+          }
+
+          const audioData = await ctx.decodeAudioData(audioBuffer.slice(0));
+          const source = ctx.createBufferSource();
+          source.buffer = audioData;
+
+          // Route through analyser for visualization
+          if (analyserRef.current) {
+            source.connect(analyserRef.current);
+            analyserRef.current.connect(ctx.destination);
+          } else {
+            source.connect(ctx.destination);
+          }
+
+          source.start();
+          audioSourcesRef.current.add(source);
+
+          source.onended = () => {
+            setIsSpeakingCustom(false);
+            audioSourcesRef.current.delete(source);
+            resolve(); // Resolve promise when audio finishes
+          };
         } else {
-          source.connect(ctx.destination);
-        }
-
-        source.start();
-        audioSourcesRef.current.add(source);
-
-        source.onended = () => {
           setIsSpeakingCustom(false);
-          audioSourcesRef.current.delete(source);
-        };
+          resolve();
+        }
+      } catch (error) {
+        console.error('Error speaking with custom voice:', error);
+        setIsSpeakingCustom(false);
+        resolve(); // Resolve even on error to prevent hanging
       }
-    } catch (error) {
-      console.error('Error speaking with custom voice:', error);
-      setIsSpeakingCustom(false);
-    }
+    });
   };
 
   return (
