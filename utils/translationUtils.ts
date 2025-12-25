@@ -1,10 +1,16 @@
 /**
  * Translation Utilities for Field Translator
- * Uses Google Gemini for translation and language detection
+ * Uses Google Gemini for translation and language detection with dialect support
  */
 
-import { GoogleGenAI } from '@anthropic-ai/sdk';
-import { SupportedLanguage, SUPPORTED_LANGUAGES } from '../types';
+import {
+  SupportedLanguage,
+  SupportedDialect,
+  SUPPORTED_LANGUAGES,
+  DIALECT_VARIANTS,
+  DetectionResult,
+  getDialectConfig
+} from '../types';
 
 // ============================================
 // Translation with Gemini
@@ -85,21 +91,51 @@ ${text}`;
 // ============================================
 
 /**
- * Detect the language of given text using Gemini
+ * Detect the language of given text using Gemini (basic version)
  */
 export const detectLanguage = async (text: string): Promise<SupportedLanguage | null> => {
+  const result = await detectLanguageWithDialect(text);
+  return result?.language || null;
+};
+
+/**
+ * Enhanced language detection with dialect recognition
+ * Detects Spanish and Arabic dialects with regional variants
+ */
+export const detectLanguageWithDialect = async (text: string): Promise<DetectionResult | null> => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY not configured');
   }
 
-  const supportedCodes = SUPPORTED_LANGUAGES.map(l => l.code).join(', ');
+  const supportedCodes = SUPPORTED_LANGUAGES.map(l => l.code).filter(c => c !== 'auto').join(', ');
 
-  const prompt = `Detect the language of the following text.
-Reply with ONLY the two-letter language code from this list: ${supportedCodes}
-If the language is not in the list or you cannot determine it, reply with "unknown".
+  const prompt = `Analyze the following text and detect its language with regional dialect if applicable.
 
-Text:
+For Spanish, identify if it's:
+- Mexican Spanish (es-mx): Uses "güey", "chido", "padre", Mexican slang
+- Puerto Rican Spanish (es-pr): Uses "boricua", "chavos", Caribbean pronunciation
+- Castilian Spanish (es-es): Uses "vale", "tío", "vosotros" conjugations
+- Argentine Spanish (es-ar): Uses "che", "vos" instead of "tú", "boludo"
+- Colombian Spanish (es-co): Uses "parcero", "bacano", clear pronunciation
+
+For Arabic, identify if it's:
+- Egyptian Arabic (ar-eg): Uses "ازيك", "كده", Egyptian expressions
+- Lebanese Arabic (ar-lb): Uses French loanwords, "كيفك", Levantine style
+- Saudi Arabic (ar-sa): Uses "وش", Gulf vocabulary, formal style
+- Moroccan Arabic (ar-ma): Uses French/Berber influence, "لاباس"
+- Gulf Arabic (ar-ae): Uses "شلونك", Gulf expressions
+
+Reply with ONLY a JSON object in this exact format:
+{"language": "xx", "dialect": "xx-xx", "confidence": 85, "region": "Country Name"}
+
+For non-Spanish/Arabic languages, omit the dialect field:
+{"language": "xx", "confidence": 90}
+
+Supported language codes: ${supportedCodes}
+If unsure or language is not supported, reply: {"language": "unknown", "confidence": 0}
+
+Text to analyze:
 ${text}`;
 
   try {
@@ -118,7 +154,7 @@ ${text}`;
           ],
           generationConfig: {
             temperature: 0,
-            maxOutputTokens: 10,
+            maxOutputTokens: 100,
           },
         }),
       }
@@ -129,15 +165,85 @@ ${text}`;
     }
 
     const data = await response.json();
-    const detectedCode = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toLowerCase();
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
-    // Validate the detected code
-    const validLang = SUPPORTED_LANGUAGES.find(l => l.code === detectedCode);
-    return validLang ? validLang.code : null;
+    if (!responseText) {
+      console.error('Empty response from Gemini');
+      return null;
+    }
+
+    // Parse JSON response
+    try {
+      // Extract JSON from response (handle potential markdown wrapping)
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.error('No JSON found in response:', responseText);
+        return null;
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      // Validate language code
+      const validLang = SUPPORTED_LANGUAGES.find(l => l.code === parsed.language);
+      if (!validLang || parsed.language === 'unknown') {
+        console.log('Unknown or unsupported language detected:', parsed.language);
+        return null;
+      }
+
+      // Validate dialect if provided
+      let validDialect: SupportedDialect | undefined;
+      if (parsed.dialect) {
+        const dialectConfig = getDialectConfig(parsed.dialect as SupportedDialect);
+        if (dialectConfig && dialectConfig.parentLang === parsed.language) {
+          validDialect = parsed.dialect as SupportedDialect;
+        }
+      }
+
+      const result: DetectionResult = {
+        language: validLang.code,
+        dialect: validDialect,
+        confidence: Math.min(100, Math.max(0, parsed.confidence || 80)),
+        region: parsed.region
+      };
+
+      console.log(`🔍 Detected: ${result.dialect || result.language} (${result.confidence}% confidence)${result.region ? ` - ${result.region}` : ''}`);
+      return result;
+    } catch (parseError) {
+      console.error('Failed to parse detection response:', responseText);
+      return null;
+    }
   } catch (error) {
     console.error('Language detection error:', error);
     return null;
   }
+};
+
+/**
+ * Get display name for a detected language/dialect
+ */
+export const getDetectionDisplayName = (result: DetectionResult): string => {
+  if (result.dialect) {
+    const dialectConfig = getDialectConfig(result.dialect);
+    if (dialectConfig) {
+      return `${dialectConfig.name} ${dialectConfig.flag}`;
+    }
+  }
+  const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === result.language);
+  return langConfig ? `${langConfig.name} ${langConfig.flag}` : result.language;
+};
+
+/**
+ * Get voice code for a detection result (prefers dialect-specific code)
+ */
+export const getVoiceCodeForDetection = (result: DetectionResult): string => {
+  if (result.dialect) {
+    const dialectConfig = getDialectConfig(result.dialect);
+    if (dialectConfig) {
+      return dialectConfig.voiceCode;
+    }
+  }
+  const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === result.language);
+  return langConfig?.voiceCode || 'en-US';
 };
 
 // ============================================

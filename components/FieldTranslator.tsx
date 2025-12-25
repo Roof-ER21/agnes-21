@@ -13,14 +13,19 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   SupportedLanguage,
+  SupportedDialect,
   SUPPORTED_LANGUAGES,
   AgnesState,
+  DetectionResult,
+  getDialectConfig,
 } from '../types';
 import {
   translateWithCache,
-  detectLanguage,
+  detectLanguageWithDialect,
   getLanguageName,
   getLanguageFlag,
+  getDetectionDisplayName,
+  getVoiceCodeForDetection,
 } from '../utils/translationUtils';
 import {
   startListening,
@@ -78,6 +83,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // Session data
   const [sessionId, setSessionId] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage | null>(null);
+  const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null);
 
   // Transcript
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
@@ -238,10 +244,10 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
         return;
       }
 
-      // Use Gemini to detect language
-      const detectedLang = await detectLanguage(spokenText);
+      // Use Gemini to detect language with dialect recognition
+      const detection = await detectLanguageWithDialect(spokenText);
 
-      if (!detectedLang || detectedLang === 'en') {
+      if (!detection || detection.language === 'en') {
         // Couldn't detect or detected English - ask to select manually
         await agnesSpeak("I couldn't determine the language. Please select it manually.", 'en');
         setIsAutoDetecting(false);
@@ -249,18 +255,24 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
         return;
       }
 
-      // Successfully detected!
-      const langName = getLanguageName(detectedLang);
-      await agnesSpeak(getLanguageDetectedMessage(langName), 'en');
+      // Successfully detected! Show dialect-specific name if available
+      const displayName = getDetectionDisplayName(detection);
+      const confidenceNote = detection.confidence >= 90
+        ? ''
+        : detection.confidence >= 70
+          ? ' I think.'
+          : ' Let me know if that\'s not right.';
+      await agnesSpeak(`I detected ${displayName.replace(/[^\w\s]/g, '')}.${confidenceNote}`, 'en');
 
-      // Set the detected language and continue
-      setSelectedLanguage(detectedLang);
-      selectedLangRef.current = detectedLang;
+      // Set the detected language and dialect info
+      setSelectedLanguage(detection.language);
+      selectedLangRef.current = detection.language;
+      setDetectionResult(detection);
       setIsAutoDetecting(false);
 
       // Add the homeowner's first message to transcript
-      const translation = await translateWithCache(spokenText, 'en', detectedLang);
-      addToTranscript('homeowner', spokenText, detectedLang, translation, 'en');
+      const translation = await translateWithCache(spokenText, 'en', detection.language);
+      addToTranscript('homeowner', spokenText, detection.language, translation, 'en');
 
       // Now introduce Agnes to homeowner in their language
       await naturalPause(500);
@@ -440,6 +452,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
     setTranscript([]);
     setSelectedLanguage(null);
     selectedLangRef.current = null;
+    setDetectionResult(null);
 
     try {
       // Step 1: Agnes introduces herself to rep (English)
@@ -497,6 +510,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       setAgnesState('idle');
       setSelectedLanguage(null);
       selectedLangRef.current = null;
+      setDetectionResult(null);
     }, 2000);
   }, [transcript, user?.id, sessionId, selectedLanguage]);
 
@@ -747,11 +761,19 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
           className="mb-4"
         />
 
-        {/* Status */}
+        {/* Status - Show dialect-specific info if available */}
         <StatusIndicator
           status={agnesState as any}
-          detectedLanguage={selectedLanguage ? getLanguageName(selectedLanguage) : undefined}
-          languageFlag={selectedLanguage ? getLanguageFlag(selectedLanguage) : undefined}
+          detectedLanguage={detectionResult
+            ? getDetectionDisplayName(detectionResult).replace(/[^\w\s]/g, '')
+            : selectedLanguage
+              ? getLanguageName(selectedLanguage)
+              : undefined}
+          languageFlag={detectionResult?.dialect
+            ? getDialectConfig(detectionResult.dialect)?.flag
+            : selectedLanguage
+              ? getLanguageFlag(selectedLanguage)
+              : undefined}
         />
 
         {/* Current Speaker Indicator */}

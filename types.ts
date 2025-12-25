@@ -32,6 +32,15 @@ export type SupportedLanguage =
   | 'pl' | 'ht' | 'pa' | 'uk' | 'fa' | 'th' | 'bn'  // More coverage
   | 'auto';  // Auto-detect option
 
+// Dialect codes for languages with regional variants
+export type SupportedDialect =
+  // Spanish variants (US focus: Mexican, Puerto Rican)
+  | 'es-mx' | 'es-pr' | 'es-es' | 'es-ar' | 'es-co'
+  // Arabic variants (US focus: Egyptian, Lebanese)
+  | 'ar-eg' | 'ar-lb' | 'ar-sa' | 'ar-ma' | 'ar-ae'
+  // Base languages (no specific dialect)
+  | SupportedLanguage;
+
 export interface LanguageConfig {
   code: SupportedLanguage;
   name: string;
@@ -39,6 +48,52 @@ export interface LanguageConfig {
   voiceCode: string;
   flag: string;
 }
+
+// Dialect configuration for regional variants
+export interface DialectConfig {
+  code: SupportedDialect;
+  parentLang: SupportedLanguage;
+  name: string;
+  nativeName: string;
+  voiceCode: string;
+  flag: string;
+  region: string;
+}
+
+// US-focused dialect variants (priority dialects)
+export const DIALECT_VARIANTS: DialectConfig[] = [
+  // Spanish dialects - US focus first
+  { code: 'es-mx', parentLang: 'es', name: 'Mexican Spanish', nativeName: 'Español Mexicano', voiceCode: 'es-MX', flag: '🇲🇽', region: 'Mexico' },
+  { code: 'es-pr', parentLang: 'es', name: 'Puerto Rican Spanish', nativeName: 'Español Puertorriqueño', voiceCode: 'es-US', flag: '🇵🇷', region: 'Puerto Rico' },
+  { code: 'es-es', parentLang: 'es', name: 'Castilian Spanish', nativeName: 'Español Castellano', voiceCode: 'es-ES', flag: '🇪🇸', region: 'Spain' },
+  { code: 'es-ar', parentLang: 'es', name: 'Argentine Spanish', nativeName: 'Español Argentino', voiceCode: 'es-AR', flag: '🇦🇷', region: 'Argentina' },
+  { code: 'es-co', parentLang: 'es', name: 'Colombian Spanish', nativeName: 'Español Colombiano', voiceCode: 'es-CO', flag: '🇨🇴', region: 'Colombia' },
+
+  // Arabic dialects - US focus first
+  { code: 'ar-eg', parentLang: 'ar', name: 'Egyptian Arabic', nativeName: 'مصري', voiceCode: 'ar-EG', flag: '🇪🇬', region: 'Egypt' },
+  { code: 'ar-lb', parentLang: 'ar', name: 'Lebanese Arabic', nativeName: 'لبناني', voiceCode: 'ar-LB', flag: '🇱🇧', region: 'Lebanon' },
+  { code: 'ar-sa', parentLang: 'ar', name: 'Saudi Arabic', nativeName: 'سعودي', voiceCode: 'ar-SA', flag: '🇸🇦', region: 'Saudi Arabia' },
+  { code: 'ar-ma', parentLang: 'ar', name: 'Moroccan Arabic', nativeName: 'مغربي', voiceCode: 'ar-MA', flag: '🇲🇦', region: 'Morocco' },
+  { code: 'ar-ae', parentLang: 'ar', name: 'Gulf Arabic', nativeName: 'خليجي', voiceCode: 'ar-AE', flag: '🇦🇪', region: 'UAE/Gulf' },
+];
+
+// Detection result with dialect information
+export interface DetectionResult {
+  language: SupportedLanguage;
+  dialect?: SupportedDialect;
+  confidence: number;
+  region?: string;
+}
+
+// Helper to get dialect config by code
+export const getDialectConfig = (code: SupportedDialect): DialectConfig | undefined => {
+  return DIALECT_VARIANTS.find(d => d.code === code);
+};
+
+// Helper to get dialects for a parent language
+export const getDialectsForLanguage = (lang: SupportedLanguage): DialectConfig[] => {
+  return DIALECT_VARIANTS.filter(d => d.parentLang === lang);
+};
 
 export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
   // Primary languages (most common in US)

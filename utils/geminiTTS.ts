@@ -7,7 +7,7 @@
 
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 import { base64ToUint8Array, decodeAudioData } from './audioUtils';
-import { SupportedLanguage, SUPPORTED_LANGUAGES } from '../types';
+import { SupportedLanguage, SupportedDialect, SUPPORTED_LANGUAGES, DIALECT_VARIANTS, getDialectConfig } from '../types';
 
 // ============================================
 // Gemini Live TTS for English
@@ -263,6 +263,23 @@ const VOICE_PREFERENCES: Record<string, string[]> = {
   pa: ['siri', 'enhanced'],
 };
 
+// Dialect-specific voice preferences (US-focused dialects)
+const DIALECT_VOICE_PREFERENCES: Record<string, string[]> = {
+  // Spanish variants
+  'es-mx': ['paulina', 'juan', 'mónica', 'siri', 'enhanced'],     // Mexican Spanish
+  'es-pr': ['paulina', 'mónica', 'siri', 'enhanced'],              // Puerto Rican Spanish
+  'es-es': ['jorge', 'mónica', 'lucia', 'siri', 'enhanced'],       // Castilian Spanish
+  'es-ar': ['diego', 'mónica', 'siri', 'enhanced'],                // Argentine Spanish
+  'es-co': ['mónica', 'paulina', 'siri', 'enhanced'],              // Colombian Spanish
+
+  // Arabic variants
+  'ar-eg': ['laila', 'maged', 'tarik', 'siri', 'enhanced'],        // Egyptian Arabic
+  'ar-lb': ['laila', 'mariam', 'siri', 'enhanced'],                // Lebanese Arabic
+  'ar-sa': ['maged', 'mishaal', 'siri', 'enhanced'],               // Saudi Arabic
+  'ar-ma': ['laila', 'mariam', 'siri', 'enhanced'],                // Moroccan Arabic
+  'ar-ae': ['maged', 'mishaal', 'siri', 'enhanced'],               // Gulf Arabic
+};
+
 const SPEECH_RATES: Record<string, number> = {
   en: 0.95, es: 0.92, zh: 0.85, vi: 0.85, ko: 0.90,
   pt: 0.92, ar: 0.85, fr: 0.92, ru: 0.90, tl: 0.92,
@@ -270,14 +287,66 @@ const SPEECH_RATES: Record<string, number> = {
   uk: 0.90, fa: 0.85, th: 0.85, bn: 0.88, ht: 0.90, pa: 0.88,
 };
 
-const scoreVoice = (voice: SpeechSynthesisVoice, lang: string): number => {
+// Dialect-specific speech rates for natural pacing
+const DIALECT_SPEECH_RATES: Record<string, number> = {
+  // Spanish variants
+  'es-mx': 0.92,  // Mexican Spanish - natural conversational pace
+  'es-pr': 0.90,  // Puerto Rican Spanish - Caribbean rhythm
+  'es-es': 0.88,  // Castilian Spanish - slightly faster
+  'es-ar': 0.90,  // Argentine Spanish - moderate pace
+  'es-co': 0.92,  // Colombian Spanish - clear pronunciation
+
+  // Arabic variants
+  'ar-eg': 0.85,  // Egyptian Arabic - clear enunciation
+  'ar-lb': 0.88,  // Lebanese Arabic - slightly faster
+  'ar-sa': 0.82,  // Saudi Arabic - formal, measured pace
+  'ar-ma': 0.85,  // Moroccan Arabic - moderate pace
+  'ar-ae': 0.85,  // Gulf Arabic - moderate pace
+};
+
+/**
+ * Get voice preferences for a language or dialect
+ */
+const getVoicePreferences = (langOrDialect: SupportedLanguage | SupportedDialect): string[] => {
+  // Check if it's a dialect first
+  if (langOrDialect.includes('-')) {
+    const dialectPrefs = DIALECT_VOICE_PREFERENCES[langOrDialect];
+    if (dialectPrefs) return dialectPrefs;
+
+    // Fallback to parent language
+    const parentLang = langOrDialect.split('-')[0] as SupportedLanguage;
+    return VOICE_PREFERENCES[parentLang] || VOICE_PREFERENCES.en;
+  }
+
+  return VOICE_PREFERENCES[langOrDialect] || VOICE_PREFERENCES.en;
+};
+
+/**
+ * Get speech rate for a language or dialect
+ */
+const getSpeechRate = (langOrDialect: SupportedLanguage | SupportedDialect): number => {
+  // Check if it's a dialect first
+  if (langOrDialect.includes('-')) {
+    const dialectRate = DIALECT_SPEECH_RATES[langOrDialect];
+    if (dialectRate) return dialectRate;
+
+    // Fallback to parent language
+    const parentLang = langOrDialect.split('-')[0] as SupportedLanguage;
+    return SPEECH_RATES[parentLang] || 0.9;
+  }
+
+  return SPEECH_RATES[langOrDialect] || 0.9;
+};
+
+const scoreVoice = (voice: SpeechSynthesisVoice, langOrDialect: string): number => {
   const nameLower = voice.name.toLowerCase();
   let score = 0;
 
   if (nameLower.includes('siri')) score += 500;
   if (nameLower.includes('enhanced') || nameLower.includes('premium')) score += 300;
 
-  const prefs = VOICE_PREFERENCES[lang] || VOICE_PREFERENCES.en;
+  // Use dialect-aware voice preferences
+  const prefs = getVoicePreferences(langOrDialect as SupportedLanguage);
   for (let i = 0; i < prefs.length; i++) {
     if (nameLower.includes(prefs[i])) score += 200 - i * 10;
   }
@@ -288,20 +357,36 @@ const scoreVoice = (voice: SpeechSynthesisVoice, lang: string): number => {
   return score;
 };
 
-const findBestVoice = async (lang: SupportedLanguage): Promise<SpeechSynthesisVoice | null> => {
+const findBestVoice = async (langOrDialect: SupportedLanguage | SupportedDialect): Promise<SpeechSynthesisVoice | null> => {
   const voices = await getVoices();
-  const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === lang);
-  const voiceCode = langConfig?.voiceCode || 'en-US';
-  const langPrefix = voiceCode.split('-')[0];
+
+  // Determine voice code - check dialect first, then language
+  let voiceCode: string;
+  let langPrefix: string;
+
+  if (langOrDialect.includes('-')) {
+    // It's a dialect - use dialect-specific voice code
+    const dialectConfig = getDialectConfig(langOrDialect as SupportedDialect);
+    voiceCode = dialectConfig?.voiceCode || 'en-US';
+    langPrefix = langOrDialect.split('-')[0];
+  } else {
+    // It's a base language
+    const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === langOrDialect);
+    voiceCode = langConfig?.voiceCode || 'en-US';
+    langPrefix = voiceCode.split('-')[0];
+  }
 
   const matching = voices.filter(v => {
     const vLang = v.lang.toLowerCase();
-    return vLang.startsWith(langPrefix.toLowerCase()) || vLang.startsWith(lang.toLowerCase());
+    // Match by dialect code first, then by language prefix
+    return vLang === voiceCode.toLowerCase() ||
+           vLang.startsWith(langPrefix.toLowerCase()) ||
+           vLang.startsWith(langOrDialect.toLowerCase());
   });
 
   if (matching.length === 0) return voices[0] || null;
 
-  const scored = matching.map(v => ({ voice: v, score: scoreVoice(v, lang) }))
+  const scored = matching.map(v => ({ voice: v, score: scoreVoice(v, langOrDialect) }))
     .sort((a, b) => b.score - a.score);
 
   return scored[0].voice;
@@ -327,7 +412,7 @@ const speakWithWebSpeech = async (
 
       const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === lang);
       utterance.lang = langConfig?.voiceCode || 'en-US';
-      utterance.rate = SPEECH_RATES[lang] || 0.9;
+      utterance.rate = getSpeechRate(lang);
       utterance.pitch = 1.0;
       utterance.volume = 1.0;
 

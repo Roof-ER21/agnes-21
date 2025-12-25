@@ -1,9 +1,10 @@
 /**
  * Speech Utilities for Field Translator
  * Uses Web Speech API for Text-to-Speech and Speech-to-Text
+ * Includes enhanced prosody control for natural-sounding speech
  */
 
-import { SupportedLanguage, SUPPORTED_LANGUAGES } from '../types';
+import { SupportedLanguage, SupportedDialect, SUPPORTED_LANGUAGES, DIALECT_VARIANTS } from '../types';
 
 // ============================================
 // Text-to-Speech (TTS)
@@ -208,30 +209,171 @@ const LANGUAGE_VOICE_SETTINGS: Record<string, { rate: number; pitch: number }> =
 };
 
 /**
- * Add natural pauses to text for better prosody
+ * Dialect-specific voice settings for regional speech patterns
+ * These override base language settings when a dialect is detected
  */
-const addNaturalPauses = (text: string): string => {
-  // Add slight pauses after punctuation for natural rhythm
-  return text
-    .replace(/\.\s+/g, '. ... ')      // Longer pause after periods
-    .replace(/\?\s+/g, '? ... ')      // Pause after questions
-    .replace(/!\s+/g, '! ... ')       // Pause after exclamations
-    .replace(/,\s+/g, ', .. ')        // Short pause after commas
-    .replace(/:\s+/g, ': .. ')        // Short pause after colons
-    .replace(/;\s+/g, '; .. ');       // Short pause after semicolons
+const DIALECT_VOICE_SETTINGS: Record<SupportedDialect, { rate: number; pitch: number }> = {
+  // Spanish dialects - US focus
+  'es-mx': { rate: 0.92, pitch: 1.02 },   // Mexican - natural conversational
+  'es-pr': { rate: 0.90, pitch: 1.03 },   // Puerto Rican - slightly slower, melodic
+  'es-es': { rate: 0.88, pitch: 1.0 },    // Castilian - more formal pace
+  'es-ar': { rate: 0.95, pitch: 1.01 },   // Argentine - faster, Italian influence
+  'es-co': { rate: 0.90, pitch: 1.02 },   // Colombian - clear, measured
+
+  // Arabic dialects - US focus
+  'ar-eg': { rate: 0.85, pitch: 1.02 },   // Egyptian - expressive, warm
+  'ar-lb': { rate: 0.88, pitch: 1.03 },   // Lebanese - melodic, French influence
+  'ar-sa': { rate: 0.82, pitch: 0.98 },   // Saudi - formal, measured
+  'ar-ma': { rate: 0.85, pitch: 1.0 },    // Moroccan - faster than Gulf
+  'ar-ae': { rate: 0.84, pitch: 1.0 },    // Gulf - clear enunciation
+} as Record<SupportedDialect, { rate: number; pitch: number }>;
+
+/**
+ * Get voice settings for a language or dialect
+ */
+export const getVoiceSettings = (langOrDialect: SupportedLanguage | SupportedDialect): { rate: number; pitch: number } => {
+  // Check if it's a dialect first
+  if (langOrDialect.includes('-')) {
+    const dialectSettings = DIALECT_VOICE_SETTINGS[langOrDialect as SupportedDialect];
+    if (dialectSettings) return dialectSettings;
+
+    // Fall back to parent language
+    const parentLang = langOrDialect.split('-')[0] as SupportedLanguage;
+    return LANGUAGE_VOICE_SETTINGS[parentLang] || { rate: 0.9, pitch: 1.0 };
+  }
+
+  return LANGUAGE_VOICE_SETTINGS[langOrDialect] || { rate: 0.9, pitch: 1.0 };
+};
+
+/**
+ * Key phrases that should have slight emphasis (pause before/after)
+ * These are common in conversational sales speech
+ */
+const EMPHASIS_PHRASES = [
+  'free', 'no cost', 'no obligation', 'completely free',
+  '10 minutes', '15 minutes', 'quick', 'fast',
+  'insurance', 'covered', 'no charge',
+  'storm damage', 'hail damage',
+  'your neighbor', 'across the street',
+];
+
+/**
+ * Prosody configuration for different speech styles
+ */
+export interface ProsodyConfig {
+  pauseAfterSentence: string;     // Pause after periods
+  pauseAfterQuestion: string;     // Pause after questions
+  pauseAfterExclaim: string;      // Pause after exclamations
+  pauseAfterComma: string;        // Pause after commas
+  pauseAfterColon: string;        // Pause after colons
+  emphasisPause: string;          // Pause before key phrases
+  breathingPause: string;         // Natural breathing pauses
+}
+
+/**
+ * Default prosody settings for conversational speech
+ */
+const DEFAULT_PROSODY: ProsodyConfig = {
+  pauseAfterSentence: ' ... ',    // ~300ms
+  pauseAfterQuestion: ' .... ',   // ~400ms (slightly longer for questions)
+  pauseAfterExclaim: ' ... ',     // ~300ms
+  pauseAfterComma: ' .. ',        // ~150ms
+  pauseAfterColon: ' .. ',        // ~150ms
+  emphasisPause: ' . ',           // ~75ms (subtle pause before key phrases)
+  breathingPause: ' . ',          // ~75ms (after "and", "but", "so")
+};
+
+/**
+ * Fast-paced prosody for energetic speech
+ */
+const FAST_PROSODY: ProsodyConfig = {
+  pauseAfterSentence: ' .. ',
+  pauseAfterQuestion: ' ... ',
+  pauseAfterExclaim: ' .. ',
+  pauseAfterComma: ' . ',
+  pauseAfterColon: ' . ',
+  emphasisPause: '',
+  breathingPause: '',
+};
+
+/**
+ * Slow, clear prosody for emphasis or non-native speakers
+ */
+const CLEAR_PROSODY: ProsodyConfig = {
+  pauseAfterSentence: ' .... ',
+  pauseAfterQuestion: ' ..... ',
+  pauseAfterExclaim: ' .... ',
+  pauseAfterComma: ' ... ',
+  pauseAfterColon: ' ... ',
+  emphasisPause: ' .. ',
+  breathingPause: ' . ',
+};
+
+/**
+ * Add natural pauses to text for better prosody
+ * @param text - The text to process
+ * @param style - 'natural' (default), 'fast', or 'clear'
+ * @param addEmphasis - Whether to add pauses before key phrases
+ */
+const addNaturalPauses = (
+  text: string,
+  style: 'natural' | 'fast' | 'clear' = 'natural',
+  addEmphasis: boolean = true
+): string => {
+  const prosody = style === 'fast' ? FAST_PROSODY
+    : style === 'clear' ? CLEAR_PROSODY
+    : DEFAULT_PROSODY;
+
+  let processed = text
+    // Sentence endings
+    .replace(/\.\s+/g, '.' + prosody.pauseAfterSentence)
+    .replace(/\?\s+/g, '?' + prosody.pauseAfterQuestion)
+    .replace(/!\s+/g, '!' + prosody.pauseAfterExclaim)
+    // Mid-sentence pauses
+    .replace(/,\s+/g, ',' + prosody.pauseAfterComma)
+    .replace(/:\s+/g, ':' + prosody.pauseAfterColon)
+    .replace(/;\s+/g, ';' + prosody.pauseAfterComma);
+
+  // Add breathing pauses after common conjunctions
+  if (prosody.breathingPause) {
+    processed = processed
+      .replace(/\band\b/gi, prosody.breathingPause + 'and')
+      .replace(/\bbut\b/gi, prosody.breathingPause + 'but')
+      .replace(/\bso\b/gi, prosody.breathingPause + 'so');
+  }
+
+  // Add subtle emphasis pauses before key phrases
+  if (addEmphasis && prosody.emphasisPause) {
+    for (const phrase of EMPHASIS_PHRASES) {
+      const regex = new RegExp(`\\b(${phrase})\\b`, 'gi');
+      processed = processed.replace(regex, prosody.emphasisPause + '$1');
+    }
+  }
+
+  return processed;
+};
+
+/**
+ * Remove prosody pauses from text (for display purposes)
+ */
+export const removeProsodyPauses = (text: string): string => {
+  return text.replace(/\s*\.{2,}\s*/g, ' ').trim();
 };
 
 /**
  * Speak text in a given language with natural prosody
+ * Supports both base languages and regional dialects
  */
 export const speak = (
   text: string,
-  langCode: SupportedLanguage,
+  langCode: SupportedLanguage | SupportedDialect,
   options?: {
     rate?: number;
     pitch?: number;
     volume?: number;
-    natural?: boolean;  // Enable natural pauses
+    natural?: boolean;          // Enable natural pauses (default: true)
+    prosodyStyle?: 'natural' | 'fast' | 'clear';  // Prosody style
+    addEmphasis?: boolean;      // Add emphasis to key phrases (default: true)
     onEnd?: () => void;
     onError?: (error: string) => void;
   }
@@ -239,29 +381,47 @@ export const speak = (
   // Cancel any ongoing speech
   stopSpeaking();
 
-  const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === langCode);
+  // Handle dialects - get the parent language config but use dialect settings
+  const baseLangCode = langCode.includes('-')
+    ? langCode.split('-')[0] as SupportedLanguage
+    : langCode;
+
+  const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === baseLangCode);
   if (!langConfig) {
     options?.onError?.('Unsupported language');
     return;
   }
 
-  // Get language-specific settings
-  const langSettings = LANGUAGE_VOICE_SETTINGS[langCode] || { rate: 0.9, pitch: 1.0 };
+  // Get voice settings (dialect-aware)
+  const voiceSettings = getVoiceSettings(langCode);
+
+  // Get voice code - prefer dialect-specific if available
+  let voiceCode = langConfig.voiceCode;
+  if (langCode.includes('-')) {
+    const dialectConfig = DIALECT_VARIANTS.find(d => d.code === langCode);
+    if (dialectConfig) {
+      voiceCode = dialectConfig.voiceCode;
+    }
+  }
 
   // Process text for natural pauses (enabled by default)
-  const processedText = options?.natural !== false ? addNaturalPauses(text) : text;
+  const prosodyStyle = options?.prosodyStyle ?? 'natural';
+  const addEmphasis = options?.addEmphasis ?? true;
+  const processedText = options?.natural !== false
+    ? addNaturalPauses(text, prosodyStyle, addEmphasis)
+    : text;
 
   const utterance = new SpeechSynthesisUtterance(processedText);
-  utterance.lang = langConfig.voiceCode;
-  utterance.rate = options?.rate ?? langSettings.rate;
-  utterance.pitch = options?.pitch ?? langSettings.pitch;
+  utterance.lang = voiceCode;
+  utterance.rate = options?.rate ?? voiceSettings.rate;
+  utterance.pitch = options?.pitch ?? voiceSettings.pitch;
   utterance.volume = options?.volume ?? 1;
 
-  // Try to set the best voice
-  const voice = getBestVoice(langCode);
+  // Try to set the best voice for the base language
+  const voice = getBestVoice(baseLangCode);
   if (voice) {
     utterance.voice = voice;
-    console.log(`Using voice: ${voice.name} (${voice.lang})`);
+    console.log(`Using voice: ${voice.name} (${voice.lang}) for ${langCode}`);
   }
 
   utterance.onend = () => {
