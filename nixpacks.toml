@@ -1,20 +1,5 @@
-[phases.setup]
-nixPkgs = ["nodejs_22"]
-
-[phases.install]
-cmds = [
-  "npm ci --cache=/tmp/npm-cache --prefer-offline=false"
-]
-
 [phases.build]
-cmds = [
-  "npm run build"
-]
-
-# Environment variables to override Vite cache location
-# Railway automatically mounts node_modules/.cache, so we use a different location
-[variables]
-VITE_CACHE_DIR = "/tmp/vite-cache"
+cmds = ["npm ci", "npm run build"]
 
 [start]
-cmd = "npx serve -s dist -l $PORT"
+cmd = "npm start"
