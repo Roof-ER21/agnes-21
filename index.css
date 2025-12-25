@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* Video Player Animations */
 @keyframes fadeIn {
   from {

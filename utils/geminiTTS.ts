@@ -169,14 +169,12 @@ Speak clearly and warmly like a professional translator.`
       };
 
       try {
-        this.session.send({
-          clientContent: {
-            turns: [{
-              role: 'user',
-              parts: [{ text: `Read this aloud: "${text}"` }]
-            }],
-            turnComplete: true
-          }
+        this.session.sendClientContent({
+          turns: [{
+            role: 'user',
+            parts: [{ text: `Read this aloud: "${text}"` }]
+          }],
+          turnComplete: true
         });
       } catch (error) {
         console.error('Error sending to Gemini:', error);
