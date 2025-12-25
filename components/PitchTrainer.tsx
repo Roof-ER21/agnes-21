@@ -29,6 +29,7 @@ import {
 import { playSuccess, playPerfect, playLevelUp, toggleSounds, areSoundsEnabled } from '../utils/soundEffects';
 import { useAuth } from '../contexts/AuthContext';
 import { checkTTSHealth, generateSpeech, DEFAULT_FEEDBACK_VOICE, speakWithChatterbox } from '../utils/chatterboxTTS';
+import { createVAD, startVAD, stopVAD, pauseVAD, createFallbackVAD } from '../utils/vadUtils';
 import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle, Sparkles, AlertTriangle, Volume2, VolumeX, Wand2 } from 'lucide-react';
 import XPBar from './XPBar';
 import LevelUpModal from './LevelUpModal';
@@ -98,6 +99,14 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   // NEW: Custom Voice Mode (Chatterbox TTS with Reeses Piecies)
   const [useCustomVoice, setUseCustomVoice] = useState(false);
   const [ttsAvailable, setTtsAvailable] = useState<boolean | null>(null);
+
+  // NEW: Score Me functionality
+  const [showScoreModal, setShowScoreModal] = useState(false);
+  const [isRequestingScore, setIsRequestingScore] = useState(false);
+
+  // NEW: Silence timeout tracking
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const SILENCE_TIMEOUT_MS = 3000; // 3 seconds of silence = end of speech
   const [isSpeakingCustom, setIsSpeakingCustom] = useState(false);
 
   // NEW: Level-up modal state
@@ -521,6 +530,76 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     setShowEndSessionModal(true);
   };
 
+  // NEW: Handle Score Me button - requests score from Agnes
+  const handleScoreMe = async () => {
+    if (!sessionPromiseRef.current || isRequestingScore) return;
+
+    setIsRequestingScore(true);
+
+    try {
+      // Send a text message to Gemini asking for scoring
+      const session = await sessionPromiseRef.current;
+
+      // Add user message to transcript
+      const scoreRequestMsg: TranscriptMessage = {
+        role: 'user',
+        text: '🎯 Score Me',
+        timestamp: new Date()
+      };
+      setTranscript(prev => [...prev, scoreRequestMsg]);
+
+      // Send the scoring request to Gemini
+      session.sendClientContent({
+        turns: [{
+          role: 'user',
+          parts: [{ text: 'Agnes, please score my performance now. Provide your AGNES SCORE out of 100 and detailed feedback on what I did well and what I can improve.' }]
+        }],
+        turnComplete: true
+      });
+
+    } catch (error) {
+      console.error('Error requesting score:', error);
+    } finally {
+      // Reset after a delay to allow response
+      setTimeout(() => setIsRequestingScore(false), 5000);
+    }
+  };
+
+  // NEW: Handle end session with auto-score option
+  const handleEndWithScore = async () => {
+    setShowScoreModal(false);
+    setIsRequestingScore(true);
+
+    try {
+      if (sessionPromiseRef.current) {
+        const session = await sessionPromiseRef.current;
+
+        // Request final score before ending
+        session.sendClientContent({
+          turns: [{
+            role: 'user',
+            parts: [{ text: 'The session is ending. Please provide your final AGNES SCORE out of 100 and a summary of my performance.' }]
+          }],
+          turnComplete: true
+        });
+
+        // Wait for response before ending
+        await new Promise(resolve => setTimeout(resolve, 8000));
+      }
+    } catch (error) {
+      console.error('Error getting final score:', error);
+    }
+
+    // Now end the session
+    confirmEndSession();
+  };
+
+  // NEW: Handle end without score
+  const handleEndWithoutScore = () => {
+    setShowScoreModal(false);
+    confirmEndSession();
+  };
+
   // NEW: Confirm and save session
   const confirmEndSession = async () => {
     setShowEndSessionModal(false);
@@ -732,8 +811,12 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     startVoiceActivityDetection();
   };
 
-  // Voice activity detection for waveform
+  // Voice activity detection for waveform - improved with silence timeout
   const startVoiceActivityDetection = () => {
+    // Higher threshold (45 instead of 15) to avoid picking up background noise
+    const VOICE_THRESHOLD = 45;
+    let lastSpeakingState = false;
+
     const checkVoiceActivity = () => {
       if (!micAnalyserRef.current) return;
 
@@ -743,10 +826,31 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       // Calculate average volume
       const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
 
-      // Threshold for voice activity (adjust as needed)
-      const VOICE_THRESHOLD = 15;
-      setIsSpeaking(average > VOICE_THRESHOLD && !isMuted);
+      const nowSpeaking = average > VOICE_THRESHOLD && !isMuted;
 
+      // If just started speaking, clear any silence timeout
+      if (nowSpeaking && !lastSpeakingState) {
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+          silenceTimeoutRef.current = null;
+        }
+        setIsSpeaking(true);
+      }
+      // If just stopped speaking, start silence timeout
+      else if (!nowSpeaking && lastSpeakingState) {
+        if (!silenceTimeoutRef.current) {
+          silenceTimeoutRef.current = setTimeout(() => {
+            setIsSpeaking(false);
+            silenceTimeoutRef.current = null;
+          }, SILENCE_TIMEOUT_MS);
+        }
+      }
+      // Still speaking, keep state true
+      else if (nowSpeaking) {
+        setIsSpeaking(true);
+      }
+
+      lastSpeakingState = nowSpeaking;
       requestAnimationFrame(checkVoiceActivity);
     };
 
@@ -1155,12 +1259,35 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
             {isVideoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
           </button>
 
-          {/* Finish / Score Button */}
-          <div className="ml-8 border-l border-neutral-800 pl-8 flex items-center">
-             <button className="flex items-center space-x-2 text-yellow-500 hover:text-yellow-400 transition-colors">
+          {/* Score Me Button */}
+          <div className="ml-8 border-l border-neutral-800 pl-8 flex items-center space-x-4">
+             <button
+               onClick={handleScoreMe}
+               disabled={isRequestingScore || !isConnected}
+               className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 ${
+                 isRequestingScore
+                   ? 'bg-yellow-600/50 text-yellow-300 cursor-wait'
+                   : 'bg-yellow-600 hover:bg-yellow-500 text-white shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)]'
+               } disabled:opacity-50 disabled:cursor-not-allowed`}
+               title="Get your score from Agnes"
+             >
                <Trophy className="w-5 h-5" />
-               <span className="text-xs font-bold tracking-widest uppercase">Ask: "Score Me"</span>
+               <span className="text-xs font-bold tracking-widest uppercase">
+                 {isRequestingScore ? 'Scoring...' : 'Score Me'}
+               </span>
              </button>
+
+             {/* Current Score Display */}
+             {currentScore !== null && (
+               <div className={`px-3 py-2 rounded-lg text-sm font-bold ${
+                 currentScore >= 80 ? 'bg-green-600/20 text-green-400 border border-green-600/50' :
+                 currentScore >= 60 ? 'bg-yellow-600/20 text-yellow-400 border border-yellow-600/50' :
+                 'bg-red-600/20 text-red-400 border border-red-600/50'
+               }`}>
+                 Score: {currentScore}/100
+               </div>
+             )}
+
              {/* ARIA Live Region for Score Updates */}
              <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
                {currentScore !== null && `Agnes scored your performance: ${currentScore} out of 100`}
@@ -1285,23 +1412,52 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
               </div>
             )}
 
+            {/* Auto-Score Option */}
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <Trophy className="w-4 h-4 text-yellow-400" />
+                <span className="text-sm font-semibold text-yellow-400">Get Final Score?</span>
+              </div>
+              <p className="text-xs text-neutral-400">
+                Have Agnes provide a final performance score and feedback before ending the session.
+              </p>
+            </div>
+
             {/* Action Buttons */}
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3">
               <button
-                onClick={() => setShowEndSessionModal(false)}
-                className="flex-1 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:ring-offset-neutral-900"
-                aria-label="Cancel and return to training session"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmEndSession}
-                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-neutral-900"
-                aria-label="Confirm and save training session"
+                onClick={handleEndWithScore}
+                disabled={isRequestingScore}
+                className={`w-full px-4 py-3 rounded-lg transition-colors font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-neutral-900 ${
+                  isRequestingScore
+                    ? 'bg-yellow-600/50 text-yellow-200 cursor-wait'
+                    : 'bg-yellow-600 hover:bg-yellow-500 text-white focus:ring-yellow-500'
+                }`}
+                aria-label="Get final score from Agnes then end session"
                 autoFocus
               >
-                Save & End Session
+                <div className="flex items-center justify-center space-x-2">
+                  <Trophy className="w-5 h-5" />
+                  <span>{isRequestingScore ? 'Getting Score...' : 'Score & End Session'}</span>
+                </div>
               </button>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowEndSessionModal(false)}
+                  className="flex-1 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:ring-offset-neutral-900"
+                  aria-label="Cancel and return to training session"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmEndSession}
+                  className="flex-1 px-4 py-3 bg-neutral-700 hover:bg-neutral-600 border border-neutral-600 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-2 focus:ring-offset-neutral-900"
+                  aria-label="End session without scoring"
+                >
+                  End Without Scoring
+                </button>
+              </div>
             </div>
 
             {/* Optional: Discard Button */}

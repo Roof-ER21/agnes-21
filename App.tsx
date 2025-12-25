@@ -14,8 +14,12 @@ import SkillTree from './components/SkillTree';
 import PerfectWeekChallenge from './components/PerfectWeekChallenge';
 import FieldTranslator from './components/FieldTranslator';
 import RoleplayDemo from './components/RoleplayDemo';
+import ManagerHome from './components/ManagerHome';
+import RepHome from './components/RepHome';
+import ScriptEditor from './components/ScriptEditor';
+import RepHistory from './components/RepHistory';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
-import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock, Globe, Video } from 'lucide-react';
+import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock, Globe, Video, ArrowLeft } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
 import { PHONE_SCRIPTS, PhoneScript } from './utils/phoneScripts';
 import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty, isManagerMode, activateManagerMode, deactivateManagerMode } from './utils/gamification';
@@ -99,10 +103,15 @@ SIMPLICITY
 • "Do you happen to know your deductible? If not, no big deal at all"!`;
 
 // Inner component that uses auth context
+// View types for role-based navigation
+type AppView = 'home' | 'training' | 'history' | 'leaderboard' | 'dashboard' | 'users' | 'translate' | 'demos' | 'scripts';
+
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null);
+  const [currentView, setCurrentView] = useState<AppView>('home');
   const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [showRepHistory, setShowRepHistory] = useState<boolean>(false);
   const [showLeaderboard, setShowLeaderboard] = useState<boolean>(false);
   const [showManagerDashboard, setShowManagerDashboard] = useState<boolean>(false);
   const [showAllUsers, setShowAllUsers] = useState<boolean>(false);
@@ -119,6 +128,57 @@ const AppContent: React.FC = () => {
     const stored = localStorage.getItem(`agnes_mini_modules_${today}`);
     return stored ? JSON.parse(stored) : [];
   });
+
+  // Handle navigation from home pages
+  const handleNavigation = (view: string) => {
+    const isManager = user?.role === 'manager';
+
+    switch (view) {
+      case 'training':
+        setCurrentView('training');
+        break;
+      case 'history':
+        // Managers see all sessions, reps see their personal history
+        if (isManager) {
+          setShowHistory(true);
+        } else {
+          setShowRepHistory(true);
+        }
+        break;
+      case 'leaderboard':
+        setShowLeaderboard(true);
+        break;
+      case 'dashboard':
+        setShowManagerDashboard(true);
+        break;
+      case 'users':
+        setShowAllUsers(true);
+        break;
+      case 'translate':
+        setShowTranslator(true);
+        break;
+      case 'demos':
+        setShowRoleplayDemo(true);
+        break;
+      case 'scripts':
+        setCurrentView('scripts');
+        break;
+      default:
+        setCurrentView('home');
+    }
+  };
+
+  // Go back to home
+  const goHome = () => {
+    setCurrentView('home');
+    setShowHistory(false);
+    setShowRepHistory(false);
+    setShowLeaderboard(false);
+    setShowManagerDashboard(false);
+    setShowAllUsers(false);
+    setShowTranslator(false);
+    setShowRoleplayDemo(false);
+  };
 
   // Handle mini-module selection
   const handleMiniModuleSelect = (module: MiniModule) => {
@@ -242,15 +302,19 @@ const AppContent: React.FC = () => {
   }
 
   if (showTranslator) {
-    return <FieldTranslator onBack={() => setShowTranslator(false)} />;
+    return <FieldTranslator onBack={goHome} />;
   }
 
   if (showRoleplayDemo) {
-    return <RoleplayDemo onBack={() => setShowRoleplayDemo(false)} />;
+    return <RoleplayDemo onBack={goHome} />;
   }
 
   if (showHistory) {
-    return <SessionHistory onBack={() => setShowHistory(false)} />;
+    return <SessionHistory onBack={goHome} />;
+  }
+
+  if (showRepHistory) {
+    return <RepHistory onBack={goHome} />;
   }
 
   if (showLeaderboard) {
@@ -258,10 +322,11 @@ const AppContent: React.FC = () => {
       <div className="min-h-screen bg-black">
         <div className="fixed top-4 left-4 z-50">
           <button
-            onClick={() => setShowLeaderboard(false)}
+            onClick={goHome}
             className="group flex items-center space-x-2 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-red-900/50 rounded-full transition-all duration-300"
           >
-            <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">← Back</span>
+            <ArrowLeft className="w-4 h-4 text-neutral-400 group-hover:text-white" />
+            <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">Home</span>
           </button>
         </div>
         <TeamLeaderboard currentUserId="user_0" />
@@ -270,15 +335,76 @@ const AppContent: React.FC = () => {
   }
 
   if (showManagerDashboard) {
-    return <ManagerDashboard onBack={() => setShowManagerDashboard(false)} />;
+    return <ManagerDashboard onBack={goHome} />;
   }
 
   if (showAllUsers) {
-    return <AllUsersView onBack={() => setShowAllUsers(false)} />;
+    return <AllUsersView onBack={goHome} />;
   }
 
+  // Script Editor (managers only)
+  if (currentView === 'scripts') {
+    return <ScriptEditor onBack={goHome} />;
+  }
+
+  // Role-based home pages
+  if (currentView === 'home') {
+    const isManager = user?.role === 'manager';
+
+    // Common header for home pages
+    const homeHeader = (
+      <div className="fixed top-4 right-4 z-50 flex items-center space-x-2">
+        <div className="flex items-center space-x-2 px-3 py-2 bg-neutral-900/80 rounded-full border border-neutral-800">
+          <span className="text-lg">{user?.avatar}</span>
+          <span className="text-xs font-mono uppercase tracking-wider text-neutral-400">{user?.name}</span>
+        </div>
+        <button
+          onClick={logout}
+          className="p-2 bg-neutral-900 hover:bg-red-900/30 border border-neutral-700 hover:border-red-500/50 rounded-full transition-all duration-300"
+          title="Logout"
+        >
+          <LogOut className="w-4 h-4 text-neutral-400 hover:text-red-500" />
+        </button>
+      </div>
+    );
+
+    if (isManager) {
+      return (
+        <>
+          {homeHeader}
+          <ManagerHome onNavigate={handleNavigation} />
+        </>
+      );
+    } else {
+      return (
+        <>
+          {homeHeader}
+          <RepHome onNavigate={handleNavigation} />
+        </>
+      );
+    }
+  }
+
+  // Training configuration view (accessible from home navigation)
+  if (currentView !== 'training') {
+    // Fallback to training view for unknown views
+    setCurrentView('training');
+  }
+
+  // Training configuration screen
   return (
     <div className="min-h-screen bg-black text-neutral-100 overflow-y-auto font-sans selection:bg-red-600/40 selection:text-white">
+      {/* Back to Home button */}
+      <div className="fixed top-4 left-4 z-50">
+        <button
+          onClick={goHome}
+          className="group flex items-center space-x-2 px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-red-900/50 rounded-full transition-all duration-300"
+        >
+          <ArrowLeft className="w-4 h-4 text-neutral-400 group-hover:text-white" />
+          <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 group-hover:text-white">Home</span>
+        </button>
+      </div>
+
       {/* Skip to main content link - Accessibility */}
       <a
         href="#main-content"
@@ -307,100 +433,6 @@ const AppContent: React.FC = () => {
             <span className="text-neutral-500 text-base">Real-time analysis. Brutally honest feedback.</span>
           </p>
 
-          {/* Navigation Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto pt-4">
-            <button
-              onClick={() => setShowTranslator(true)}
-              className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-cyan-900/30 border border-neutral-800 hover:border-cyan-500/50 rounded-xl transition-all duration-300"
-            >
-              <Globe className="w-6 h-6 text-cyan-400 mb-2" />
-              <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-cyan-300">Translate</span>
-            </button>
-
-            <button
-              onClick={() => setShowRoleplayDemo(true)}
-              className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-purple-900/30 border border-neutral-800 hover:border-purple-500/50 rounded-xl transition-all duration-300"
-            >
-              <Video className="w-6 h-6 text-purple-400 mb-2" />
-              <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-purple-300">Demos</span>
-            </button>
-
-            <button
-              onClick={() => setShowHistory(true)}
-              className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-red-900/20 border border-neutral-800 hover:border-red-500/50 rounded-xl transition-all duration-300"
-            >
-              <History className="w-6 h-6 text-red-400 mb-2" />
-              <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-red-300">History</span>
-            </button>
-
-            <button
-              onClick={() => setShowLeaderboard(true)}
-              className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-yellow-900/20 border border-neutral-800 hover:border-yellow-500/50 rounded-xl transition-all duration-300"
-            >
-              <Trophy className="w-6 h-6 text-yellow-400 mb-2" />
-              <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-yellow-300">Leaderboard</span>
-            </button>
-
-            {/* Analytics - Only for managers */}
-            {user?.role === 'manager' && (
-              <button
-                onClick={() => setShowManagerDashboard(true)}
-                className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-blue-900/20 border border-neutral-800 hover:border-blue-500/50 rounded-xl transition-all duration-300"
-              >
-                <BarChart3 className="w-6 h-6 text-blue-400 mb-2" />
-                <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-blue-300">Analytics</span>
-              </button>
-            )}
-
-            {/* All Users - Only for managers */}
-            {user?.role === 'manager' && (
-              <button
-                onClick={() => setShowAllUsers(true)}
-                className="group flex flex-col items-center justify-center p-4 bg-neutral-900/80 hover:bg-green-900/20 border border-neutral-800 hover:border-green-500/50 rounded-xl transition-all duration-300"
-              >
-                <Users className="w-6 h-6 text-green-400 mb-2" />
-                <span className="text-xs font-mono uppercase tracking-wider text-neutral-300 group-hover:text-green-300">All Users</span>
-              </button>
-            )}
-          </div>
-
-          {/* User Bar */}
-          <div className="flex items-center justify-center gap-3 pt-2">
-            <div className="flex items-center space-x-2 px-3 py-2 bg-neutral-900/50 rounded-full border border-neutral-800">
-              <span className="text-lg">{user?.avatar}</span>
-              <span className="text-xs font-mono uppercase tracking-wider text-neutral-400">{user?.name}</span>
-            </div>
-
-            {/* Manager Mode Toggle */}
-            {managerModeActive ? (
-              <button
-                onClick={handleManagerLogout}
-                className="flex items-center space-x-2 px-3 py-2 bg-green-900/50 hover:bg-green-800/50 border border-green-500/50 rounded-full transition-all duration-300"
-                title="Exit Manager Mode"
-              >
-                <Shield className="w-4 h-4 text-green-400" />
-                <span className="text-xs font-mono uppercase tracking-wider text-green-400">Exit</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleManagerLogin}
-                className="flex items-center space-x-2 px-3 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-neutral-500 rounded-full transition-all duration-300"
-                title="Manager Login"
-              >
-                <Lock className="w-3 h-3 text-neutral-500" />
-                <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Manager</span>
-              </button>
-            )}
-
-            <button
-              onClick={logout}
-              className="flex items-center space-x-2 px-3 py-2 bg-neutral-900 hover:bg-red-900/30 border border-neutral-700 hover:border-red-500/50 rounded-full transition-all duration-300"
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4 text-neutral-400 hover:text-red-500" />
-              <span className="text-xs font-mono uppercase tracking-wider text-neutral-400">Logout</span>
-            </button>
-          </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">

@@ -101,8 +101,15 @@ export const detectLanguage = async (text: string): Promise<SupportedLanguage | 
 /**
  * Enhanced language detection with dialect recognition
  * Detects Spanish and Arabic dialects with regional variants
+ * Uses caching for high-confidence results
  */
 export const detectLanguageWithDialect = async (text: string): Promise<DetectionResult | null> => {
+  // Check cache first
+  const cached = getCachedDetection(text);
+  if (cached) {
+    return cached;
+  }
+
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY not configured');
@@ -207,6 +214,10 @@ ${text}`;
       };
 
       console.log(`🔍 Detected: ${result.dialect || result.language} (${result.confidence}% confidence)${result.region ? ` - ${result.region}` : ''}`);
+
+      // Cache high-confidence results
+      cacheDetection(text, result);
+
       return result;
     } catch (parseError) {
       console.error('Failed to parse detection response:', responseText);
@@ -247,16 +258,85 @@ export const getVoiceCodeForDetection = (result: DetectionResult): string => {
 };
 
 // ============================================
-// Translation Caching
+// Translation Caching (LRU with size limits)
 // ============================================
 
 interface CacheEntry {
   translation: string;
   timestamp: number;
+  lastAccessed: number;
 }
 
 const CACHE_KEY = 'agnes_translation_cache';
 const CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+const CACHE_MAX_ENTRIES = 500; // LRU limit
+
+// In-memory cache for faster access (avoids JSON.parse on every lookup)
+let memoryCache: Map<string, CacheEntry> | null = null;
+
+/**
+ * Load cache from localStorage into memory (lazy loading)
+ */
+const loadCache = (): Map<string, CacheEntry> => {
+  if (memoryCache) return memoryCache;
+
+  try {
+    const stored = localStorage.getItem(CACHE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      memoryCache = new Map(Object.entries(parsed));
+    } else {
+      memoryCache = new Map();
+    }
+  } catch {
+    memoryCache = new Map();
+  }
+  return memoryCache;
+};
+
+/**
+ * Save cache to localStorage (debounced)
+ */
+let saveTimeout: NodeJS.Timeout | null = null;
+const saveCache = (): void => {
+  if (saveTimeout) clearTimeout(saveTimeout);
+
+  saveTimeout = setTimeout(() => {
+    try {
+      if (!memoryCache) return;
+      const obj: Record<string, CacheEntry> = {};
+      memoryCache.forEach((v, k) => { obj[k] = v; });
+      localStorage.setItem(CACHE_KEY, JSON.stringify(obj));
+    } catch (error) {
+      console.error('Cache save error:', error);
+    }
+  }, 1000); // Debounce saves by 1 second
+};
+
+/**
+ * Evict oldest entries if cache exceeds max size (LRU)
+ */
+const evictOldEntries = (cache: Map<string, CacheEntry>): void => {
+  const now = Date.now();
+
+  // First, remove expired entries
+  for (const [key, entry] of cache) {
+    if (now - entry.timestamp > CACHE_MAX_AGE) {
+      cache.delete(key);
+    }
+  }
+
+  // If still over limit, remove least recently accessed
+  if (cache.size > CACHE_MAX_ENTRIES) {
+    const entries = Array.from(cache.entries())
+      .sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+
+    const toRemove = cache.size - CACHE_MAX_ENTRIES;
+    for (let i = 0; i < toRemove; i++) {
+      cache.delete(entries[i][0]);
+    }
+  }
+};
 
 /**
  * Get cached translation if available
@@ -266,11 +346,13 @@ export const getCachedTranslation = (
   targetLang: SupportedLanguage
 ): string | null => {
   try {
-    const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+    const cache = loadCache();
     const key = `${text}:${targetLang}`;
-    const entry: CacheEntry | undefined = cache[key];
+    const entry = cache.get(key);
 
     if (entry && Date.now() - entry.timestamp < CACHE_MAX_AGE) {
+      // Update last accessed time (LRU)
+      entry.lastAccessed = Date.now();
       return entry.translation;
     }
 
@@ -289,24 +371,64 @@ export const cacheTranslation = (
   translation: string
 ): void => {
   try {
-    const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+    const cache = loadCache();
     const key = `${text}:${targetLang}`;
-    cache[key] = {
-      translation,
-      timestamp: Date.now(),
-    };
-
-    // Clean old entries
     const now = Date.now();
-    for (const k of Object.keys(cache)) {
-      if (now - cache[k].timestamp > CACHE_MAX_AGE) {
-        delete cache[k];
-      }
-    }
 
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    cache.set(key, {
+      translation,
+      timestamp: now,
+      lastAccessed: now,
+    });
+
+    // LRU eviction
+    evictOldEntries(cache);
+
+    // Debounced save to localStorage
+    saveCache();
   } catch (error) {
     console.error('Cache error:', error);
+  }
+};
+
+// ============================================
+// Language Detection Caching (Session-based)
+// ============================================
+
+// In-memory cache for detected languages (per session, high confidence)
+const detectionCache = new Map<string, { result: DetectionResult; timestamp: number }>();
+const DETECTION_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const DETECTION_CONFIDENCE_THRESHOLD = 85; // Only cache high-confidence detections
+
+/**
+ * Get cached detection result
+ */
+export const getCachedDetection = (text: string): DetectionResult | null => {
+  const key = text.trim().toLowerCase().substring(0, 100); // Normalize key
+  const cached = detectionCache.get(key);
+
+  if (cached && Date.now() - cached.timestamp < DETECTION_CACHE_TTL) {
+    console.log(`🔍 Using cached detection: ${cached.result.dialect || cached.result.language}`);
+    return cached.result;
+  }
+
+  return null;
+};
+
+/**
+ * Cache a detection result (only if high confidence)
+ */
+export const cacheDetection = (text: string, result: DetectionResult): void => {
+  if (result.confidence >= DETECTION_CONFIDENCE_THRESHOLD) {
+    const key = text.trim().toLowerCase().substring(0, 100);
+    detectionCache.set(key, { result, timestamp: Date.now() });
+
+    // Limit cache size
+    if (detectionCache.size > 100) {
+      const oldest = Array.from(detectionCache.entries())
+        .sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+      if (oldest) detectionCache.delete(oldest[0]);
+    }
   }
 };
 
@@ -331,11 +453,46 @@ export const translateWithCache = async (
 };
 
 // ============================================
-// Batch Translation
+// Batch Translation (with concurrency limit)
 // ============================================
 
+const BATCH_CONCURRENCY_LIMIT = 3; // Max parallel API calls
+
 /**
- * Translate multiple texts at once
+ * Run promises with concurrency limit
+ */
+const limitConcurrency = async <T>(
+  tasks: (() => Promise<T>)[],
+  limit: number
+): Promise<T[]> => {
+  const results: T[] = [];
+  const executing: Promise<void>[] = [];
+
+  for (const task of tasks) {
+    const p = Promise.resolve().then(() => task()).then(result => {
+      results.push(result);
+    });
+
+    executing.push(p);
+
+    if (executing.length >= limit) {
+      await Promise.race(executing);
+      // Remove completed promises
+      for (let i = executing.length - 1; i >= 0; i--) {
+        if (executing[i] === p) {
+          executing.splice(i, 1);
+          break;
+        }
+      }
+    }
+  }
+
+  await Promise.all(executing);
+  return results;
+};
+
+/**
+ * Translate multiple texts at once (with concurrency limit)
  */
 export const translateBatch = async (
   texts: string[],
@@ -347,28 +504,37 @@ export const translateBatch = async (
     getCachedTranslation(text, targetLang)
   );
 
-  // Find texts that need translation
-  const needsTranslation = texts.filter((_, i) => results[i] === null);
+  // Find texts that need translation with their original indices
+  const uncachedIndices: number[] = [];
+  const uncachedTexts: string[] = [];
 
-  if (needsTranslation.length === 0) {
+  texts.forEach((text, i) => {
+    if (results[i] === null) {
+      uncachedIndices.push(i);
+      uncachedTexts.push(text);
+    }
+  });
+
+  if (uncachedTexts.length === 0) {
     return results as string[];
   }
 
-  // Translate uncached texts
-  const translations = await Promise.all(
-    needsTranslation.map(text => translateText(text, targetLang, sourceLang))
-  );
+  console.log(`📝 Translating ${uncachedTexts.length} texts (${BATCH_CONCURRENCY_LIMIT} parallel max)`);
+
+  // Create translation tasks
+  const tasks = uncachedTexts.map(text => () => translateText(text, targetLang, sourceLang));
+
+  // Execute with concurrency limit
+  const translations = await limitConcurrency(tasks, BATCH_CONCURRENCY_LIMIT);
 
   // Cache and merge results
-  let translationIndex = 0;
-  return texts.map((text, i) => {
-    if (results[i] !== null) {
-      return results[i]!;
-    }
-    const translation = translations[translationIndex++];
-    cacheTranslation(text, targetLang, translation);
-    return translation;
+  uncachedIndices.forEach((originalIndex, i) => {
+    const translation = translations[i];
+    results[originalIndex] = translation;
+    cacheTranslation(texts[originalIndex], targetLang, translation);
   });
+
+  return results as string[];
 };
 
 // ============================================

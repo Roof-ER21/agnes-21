@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
-    "postgres": "^3.4.5",
+    "@ricky0123/vad-web": "^0.0.30",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
     "dotenv": "^16.4.5",
@@ -30,6 +30,8 @@
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.554.0",
+    "onnxruntime-web": "^1.23.2",
+    "postgres": "^3.4.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "serve": "^14.2.1"
