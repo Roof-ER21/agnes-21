@@ -35,8 +35,8 @@ const DEMO_LEVELS = [
       'Name introduction within 5 seconds',
       'Company mention with value proposition',
       'Relatable neighborhood reference',
-      'Clear purpose (inspection)',
-      'Strong assumptive close'
+      'Clear purpose (free inspection/appointment)',
+      'Strong assumptive close to set appointment'
     ]
   },
   {
@@ -52,7 +52,7 @@ const DEMO_LEVELS = [
       'Covers all non-negotiables',
       'Slightly rushed delivery',
       'Could be more conversational',
-      'Close could be stronger',
+      'Gets appointment but close could be stronger',
       'Good foundation to build on'
     ]
   },
@@ -64,13 +64,13 @@ const DEMO_LEVELS = [
     bgColor: 'bg-yellow-500/20',
     borderColor: 'border-yellow-500',
     icon: TrendingDown,
-    description: 'Missing 2-3 non-negotiables, weak close attempt',
+    description: 'Missing 2-3 non-negotiables, weak appointment close',
     characteristics: [
       'Skips company introduction',
-      'No relatability element',
-      'Weak or missing close',
+      'No relatability/neighbor reference',
+      'Weak or unclear appointment request',
       'Too scripted/robotic',
-      'Needs more practice'
+      'Needs more practice on door-to-door approach'
     ]
   },
   {
@@ -84,10 +84,10 @@ const DEMO_LEVELS = [
     description: 'Pushy, no intro, defensive behavior leads to door slam',
     characteristics: [
       'No personal introduction',
-      'Immediately pushy/salesy',
+      'Immediately pushy/salesy (tries to close vs set appointment)',
       'Ignores homeowner concerns',
       'Gets defensive when rejected',
-      'Results in door slam'
+      'Results in door slam - no appointment set'
     ]
   }
 ];
@@ -134,66 +134,146 @@ interface Props {
   onBack?: () => void;
 }
 
+// Helper to get audio file path for a script line
+const getAudioPath = (level: string, speaker: 'salesperson' | 'homeowner', index: number): string => {
+  return `/demos/${level}_${speaker}_${index + 1}.wav`;
+};
+
 const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentLine, setCurrentLine] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [audioError, setAudioError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const speakerCountRef = useRef<{ salesperson: number; homeowner: number }>({ salesperson: 0, homeowner: 0 });
 
   const selectedDemo = DEMO_LEVELS.find(d => d.id === selectedLevel);
   const script = selectedLevel ? DEMO_SCRIPTS[selectedLevel] : [];
 
-  // Simulate playback with transcript highlighting
-  useEffect(() => {
-    if (isPlaying && script.length > 0) {
-      intervalRef.current = setInterval(() => {
-        setCurrentLine(prev => {
-          const next = prev + 1;
-          if (next >= script.length) {
-            setIsPlaying(false);
-            return 0;
-          }
-          setProgress((next / script.length) * 100);
-          return next;
-        });
-      }, 3000); // 3 seconds per line
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+  // Play audio for current line
+  const playCurrentLine = (lineIndex: number) => {
+    if (!selectedLevel || lineIndex >= script.length) {
+      setIsPlaying(false);
+      return;
+    }
+
+    const line = script[lineIndex];
+    const speaker = line.speaker;
+
+    // Count how many times this speaker has spoken (for file indexing)
+    let speakerIndex = 0;
+    for (let i = 0; i <= lineIndex; i++) {
+      if (script[i].speaker === speaker) {
+        speakerIndex++;
       }
     }
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+    const audioPath = getAudioPath(selectedLevel, speaker, speakerIndex - 1);
+    console.log(`Playing audio: ${audioPath}`);
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+
+    const audio = new Audio(audioPath);
+    audio.muted = isMuted;
+    audioRef.current = audio;
+
+    audio.onended = () => {
+      const nextLine = lineIndex + 1;
+      if (nextLine < script.length) {
+        setCurrentLine(nextLine);
+        setProgress((nextLine / script.length) * 100);
+        playCurrentLine(nextLine);
+      } else {
+        setIsPlaying(false);
+        setProgress(100);
       }
     };
-  }, [isPlaying, script.length]);
+
+    audio.onerror = (e) => {
+      console.error(`Audio error for ${audioPath}:`, e);
+      setAudioError(`Could not load audio: ${audioPath}`);
+      // Continue to next line even on error
+      const nextLine = lineIndex + 1;
+      if (nextLine < script.length) {
+        setTimeout(() => {
+          setCurrentLine(nextLine);
+          setProgress((nextLine / script.length) * 100);
+          playCurrentLine(nextLine);
+        }, 500);
+      } else {
+        setIsPlaying(false);
+      }
+    };
+
+    audio.play().catch(err => {
+      console.error('Audio play failed:', err);
+      setAudioError(`Playback failed: ${err.message}`);
+    });
+  };
+
+  // Handle mute changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   const handlePlay = () => {
+    setAudioError(null);
     setIsPlaying(true);
     setCurrentLine(0);
     setProgress(0);
-    // In production, this would play the pre-generated audio files
-    // For now, we simulate with transcript highlighting
+    playCurrentLine(0);
   };
 
   const handlePause = () => {
     setIsPlaying(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+  };
+
+  const handleResume = () => {
+    if (audioRef.current && audioRef.current.paused) {
+      setIsPlaying(true);
+      audioRef.current.play().catch(console.error);
+    } else {
+      handlePlay();
+    }
   };
 
   const handleRestart = () => {
+    setAudioError(null);
     setCurrentLine(0);
     setProgress(0);
     setIsPlaying(true);
+    playCurrentLine(0);
   };
 
   const handleSkip = () => {
-    setCurrentLine(prev => Math.min(prev + 1, script.length - 1));
-    setProgress(((currentLine + 1) / script.length) * 100);
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const nextLine = Math.min(currentLine + 1, script.length - 1);
+    setCurrentLine(nextLine);
+    setProgress((nextLine / script.length) * 100);
+    if (isPlaying) {
+      playCurrentLine(nextLine);
+    }
   };
 
   if (!selectedLevel) {
@@ -350,6 +430,13 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
 
         {/* Playback controls */}
         <div className="bg-slate-800/50 rounded-2xl border border-slate-700 p-6">
+          {/* Audio error display */}
+          {audioError && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
+              ⚠️ {audioError}
+            </div>
+          )}
+
           {/* Progress bar */}
           <div className="mb-4">
             <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
@@ -358,6 +445,10 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
                 style={{ width: `${progress}%` }}
               />
             </div>
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>Line {currentLine + 1} of {script.length}</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
           </div>
 
           {/* Controls */}
@@ -365,13 +456,15 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
             <button
               onClick={handleRestart}
               className="p-3 rounded-full bg-slate-700 hover:bg-slate-600 transition-colors"
+              title="Restart"
             >
               <SkipBack className="w-5 h-5 text-white" />
             </button>
 
             <button
-              onClick={isPlaying ? handlePause : handlePlay}
+              onClick={isPlaying ? handlePause : handleResume}
               className={`p-4 rounded-full bg-gradient-to-r ${selectedDemo?.color} hover:opacity-90 transition-opacity`}
+              title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
                 <Pause className="w-8 h-8 text-white" />
@@ -383,6 +476,7 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
             <button
               onClick={handleSkip}
               className="p-3 rounded-full bg-slate-700 hover:bg-slate-600 transition-colors"
+              title="Skip"
             >
               <SkipForward className="w-5 h-5 text-white" />
             </button>
@@ -390,6 +484,7 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
             <button
               onClick={() => setIsMuted(!isMuted)}
               className="p-3 rounded-full bg-slate-700 hover:bg-slate-600 transition-colors ml-4"
+              title={isMuted ? 'Unmute' : 'Mute'}
             >
               {isMuted ? (
                 <VolumeX className="w-5 h-5 text-white" />
@@ -400,7 +495,11 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
           </div>
 
           <p className="text-center text-gray-500 text-sm mt-4">
-            {isPlaying ? 'Playing demo...' : 'Click play to start the demonstration'}
+            {isPlaying
+              ? `Playing: ${script[currentLine]?.speaker === 'salesperson' ? '21 (Salesperson)' : 'Agnes (Homeowner)'}`
+              : progress > 0
+                ? 'Paused - Click play to resume'
+                : 'Click play to start the demonstration'}
           </p>
         </div>
 

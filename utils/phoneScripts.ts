@@ -155,11 +155,11 @@ For full playbook with all 100 questions, refer to the complete Pushback PDF doc
   },
   {
     id: 'retail-pitch',
-    title: 'Retail Store Approach',
+    title: 'Door-to-Door Appointment Setting',
     category: 'retail',
-    description: 'Big-box store neighbor notification pitch for lead generation',
+    description: 'Neighbor notification approach for setting inspection appointments',
     voice: 'agnes_21',
-    content: `Retail Pitch
+    content: `Door-to-Door Appointment Setting
 
 Hello, how are you?
 
@@ -185,10 +185,12 @@ Great! My job is simple.
 ---
 
 Key Points:
-- Keep it quick and friendly
-- Use the neighbor angle to create social proof
-- Get commitment on timing preference
-- Leave with contact info collected
+- Keep it quick and friendly (door-to-door requires brevity)
+- Use the neighbor angle to create social proof and relatability
+- Get commitment on timing preference (afternoon vs evening)
+- GOAL: Set the appointment for a free inspection/quote
+- Not trying to close the sale - just book the appointment
+- Leave with contact info collected and scheduled time
 
 Voice Selection: This script works best with Agnes 21 or 21 voice for TTS playback.`
   }

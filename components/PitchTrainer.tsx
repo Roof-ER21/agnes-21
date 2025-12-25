@@ -208,14 +208,20 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   useEffect(() => {
     const checkTTS = async () => {
       try {
+        console.log('Checking Chatterbox TTS availability...');
         const available = await checkTTSHealth();
         setTtsAvailable(available);
         if (available) {
-          console.log('✅ Chatterbox TTS is available');
+          console.log('✅ Chatterbox TTS is available - custom voice enabled');
+          console.log('   Voice: Reeses Piecies');
+          console.log('   Press "C" or click the wand icon to toggle custom voice');
         } else {
-          console.log('⚠️ Chatterbox TTS is not available, custom voice disabled');
+          console.log('⚠️ Chatterbox TTS backend not responding');
+          console.log('   Custom voice will be disabled');
+          console.log('   To enable: Start TTS backend at http://localhost:8000');
         }
-      } catch {
+      } catch (error) {
+        console.error('❌ Error checking TTS availability:', error);
         setTtsAvailable(false);
       }
     };
@@ -947,21 +953,50 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
              )}
            </button>
 
-           {/* Custom Voice Toggle (Chatterbox TTS) */}
-           {ttsAvailable && (
-             <button
-               onClick={() => setUseCustomVoice(!useCustomVoice)}
-               className={`p-2 rounded-full transition-all duration-300 ${
-                 useCustomVoice
-                   ? 'bg-purple-600/30 border border-purple-500 text-purple-400 hover:bg-purple-600/50'
-                   : 'bg-neutral-900/50 border border-neutral-800 text-neutral-500 hover:bg-neutral-800 hover:border-neutral-700 hover:text-white'
-               }`}
-               title={useCustomVoice ? 'Using Reeses Piecies voice (click for standard)' : 'Switch to Reeses Piecies custom voice'}
-               aria-label={useCustomVoice ? 'Switch to standard Gemini voice' : 'Switch to Reeses Piecies custom voice'}
-             >
-               <Wand2 className="w-5 h-5" />
-             </button>
-           )}
+           {/* Custom Voice Toggle (Chatterbox TTS) - Always visible with status */}
+           <button
+             onClick={() => {
+               if (ttsAvailable) {
+                 setUseCustomVoice(!useCustomVoice);
+               }
+             }}
+             className={`p-2 rounded-full transition-all duration-300 relative ${
+               ttsAvailable === null
+                 ? 'bg-neutral-900/50 border border-neutral-800 text-neutral-600 cursor-wait'
+                 : !ttsAvailable
+                 ? 'bg-neutral-900/50 border border-neutral-800 text-neutral-600 cursor-not-allowed opacity-50'
+                 : useCustomVoice
+                 ? 'bg-purple-600/30 border border-purple-500 text-purple-400 hover:bg-purple-600/50'
+                 : 'bg-neutral-900/50 border border-neutral-800 text-neutral-500 hover:bg-neutral-800 hover:border-neutral-700 hover:text-white'
+             }`}
+             title={
+               ttsAvailable === null
+                 ? 'Checking custom voice availability...'
+                 : !ttsAvailable
+                 ? 'Custom voice unavailable (TTS backend not running)'
+                 : useCustomVoice
+                 ? 'Using Reeses Piecies custom voice (click for standard Gemini voice)'
+                 : 'Switch to Reeses Piecies custom voice'
+             }
+             aria-label={
+               ttsAvailable === null
+                 ? 'Checking custom voice availability'
+                 : !ttsAvailable
+                 ? 'Custom voice unavailable - TTS backend not running'
+                 : useCustomVoice
+                 ? 'Switch to standard Gemini voice'
+                 : 'Switch to Reeses Piecies custom voice'
+             }
+             disabled={!ttsAvailable}
+           >
+             <Wand2 className="w-5 h-5" />
+             {ttsAvailable === false && (
+               <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border border-black"></div>
+             )}
+             {useCustomVoice && ttsAvailable && (
+               <div className="absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full border border-black animate-pulse"></div>
+             )}
+           </button>
 
            <button
              onClick={handleEndSession}
@@ -1173,12 +1208,13 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
               <span className="text-neutral-400">Toggle Transcript</span>
               <kbd className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-white font-mono text-xs">T</kbd>
             </div>
-            {ttsAvailable && (
-              <div className="flex items-center justify-between py-2 border-b border-neutral-800">
-                <span className="text-neutral-400">Toggle Custom Voice</span>
-                <kbd className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-white font-mono text-xs">C</kbd>
-              </div>
-            )}
+            <div className="flex items-center justify-between py-2 border-b border-neutral-800">
+              <span className="text-neutral-400">
+                Toggle Custom Voice
+                {!ttsAvailable && <span className="text-red-400 text-xs ml-1">(disabled)</span>}
+              </span>
+              <kbd className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-white font-mono text-xs">C</kbd>
+            </div>
             <div className="flex items-center justify-between py-2 border-b border-neutral-800">
               <span className="text-neutral-400">End Session</span>
               <kbd className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-white font-mono text-xs">ESC</kbd>
