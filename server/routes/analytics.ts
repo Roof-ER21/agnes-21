@@ -182,6 +182,7 @@ router.get('/users', authenticateToken, requireManager, async (_req: AuthRequest
         name: schema.users.name,
         email: schema.users.email,
         role: schema.users.role,
+        division: schema.users.division,
         avatar: schema.users.avatar,
         totalXp: schema.users.totalXp,
         currentLevel: schema.users.currentLevel,
