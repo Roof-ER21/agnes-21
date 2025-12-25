@@ -54,79 +54,13 @@ interface WeeklyWinner {
 type LeaderboardCategory = 'overall' | 'streaks' | 'volume' | 'achievements' | 'rising';
 
 // ============================================
-// MOCK DATA GENERATOR
+// XP CALCULATION INFO (For Reference)
 // ============================================
-
-const MOCK_NAMES = [
-  { name: 'Alex Rivera', avatar: '🦅' },
-  { name: 'Jordan Chen', avatar: '🐉' },
-  { name: 'Taylor Swift', avatar: '⚡' },
-  { name: 'Morgan Blake', avatar: '🔥' },
-  { name: 'Casey Knight', avatar: '⚔️' },
-  { name: 'Quinn Storm', avatar: '🌪️' },
-  { name: 'Sam Phoenix', avatar: '🦅' },
-  { name: 'Riley Frost', avatar: '❄️' },
-  { name: 'Drew Shadow', avatar: '🌑' },
-  { name: 'Avery Blaze', avatar: '💥' },
-  { name: 'Dakota Steel', avatar: '🛡️' },
-  { name: 'Skylar Volt', avatar: '⚡' }
-];
-
-const generateMockUsers = (): LeaderboardUser[] => {
-  const stored = localStorage.getItem('mock_leaderboard_users');
-
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error('Failed to parse stored mock users');
-    }
-  }
-
-  // Generate fresh mock data
-  const users = MOCK_NAMES.map((person, index) => {
-    const totalSessions = Math.floor(Math.random() * 100) + 10;
-    const avgScore = Math.floor(Math.random() * 30) + 70;
-    const currentStreak = Math.floor(Math.random() * 50);
-    const achievementCount = Math.floor(Math.random() * 12) + 2;
-
-    // Generate recent sessions
-    const recentSessions: SessionData[] = [];
-    for (let i = 0; i < 5; i++) {
-      recentSessions.push({
-        sessionId: `mock_${index}_${i}`,
-        timestamp: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
-        difficulty: ['ROOKIE', 'PRO', 'ELITE'][Math.floor(Math.random() * 3)] as any,
-        mode: ['COACH', 'ROLEPLAY'][Math.floor(Math.random() * 2)] as any,
-        script: 'Mock script',
-        transcript: [],
-        finalScore: Math.floor(Math.random() * 40) + 60,
-        duration: Math.floor(Math.random() * 600) + 300
-      });
-    }
-
-    // Calculate score improvement (last 5 vs first 5)
-    const firstAvg = recentSessions.slice(0, 5).reduce((sum, s) => sum + (s.finalScore || 0), 0) / 5;
-    const lastAvg = avgScore;
-    const scoreImprovement = Math.round(lastAvg - firstAvg);
-
-    return {
-      id: `user_${index}`,
-      name: person.name,
-      avatar: person.avatar,
-      totalSessions,
-      avgScore,
-      currentStreak,
-      achievementCount,
-      recentSessions,
-      scoreImprovement
-    };
-  });
-
-  // Save to localStorage
-  localStorage.setItem('mock_leaderboard_users', JSON.stringify(users));
-  return users;
-};
+// Base XP: 50 per session
+// Score Bonus: +1 XP per point above 70 (max +30)
+// Perfect Bonus: +50 XP for score >= 100
+// Streak Bonus: +10 XP per streak day
+// Difficulty Multipliers: BEGINNER (1x), ROOKIE (1.25x), PRO (1.5x), ELITE (2x), NIGHTMARE (3x)
 
 // ============================================
 // HELPER FUNCTIONS
@@ -572,24 +506,24 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
     const fetchLeaderboard = async () => {
       try {
         const data = await leaderboardApi.get();
-        // Transform API data to LeaderboardUser format
-        const transformedUsers: LeaderboardUser[] = data.map((u, index) => ({
+        // Transform API data to LeaderboardUser format (now includes real session stats)
+        const transformedUsers: LeaderboardUser[] = data.map((u: any, index: number) => ({
           id: u.id,
           name: u.name,
           avatar: u.avatar,
-          totalSessions: 0, // Will be populated if available
-          avgScore: Math.round(u.totalXp / Math.max(u.currentLevel, 1)), // Estimate from XP
-          currentStreak: u.currentStreak,
-          achievementCount: 0,
-          recentSessions: [],
-          scoreImprovement: 0,
+          totalSessions: u.totalSessions || 0,
+          avgScore: u.avgScore || 0,
+          currentStreak: u.currentStreak || 0,
+          achievementCount: 0, // Can be enhanced later
+          recentSessions: [], // Not included in API response
+          scoreImprovement: 0, // Calculated from recent sessions
           rank: u.rank || index + 1,
           weekScore: u.totalXp
         }));
         setApiUsers(transformedUsers);
       } catch (error) {
-        console.warn('Failed to fetch leaderboard from API, using mock data:', error);
-        setApiUsers(null);
+        console.warn('Failed to fetch leaderboard from API:', error);
+        setApiUsers([]);
       } finally {
         setIsLoading(false);
       }
@@ -607,48 +541,37 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
     return () => clearInterval(interval);
   }, []);
 
-  // Get users from API or generate mock users as fallback
+  // Get users from API - no more mock data fallback
   const users = useMemo(() => {
-    // Use API data if available
-    if (apiUsers && apiUsers.length > 0) {
-      return apiUsers;
-    }
+    // Return API data (can be empty array if no users yet)
+    const baseUsers = apiUsers || [];
 
-    // Fallback to mock data
-    const mockUsers = generateMockUsers();
+    // Enhance current user's data with local session info if available
+    if (user?.id && baseUsers.length > 0) {
+      const sessions = getSessions(user.id);
+      const currentUserInList = baseUsers.find(u => u.id === user.id);
 
-    // Add current user's real data if available
-    const sessions = getSessions(user?.id);
-    if (sessions.length > 0) {
-      const realUser = mockUsers.find(u => u.id === currentUserId);
-      if (realUser) {
-        const sessionsWithScores = sessions.filter(s => s.finalScore !== undefined);
-        const avgScore = sessionsWithScores.length > 0
-          ? Math.round(sessionsWithScores.reduce((sum, s) => sum + (s.finalScore || 0), 0) / sessionsWithScores.length)
-          : 0;
+      if (currentUserInList && sessions.length > 0) {
+        const streak = getStreak(user.id);
+        const achievementProgress = getAchievementProgress(user.id);
 
-        const streak = getStreak(user?.id);
-        const achievementProgress = getAchievementProgress(user?.id);
+        // Update with local session data
+        currentUserInList.recentSessions = sessions.slice(-5);
+        currentUserInList.achievementCount = achievementProgress.unlockedAchievements.length;
 
-        realUser.totalSessions = sessions.length;
-        realUser.avgScore = avgScore;
-        realUser.currentStreak = streak.currentStreak;
-        realUser.achievementCount = achievementProgress.unlockedAchievements.length;
-        realUser.recentSessions = sessions.slice(-5);
-
-        // Calculate score improvement
+        // Calculate score improvement from local sessions
         const firstFive = sessions.slice(0, 5).filter(s => s.finalScore);
         const lastFive = sessions.slice(-5).filter(s => s.finalScore);
         if (firstFive.length > 0 && lastFive.length > 0) {
           const firstAvg = firstFive.reduce((sum, s) => sum + (s.finalScore || 0), 0) / firstFive.length;
           const lastAvg = lastFive.reduce((sum, s) => sum + (s.finalScore || 0), 0) / lastFive.length;
-          realUser.scoreImprovement = Math.round(lastAvg - firstAvg);
+          currentUserInList.scoreImprovement = Math.round(lastAvg - firstAvg);
         }
       }
     }
 
-    return mockUsers;
-  }, [lastUpdate, currentUserId, apiUsers]);
+    return baseUsers;
+  }, [lastUpdate, user?.id, apiUsers]);
 
   // Sort users by category
   const sortedUsers = useMemo(() => {
@@ -683,8 +606,9 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
 
   const topTen = sortedUsers.slice(0, 10);
   const topThree = sortedUsers.slice(0, 3);
-  const currentUser = sortedUsers.find(u => u.id === currentUserId);
-  const isCurrentUserTopThree = currentUser ? currentUser.rank! <= 3 : false;
+  const actualUserId = user?.id || currentUserId;
+  const currentUserEntry = sortedUsers.find(u => u.id === actualUserId);
+  const isCurrentUserTopThree = currentUserEntry ? currentUserEntry.rank! <= 3 : false;
 
   // Weekly competition (mock)
   const weeklyWinners: WeeklyWinner[] = JSON.parse(
@@ -753,12 +677,14 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
       </div>
 
       <div className="max-w-6xl mx-auto">
-        {/* Podium Display for Top 3 */}
-        <Podium
-          topThree={topThree}
-          onUserClick={setSelectedUser}
-          isUserInTopThree={isCurrentUserTopThree}
-        />
+        {/* Podium Display for Top 3 (only show if we have at least 3 users) */}
+        {!isLoading && topThree.length >= 3 && (
+          <Podium
+            topThree={topThree}
+            onUserClick={setSelectedUser}
+            isUserInTopThree={isCurrentUserTopThree}
+          />
+        )}
 
         {/* Weekly Competition Banner */}
         <div className="mb-8 bg-gradient-to-r from-purple-600/20 to-blue-600/20 border-2 border-purple-500/30 rounded-xl p-6">
@@ -794,33 +720,51 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
             Top 10 Rankings
           </h2>
 
-          {topTen.map(user => (
-            <LeaderboardRow
-              key={user.id}
-              user={user}
-              rank={user.rank!}
-              isCurrentUser={user.id === currentUserId}
-              onClick={() => setSelectedUser(user)}
-            />
-          ))}
-
-          {/* Current user position if not in top 10 */}
-          {currentUser && currentUser.rank! > 10 && (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-gray-400">Loading leaderboard...</p>
+            </div>
+          ) : topTen.length === 0 ? (
+            <div className="text-center py-12">
+              <Trophy className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-white mb-2">No Training Data Yet</h3>
+              <p className="text-gray-400 mb-4">Complete training sessions to appear on the leaderboard!</p>
+              <p className="text-sm text-gray-500">
+                Earn XP by training: 50 base XP per session + bonuses for high scores and streaks.
+              </p>
+            </div>
+          ) : (
             <>
-              <div className="py-4 text-center text-gray-500">
-                <div className="inline-flex items-center gap-2">
-                  <div className="h-px w-8 bg-gray-700" />
-                  <span className="text-sm">Your Position</span>
-                  <div className="h-px w-8 bg-gray-700" />
-                </div>
-              </div>
+              {topTen.map(u => (
+                <LeaderboardRow
+                  key={u.id}
+                  user={u}
+                  rank={u.rank!}
+                  isCurrentUser={u.id === actualUserId}
+                  onClick={() => setSelectedUser(u)}
+                />
+              ))}
 
-              <LeaderboardRow
-                user={currentUser}
-                rank={currentUser.rank!}
-                isCurrentUser={true}
-                onClick={() => setSelectedUser(currentUser)}
-              />
+              {/* Current user position if not in top 10 */}
+              {currentUserEntry && currentUserEntry.rank! > 10 && (
+                <>
+                  <div className="py-4 text-center text-gray-500">
+                    <div className="inline-flex items-center gap-2">
+                      <div className="h-px w-8 bg-gray-700" />
+                      <span className="text-sm">Your Position</span>
+                      <div className="h-px w-8 bg-gray-700" />
+                    </div>
+                  </div>
+
+                  <LeaderboardRow
+                    user={currentUserEntry}
+                    rank={currentUserEntry.rank!}
+                    isCurrentUser={true}
+                    onClick={() => setSelectedUser(currentUserEntry)}
+                  />
+                </>
+              )}
             </>
           )}
         </div>

@@ -5,10 +5,11 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// GET /api/leaderboard - Get current rankings
+// GET /api/leaderboard - Get current rankings with session stats
 router.get('/', authenticateToken, async (_req: AuthRequest, res: Response) => {
   try {
-    const users = await db
+    // Get users with their session stats
+    const usersWithStats = await db
       .select({
         id: schema.users.id,
         name: schema.users.name,
@@ -17,13 +18,24 @@ router.get('/', authenticateToken, async (_req: AuthRequest, res: Response) => {
         currentLevel: schema.users.currentLevel,
         currentStreak: schema.users.currentStreak,
         longestStreak: schema.users.longestStreak,
+        totalSessions: sql<number>`(
+          SELECT COUNT(*)
+          FROM ${schema.trainingSessions}
+          WHERE ${schema.trainingSessions.userId} = ${schema.users.id}
+        )`.as('total_sessions'),
+        avgScore: sql<number>`(
+          SELECT COALESCE(ROUND(AVG(${schema.trainingSessions.finalScore})), 0)
+          FROM ${schema.trainingSessions}
+          WHERE ${schema.trainingSessions.userId} = ${schema.users.id}
+          AND ${schema.trainingSessions.finalScore} IS NOT NULL
+        )`.as('avg_score'),
       })
       .from(schema.users)
       .orderBy(desc(schema.users.totalXp))
       .limit(50);
 
     // Add rank to each user
-    const rankedUsers = users.map((user, index) => ({
+    const rankedUsers = usersWithStats.map((user, index) => ({
       ...user,
       rank: index + 1,
     }));

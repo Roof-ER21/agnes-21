@@ -19,6 +19,7 @@ import {
   User
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { PHONE_SCRIPTS } from '../utils/phoneScripts';
 
 // Script type definition
 interface Script {
@@ -108,6 +109,24 @@ As they are opening the door, smile and wave.
   }
 ];
 
+// Convert phone scripts to Script format and merge with system scripts
+const convertedPhoneScripts: Script[] = PHONE_SCRIPTS.map(ps => ({
+  id: `sys-phone-${ps.id}`,
+  title: ps.title,
+  category: 'phone' as const,
+  content: ps.content,
+  description: ps.description,
+  difficulty: 'all' as const,
+  tags: [ps.category, 'phone'],
+  createdBy: 'system',
+  createdAt: '2024-01-01',
+  updatedAt: '2024-01-01',
+  isActive: true
+}));
+
+// All system scripts (built-in + phone scripts)
+const ALL_SYSTEM_SCRIPTS: Script[] = [...SYSTEM_SCRIPTS, ...convertedPhoneScripts];
+
 // Helper functions
 const generateId = (): string => `script-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -150,7 +169,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
   // Load scripts on mount
   useEffect(() => {
     const customScripts = getStoredScripts();
-    setScripts([...SYSTEM_SCRIPTS, ...customScripts]);
+    setScripts([...ALL_SYSTEM_SCRIPTS, ...customScripts]);
   }, []);
 
   // Filter scripts
@@ -232,7 +251,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
           : s
       );
       saveScripts(updatedScripts);
-      setScripts([...SYSTEM_SCRIPTS, ...updatedScripts]);
+      setScripts([...ALL_SYSTEM_SCRIPTS, ...updatedScripts]);
     } else {
       // Create new script
       const newScript: Script = {
@@ -250,7 +269,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
       };
       const updatedScripts = [...customScripts, newScript];
       saveScripts(updatedScripts);
-      setScripts([...SYSTEM_SCRIPTS, ...updatedScripts]);
+      setScripts([...ALL_SYSTEM_SCRIPTS, ...updatedScripts]);
     }
 
     setIsEditing(false);
@@ -270,7 +289,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
 
     const customScripts = getStoredScripts().filter(s => s.id !== script.id);
     saveScripts(customScripts);
-    setScripts([...SYSTEM_SCRIPTS, ...customScripts]);
+    setScripts([...ALL_SYSTEM_SCRIPTS, ...customScripts]);
   };
 
   // Duplicate script
@@ -287,7 +306,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
 
     const customScripts = [...getStoredScripts(), newScript];
     saveScripts(customScripts);
-    setScripts([...SYSTEM_SCRIPTS, ...customScripts]);
+    setScripts([...ALL_SYSTEM_SCRIPTS, ...customScripts]);
   };
 
   const getCategoryColor = (category: string) => {

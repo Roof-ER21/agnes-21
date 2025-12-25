@@ -1,14 +1,37 @@
 /**
  * All Users View Component for Managers
  * Shows all registered users and their training sessions
+ * Includes CRUD operations for user management
  */
 
 import React, { useState, useEffect } from 'react';
 import { getUsers, User } from '../utils/auth';
 import { getSessions, SessionData } from '../utils/sessionStorage';
-import { analyticsApi, sessionsApi } from '../utils/apiClient';
-import { ArrowLeft, Users as UsersIcon, Video, MessageSquare, Trophy, Calendar, Clock, Search, Loader2, AlertCircle } from 'lucide-react';
+import { analyticsApi, sessionsApi, adminApi } from '../utils/apiClient';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  ArrowLeft,
+  Users as UsersIcon,
+  Video,
+  MessageSquare,
+  Trophy,
+  Calendar,
+  Clock,
+  Search,
+  Loader2,
+  AlertCircle,
+  Plus,
+  Edit2,
+  Key,
+  Trash2,
+  X,
+  Check,
+  RefreshCw
+} from 'lucide-react';
 import { DifficultyLevel, PitchMode } from '../types';
+
+// Available avatars for selection
+const AVATARS = ['👤', '🦅', '🐉', '⚡', '🔥', '⚔️', '🌪️', '❄️', '💥', '🛡️', '🎯', '🏆', '💎', '👑', '🌟', '🚀'];
 
 interface AllUsersViewProps {
   onBack: () => void;
@@ -22,12 +45,37 @@ interface UserWithSessions {
   totalMinutes: number;
 }
 
+// Modal types
+type ModalType = 'create' | 'edit' | 'resetPin' | 'delete' | null;
+
+interface ModalState {
+  type: ModalType;
+  user?: User;
+}
+
 const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
+  const { user: currentUser } = useAuth();
   const [usersWithSessions, setUsersWithSessions] = useState<UserWithSessions[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserWithSessions | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // Modal state
+  const [modal, setModal] = useState<ModalState>({ type: null });
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  // Form state for create/edit
+  const [formData, setFormData] = useState({
+    name: '',
+    pin: '',
+    role: 'trainee' as 'trainee' | 'manager',
+    avatar: '👤'
+  });
+
+  // Generated PIN state for reset
+  const [generatedPin, setGeneratedPin] = useState<string | null>(null);
 
   useEffect(() => {
     loadAllUsersData();
@@ -123,6 +171,454 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
       case PitchMode.ROLEPLAY:
         return '🎭';
     }
+  };
+
+  // ============================================
+  // CRUD HANDLERS
+  // ============================================
+
+  const openCreateModal = () => {
+    setFormData({ name: '', pin: '', role: 'trainee', avatar: '👤' });
+    setModalError(null);
+    setModal({ type: 'create' });
+  };
+
+  const openEditModal = (user: User) => {
+    setFormData({
+      name: user.name,
+      pin: '',
+      role: user.role as 'trainee' | 'manager',
+      avatar: user.avatar
+    });
+    setModalError(null);
+    setModal({ type: 'edit', user });
+  };
+
+  const openResetPinModal = (user: User) => {
+    setGeneratedPin(null);
+    setModalError(null);
+    setFormData({ ...formData, pin: '' });
+    setModal({ type: 'resetPin', user });
+  };
+
+  const openDeleteModal = (user: User) => {
+    setModalError(null);
+    setModal({ type: 'delete', user });
+  };
+
+  const closeModal = () => {
+    setModal({ type: null });
+    setModalError(null);
+    setGeneratedPin(null);
+  };
+
+  const handleCreateUser = async () => {
+    if (!formData.name.trim()) {
+      setModalError('Name is required');
+      return;
+    }
+    if (!formData.pin || formData.pin.length !== 4 || !/^\d{4}$/.test(formData.pin)) {
+      setModalError('PIN must be exactly 4 digits');
+      return;
+    }
+
+    setModalLoading(true);
+    setModalError(null);
+
+    try {
+      await adminApi.createUser({
+        name: formData.name.trim(),
+        pin: formData.pin,
+        role: formData.role,
+        avatar: formData.avatar
+      });
+      closeModal();
+      loadAllUsersData(); // Refresh the list
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : 'Failed to create user');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!modal.user) return;
+    if (!formData.name.trim()) {
+      setModalError('Name is required');
+      return;
+    }
+
+    setModalLoading(true);
+    setModalError(null);
+
+    try {
+      await adminApi.updateUser(modal.user.id, {
+        name: formData.name.trim(),
+        role: formData.role,
+        avatar: formData.avatar
+      });
+      closeModal();
+      loadAllUsersData(); // Refresh the list
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : 'Failed to update user');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleResetPin = async (useGenerated: boolean) => {
+    if (!modal.user) return;
+    if (!useGenerated && (!formData.pin || formData.pin.length !== 4 || !/^\d{4}$/.test(formData.pin))) {
+      setModalError('PIN must be exactly 4 digits');
+      return;
+    }
+
+    setModalLoading(true);
+    setModalError(null);
+
+    try {
+      const result = await adminApi.resetPin(modal.user.id, useGenerated ? undefined : formData.pin);
+      if (result.newPin) {
+        setGeneratedPin(result.newPin);
+      } else {
+        closeModal();
+        loadAllUsersData();
+      }
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : 'Failed to reset PIN');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!modal.user) return;
+
+    setModalLoading(true);
+    setModalError(null);
+
+    try {
+      await adminApi.deleteUser(modal.user.id);
+      closeModal();
+      loadAllUsersData(); // Refresh the list
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : 'Failed to delete user');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  // ============================================
+  // MODAL RENDERING
+  // ============================================
+
+  const renderModal = () => {
+    if (!modal.type) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-md shadow-2xl">
+          {/* Create User Modal */}
+          {modal.type === 'create' && (
+            <>
+              <div className="flex items-center justify-between p-6 border-b border-neutral-800">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-green-500" />
+                  Create New User
+                </h2>
+                <button onClick={closeModal} className="text-neutral-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm text-neutral-400 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-red-500"
+                    placeholder="Enter user name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-neutral-400 mb-1">4-Digit PIN</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    value={formData.pin}
+                    onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '') })}
+                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-red-500"
+                    placeholder="0000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-neutral-400 mb-1">Role</label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as 'trainee' | 'manager' })}
+                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-red-500"
+                  >
+                    <option value="trainee">Sales Rep (Trainee)</option>
+                    <option value="manager">Manager</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-neutral-400 mb-1">Avatar</label>
+                  <div className="flex flex-wrap gap-2">
+                    {AVATARS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => setFormData({ ...formData, avatar: emoji })}
+                        className={`text-2xl p-2 rounded-lg transition-all ${
+                          formData.avatar === emoji
+                            ? 'bg-red-600 ring-2 ring-red-400'
+                            : 'bg-neutral-800 hover:bg-neutral-700'
+                        }`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {modalError && (
+                  <div className="text-red-400 text-sm flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {modalError}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-3 p-6 border-t border-neutral-800">
+                <button
+                  onClick={closeModal}
+                  className="flex-1 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateUser}
+                  disabled={modalLoading}
+                  className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {modalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Create User
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Edit User Modal */}
+          {modal.type === 'edit' && modal.user && (
+            <>
+              <div className="flex items-center justify-between p-6 border-b border-neutral-800">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Edit2 className="w-5 h-5 text-blue-500" />
+                  Edit User: {modal.user.name}
+                </h2>
+                <button onClick={closeModal} className="text-neutral-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm text-neutral-400 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-neutral-400 mb-1">Role</label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as 'trainee' | 'manager' })}
+                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-red-500"
+                  >
+                    <option value="trainee">Sales Rep (Trainee)</option>
+                    <option value="manager">Manager</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-neutral-400 mb-1">Avatar</label>
+                  <div className="flex flex-wrap gap-2">
+                    {AVATARS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => setFormData({ ...formData, avatar: emoji })}
+                        className={`text-2xl p-2 rounded-lg transition-all ${
+                          formData.avatar === emoji
+                            ? 'bg-red-600 ring-2 ring-red-400'
+                            : 'bg-neutral-800 hover:bg-neutral-700'
+                        }`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {modalError && (
+                  <div className="text-red-400 text-sm flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {modalError}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-3 p-6 border-t border-neutral-800">
+                <button
+                  onClick={closeModal}
+                  className="flex-1 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateUser}
+                  disabled={modalLoading}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {modalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Save Changes
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Reset PIN Modal */}
+          {modal.type === 'resetPin' && modal.user && (
+            <>
+              <div className="flex items-center justify-between p-6 border-b border-neutral-800">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Key className="w-5 h-5 text-yellow-500" />
+                  Reset PIN: {modal.user.name}
+                </h2>
+                <button onClick={closeModal} className="text-neutral-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                {generatedPin ? (
+                  <div className="text-center py-4">
+                    <div className="text-green-400 mb-2 flex items-center justify-center gap-2">
+                      <Check className="w-5 h-5" />
+                      PIN Reset Successfully!
+                    </div>
+                    <div className="text-4xl font-mono font-bold tracking-widest bg-neutral-800 rounded-lg py-4">
+                      {generatedPin}
+                    </div>
+                    <p className="text-sm text-neutral-400 mt-3">
+                      Share this PIN with {modal.user.name}. It won't be shown again.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-center text-neutral-400 mb-4">
+                      Choose how to reset the PIN:
+                    </div>
+                    <button
+                      onClick={() => handleResetPin(true)}
+                      disabled={modalLoading}
+                      className="w-full px-4 py-3 bg-yellow-600/20 hover:bg-yellow-600/30 border border-yellow-600/50 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${modalLoading ? 'animate-spin' : ''}`} />
+                      Generate Random PIN
+                    </button>
+                    <div className="text-center text-neutral-500 text-sm">or</div>
+                    <div>
+                      <label className="block text-sm text-neutral-400 mb-1">Set Specific PIN</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          maxLength={4}
+                          value={formData.pin}
+                          onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '') })}
+                          className="flex-1 px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-yellow-500"
+                          placeholder="0000"
+                        />
+                        <button
+                          onClick={() => handleResetPin(false)}
+                          disabled={modalLoading || formData.pin.length !== 4}
+                          className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          Set PIN
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+                {modalError && (
+                  <div className="text-red-400 text-sm flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {modalError}
+                  </div>
+                )}
+              </div>
+              <div className="p-6 border-t border-neutral-800">
+                <button
+                  onClick={closeModal}
+                  className="w-full px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors"
+                >
+                  {generatedPin ? 'Done' : 'Cancel'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Delete User Modal */}
+          {modal.type === 'delete' && modal.user && (
+            <>
+              <div className="flex items-center justify-between p-6 border-b border-neutral-800">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Trash2 className="w-5 h-5 text-red-500" />
+                  Delete User
+                </h2>
+                <button onClick={closeModal} className="text-neutral-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="text-center">
+                  <div className="text-5xl mb-3">{modal.user.avatar}</div>
+                  <div className="text-lg font-bold">{modal.user.name}</div>
+                  <div className="text-sm text-neutral-400">{modal.user.role === 'manager' ? 'Manager' : 'Sales Rep'}</div>
+                </div>
+                <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 text-center">
+                  <p className="text-red-400">
+                    Are you sure you want to delete this user?
+                  </p>
+                  <p className="text-sm text-neutral-400 mt-2">
+                    This will permanently remove the user and all their training sessions.
+                    This action cannot be undone.
+                  </p>
+                </div>
+                {modalError && (
+                  <div className="text-red-400 text-sm flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {modalError}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-3 p-6 border-t border-neutral-800">
+                <button
+                  onClick={closeModal}
+                  className="flex-1 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={modalLoading}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {modalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  Delete User
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -320,16 +816,25 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
             </p>
           </div>
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search users..."
-              className="pl-10 pr-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-red-500 w-64"
-            />
+          {/* Search and Create */}
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search users..."
+                className="pl-10 pr-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-red-500 w-64"
+              />
+            </div>
+            <button
+              onClick={openCreateModal}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-colors font-semibold"
+            >
+              <Plus className="w-5 h-5" />
+              Create User
+            </button>
           </div>
         </div>
 
@@ -389,10 +894,43 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
                     </div>
                   )}
                 </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 mt-4 pt-4 border-t border-neutral-800">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openEditModal(user); }}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-600/50 text-blue-400 rounded-lg text-sm transition-colors"
+                    title="Edit user"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openResetPinModal(user); }}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 border border-yellow-600/50 text-yellow-400 rounded-lg text-sm transition-colors"
+                    title="Reset PIN"
+                  >
+                    <Key className="w-3 h-3" />
+                    PIN
+                  </button>
+                  {user.id !== currentUser?.id && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openDeleteModal(user); }}
+                      className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-600/50 text-red-400 rounded-lg text-sm transition-colors"
+                      title="Delete user"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
+
+        {/* Render Modals */}
+        {renderModal()}
       </div>
     </div>
   );

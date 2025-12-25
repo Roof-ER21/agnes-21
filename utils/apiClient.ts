@@ -318,6 +318,87 @@ export const analyticsApi = {
   },
 };
 
+// Admin API (Manager only) - User CRUD operations
+export const adminApi = {
+  // Create new user
+  createUser: async (data: { name: string; pin: string; role?: string; avatar?: string }) => {
+    return apiFetch<{
+      success: boolean;
+      user: {
+        id: string;
+        name: string;
+        role: string;
+        avatar: string;
+        totalXp: number;
+        currentLevel: number;
+        currentStreak: number;
+        longestStreak: number;
+      };
+    }>('/auth/admin/create-user', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Update user info
+  updateUser: async (userId: string, data: { name?: string; role?: string; avatar?: string }) => {
+    return apiFetch<{
+      success: boolean;
+      user: {
+        id: string;
+        name: string;
+        role: string;
+        avatar: string;
+        totalXp: number;
+        currentLevel: number;
+        currentStreak: number;
+        longestStreak: number;
+      };
+    }>(`/auth/admin/user/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Reset user PIN
+  resetPin: async (userId: string, newPin?: string) => {
+    return apiFetch<{
+      success: boolean;
+      message: string;
+      newPin?: string;
+    }>(`/auth/admin/user/${userId}/reset-pin`, {
+      method: 'PUT',
+      body: JSON.stringify({ newPin }),
+    });
+  },
+
+  // Delete user
+  deleteUser: async (userId: string) => {
+    return apiFetch<{
+      success: boolean;
+      message: string;
+    }>(`/auth/admin/user/${userId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Get all users
+  getUsers: async () => {
+    return apiFetch<Array<{
+      id: string;
+      name: string;
+      role: string;
+      avatar: string;
+      totalXp: number;
+      currentLevel: number;
+      currentStreak: number;
+      longestStreak: number;
+      createdAt: string;
+      lastLogin?: string;
+    }>>('/auth/admin/users');
+  },
+};
+
 // Health check
 export const checkApiHealth = async (): Promise<boolean> => {
   try {
