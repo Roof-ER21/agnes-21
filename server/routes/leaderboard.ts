@@ -1,19 +1,23 @@
 import { Router, Response } from 'express';
 import { db, schema } from '../db';
-import { desc, sql, gte } from 'drizzle-orm';
-import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { desc, sql, gte, eq } from 'drizzle-orm';
+import { authenticateToken, getDivisionFilter, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
 // GET /api/leaderboard - Get current rankings with session stats
-router.get('/', authenticateToken, async (_req: AuthRequest, res: Response) => {
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
+    // Get division filter based on user's role
+    const divisionFilter = getDivisionFilter(req.userRole!, req.userDivision!);
+
     // Get users with their session stats
-    const usersWithStats = await db
+    let query = db
       .select({
         id: schema.users.id,
         name: schema.users.name,
         avatar: schema.users.avatar,
+        division: schema.users.division,
         totalXp: schema.users.totalXp,
         currentLevel: schema.users.currentLevel,
         currentStreak: schema.users.currentStreak,
@@ -30,7 +34,14 @@ router.get('/', authenticateToken, async (_req: AuthRequest, res: Response) => {
           AND ${schema.trainingSessions.finalScore} IS NOT NULL
         )`.as('avg_score'),
       })
-      .from(schema.users)
+      .from(schema.users);
+
+    // Apply division filter for non-admin users
+    if (divisionFilter) {
+      query = query.where(eq(schema.users.division, divisionFilter)) as typeof query;
+    }
+
+    const usersWithStats = await query
       .orderBy(desc(schema.users.totalXp))
       .limit(50);
 
@@ -48,13 +59,39 @@ router.get('/', authenticateToken, async (_req: AuthRequest, res: Response) => {
 });
 
 // GET /api/leaderboard/weekly - Get weekly rankings
-router.get('/weekly', authenticateToken, async (_req: AuthRequest, res: Response) => {
+router.get('/weekly', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
+    // Get division filter based on user's role
+    const divisionFilter = getDivisionFilter(req.userRole!, req.userDivision!);
+
     // Get start of current week (Sunday)
     const now = new Date();
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
+
+    // First get the list of users in the target division
+    let userQuery = db
+      .select({
+        id: schema.users.id,
+        name: schema.users.name,
+        avatar: schema.users.avatar,
+        division: schema.users.division,
+        currentLevel: schema.users.currentLevel,
+      })
+      .from(schema.users);
+
+    if (divisionFilter) {
+      userQuery = userQuery.where(eq(schema.users.division, divisionFilter)) as typeof userQuery;
+    }
+
+    const users = await userQuery;
+    const userMap = new Map(users.map(u => [u.id, u]));
+    const divisionUserIds = users.map(u => u.id);
+
+    if (divisionUserIds.length === 0) {
+      return res.json([]);
+    }
 
     // Aggregate XP earned this week from sessions
     const weeklyStats = await db
@@ -69,30 +106,17 @@ router.get('/weekly', authenticateToken, async (_req: AuthRequest, res: Response
       .orderBy(sql`weekly_xp DESC`)
       .limit(50);
 
-    // Get user details for each entry
-    const userIds = weeklyStats.map(s => s.userId);
-    if (userIds.length === 0) {
-      return res.json([]);
-    }
+    // Filter to only include users in the division
+    const filteredStats = weeklyStats.filter(s => divisionUserIds.includes(s.userId));
 
-    const users = await db
-      .select({
-        id: schema.users.id,
-        name: schema.users.name,
-        avatar: schema.users.avatar,
-        currentLevel: schema.users.currentLevel,
-      })
-      .from(schema.users);
-
-    const userMap = new Map(users.map(u => [u.id, u]));
-
-    const rankedWeekly = weeklyStats.map((stat, index) => {
+    const rankedWeekly = filteredStats.map((stat, index) => {
       const user = userMap.get(stat.userId);
       return {
         rank: index + 1,
         id: stat.userId,
         name: user?.name || 'Unknown',
         avatar: user?.avatar || '👤',
+        division: user?.division || 'insurance',
         currentLevel: user?.currentLevel || 1,
         weeklyXp: stat.weeklyXp,
         sessionsCount: stat.sessionsCount,

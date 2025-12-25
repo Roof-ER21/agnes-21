@@ -3,7 +3,7 @@
  * Plays pre-generated AI-to-AI roleplay demonstrations showing different quality levels
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Play,
   Pause,
@@ -19,7 +19,9 @@ import {
   CheckCircle,
   ArrowLeft,
   MessageCircle,
-  Lightbulb
+  Lightbulb,
+  Search,
+  Filter
 } from 'lucide-react';
 
 // Demo quality levels with scoring info
@@ -395,6 +397,8 @@ const getAudioPath = (level: string, speaker: 'salesperson' | 'homeowner', index
   return `/demos/${level}_${speaker}_${index + 1}.wav`;
 };
 
+type CategoryFilter = 'all' | 'quality' | 'objection';
+
 const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [demoType, setDemoType] = useState<'quality' | 'objection'>('quality');
@@ -405,6 +409,27 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
   const [audioError, setAudioError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const speakerCountRef = useRef<{ salesperson: number; homeowner: number }>({ salesperson: 0, homeowner: 0 });
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+
+  // Filter demos based on search query
+  const filteredQualityDemos = useMemo(() => {
+    return DEMO_LEVELS.filter(demo =>
+      demo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      demo.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      demo.characteristics.some(c => c.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [searchQuery]);
+
+  const filteredObjectionDemos = useMemo(() => {
+    return OBJECTION_LEVELS.filter(demo =>
+      demo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      demo.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      demo.characteristics.some(c => c.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [searchQuery]);
 
   // Find the selected demo from either quality or objection levels
   const selectedDemo = demoType === 'quality'
@@ -593,7 +618,63 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
             </p>
           </div>
 
+          {/* Search and Filter Bar */}
+          <div className="mb-8 space-y-4">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search demos by name, description, or techniques..."
+                className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  <XCircle className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            {/* Category Filter Tabs */}
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <div className="flex gap-2">
+                {([
+                  { id: 'all', label: 'All Demos', count: DEMO_LEVELS.length + OBJECTION_LEVELS.length },
+                  { id: 'quality', label: 'Quality Levels', count: filteredQualityDemos.length },
+                  { id: 'objection', label: 'Objection Handling', count: filteredObjectionDemos.length }
+                ] as { id: CategoryFilter; label: string; count: number }[]).map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setCategoryFilter(tab.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      categoryFilter === tab.id
+                        ? 'bg-red-600 text-white'
+                        : 'bg-slate-800/50 text-gray-400 hover:bg-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {tab.label}
+                    <span className="ml-2 text-xs opacity-70">({tab.count})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Search Results Count */}
+            {searchQuery && (
+              <p className="text-sm text-gray-500">
+                Found {filteredQualityDemos.length + filteredObjectionDemos.length} demos matching "{searchQuery}"
+              </p>
+            )}
+          </div>
+
           {/* Quality Level Demos Section */}
+          {(categoryFilter === 'all' || categoryFilter === 'quality') && filteredQualityDemos.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
               <Award className="w-6 h-6 text-yellow-400" />
@@ -601,7 +682,7 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
               <span className="text-sm text-gray-500">Full pitch demonstrations rated by effectiveness</span>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {DEMO_LEVELS.map((level) => {
+              {filteredQualityDemos.map((level) => {
                 const Icon = level.icon;
                 return (
                   <button
@@ -634,8 +715,10 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
               })}
             </div>
           </div>
+          )}
 
           {/* Objection Handling Demos Section */}
+          {(categoryFilter === 'all' || categoryFilter === 'objection') && filteredObjectionDemos.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
               <MessageCircle className="w-6 h-6 text-purple-400" />
@@ -643,7 +726,7 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
               <span className="text-sm text-gray-500">Master responses to common pushbacks</span>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {OBJECTION_LEVELS.map((level) => {
+              {filteredObjectionDemos.map((level) => {
                 const Icon = level.icon;
                 return (
                   <button
@@ -673,6 +756,22 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
               })}
             </div>
           </div>
+          )}
+
+          {/* No Results Message */}
+          {searchQuery && filteredQualityDemos.length === 0 && filteredObjectionDemos.length === 0 && (
+            <div className="text-center py-12">
+              <Search className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-white mb-2">No demos found</h3>
+              <p className="text-gray-400 mb-4">Try a different search term or clear the filter</p>
+              <button
+                onClick={() => setSearchQuery('')}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white transition-colors"
+              >
+                Clear Search
+              </button>
+            </div>
+          )}
 
           {/* How to use section */}
           <div className="grid gap-4 md:grid-cols-2">

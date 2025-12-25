@@ -7,6 +7,7 @@ export interface PhoneScript {
   id: string;
   title: string;
   category: 'estimate' | 'objection' | 'authorization' | 'pushback' | 'retail';
+  division: 'insurance' | 'retail' | 'both';
   content: string;
   description: string;
   voice?: 'agnes_21' | '21' | 'reeses_piecies'; // Optional voice selection for TTS
@@ -17,6 +18,7 @@ export const PHONE_SCRIPTS: PhoneScript[] = [
     id: 'full-approval-estimate',
     title: 'Full Approval Estimate Phone Call',
     category: 'estimate',
+    division: 'insurance',
     description: 'Call to make when you receive a full approval estimate from insurance',
     content: `Full Approval Estimate Phone Call
 
@@ -58,6 +60,7 @@ If you haven't already put up a yard sign: "Would you mind if I put up a yard si
     id: 'partial-estimate-denial',
     title: 'Partial Estimate/Denial Phone Call',
     category: 'estimate',
+    division: 'insurance',
     description: 'Call to make when you receive a partial approval or denial',
     content: `Partial Estimate/Denial Phone Call
 
@@ -91,6 +94,7 @@ Answer any questions or concerns the HO has.
     id: 'contingency-claim-auth',
     title: 'Contingency & Claim Authorization',
     category: 'authorization',
+    division: 'insurance',
     description: 'Script for getting claim authorization after filing',
     content: `Contingency & Claim Authorization
 
@@ -121,6 +125,7 @@ Answer any questions that the HO may have
     id: 'insurance-pushback',
     title: 'Insurance Pushback & Arguments (Q1-Q100)',
     category: 'pushback',
+    division: 'insurance',
     description: 'Comprehensive responses to insurance company objections',
     content: `Insurance Pushback & Arguments Playbook
 
@@ -157,6 +162,7 @@ For full playbook with all 100 questions, refer to the complete Pushback PDF doc
     id: 'retail-pitch',
     title: 'Door-to-Door Appointment Setting',
     category: 'retail',
+    division: 'retail',
     description: 'Neighbor notification approach for setting inspection appointments',
     voice: 'agnes_21',
     content: `Door-to-Door Appointment Setting
@@ -215,4 +221,11 @@ export const getScriptsByCategory = (category: PhoneScript['category']): PhoneSc
  */
 export const getScriptCategories = (): PhoneScript['category'][] => {
   return ['estimate', 'objection', 'authorization', 'pushback', 'retail'];
+};
+
+/**
+ * Get scripts by division
+ */
+export const getScriptsByDivision = (division: 'insurance' | 'retail'): PhoneScript[] => {
+  return PHONE_SCRIPTS.filter(script => script.division === division || script.division === 'both');
 };

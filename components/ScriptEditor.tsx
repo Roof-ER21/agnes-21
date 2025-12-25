@@ -19,7 +19,7 @@ import {
   User
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { PHONE_SCRIPTS } from '../utils/phoneScripts';
+import { PHONE_SCRIPTS, getScriptsByDivision, PhoneScript } from '../utils/phoneScripts';
 
 // Script type definition
 interface Script {
@@ -29,6 +29,7 @@ interface Script {
   content: string;
   description: string;
   difficulty: 'all' | 'beginner' | 'rookie' | 'pro' | 'elite';
+  division: 'insurance' | 'retail' | 'both';
   tags: string[];
   createdBy: string;
   createdAt: string;
@@ -75,6 +76,7 @@ As they are opening the door, smile and wave.
 • "I will give you a knock when I finish up and show you what I've found."`,
     description: 'The primary door-to-door pitch covering the 5 non-negotiables',
     difficulty: 'all',
+    division: 'insurance',
     tags: ['door-to-door', 'initial', 'core'],
     createdBy: 'system',
     createdAt: '2024-01-01',
@@ -101,6 +103,7 @@ As they are opening the door, smile and wave.
 • "As you can see there is quite a bit of damage.`,
     description: 'Follow-up pitch after completing the roof inspection',
     difficulty: 'pro',
+    division: 'insurance',
     tags: ['follow-up', 'post-inspection', 'photos'],
     createdBy: 'system',
     createdAt: '2024-01-01',
@@ -110,19 +113,22 @@ As they are opening the door, smile and wave.
 ];
 
 // Convert phone scripts to Script format and merge with system scripts
-const convertedPhoneScripts: Script[] = PHONE_SCRIPTS.map(ps => ({
+const convertPhoneScriptToScript = (ps: PhoneScript): Script => ({
   id: `sys-phone-${ps.id}`,
   title: ps.title,
   category: 'phone' as const,
   content: ps.content,
   description: ps.description,
   difficulty: 'all' as const,
-  tags: [ps.category, 'phone'],
+  division: ps.division,
+  tags: [ps.category, 'phone', ps.division],
   createdBy: 'system',
   createdAt: '2024-01-01',
   updatedAt: '2024-01-01',
   isActive: true
-}));
+});
+
+const convertedPhoneScripts: Script[] = PHONE_SCRIPTS.map(convertPhoneScriptToScript);
 
 // All system scripts (built-in + phone scripts)
 const ALL_SYSTEM_SCRIPTS: Script[] = [...SYSTEM_SCRIPTS, ...convertedPhoneScripts];
@@ -152,9 +158,14 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
   const [scripts, setScripts] = useState<Script[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterDivision, setFilterDivision] = useState<string>('all');
   const [isEditing, setIsEditing] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [currentScript, setCurrentScript] = useState<Script | null>(null);
+
+  // Check if user is admin/manager (can see all divisions)
+  const isAdmin = user?.role === 'manager';
+  const userDivision = user?.division || 'insurance';
 
   // Form state
   const [formData, setFormData] = useState({
@@ -163,14 +174,32 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
     content: '',
     description: '',
     difficulty: 'all' as Script['difficulty'],
+    division: userDivision as Script['division'],
     tags: ''
   });
 
-  // Load scripts on mount
+  // Load scripts on mount - filter by user's division unless admin
   useEffect(() => {
     const customScripts = getStoredScripts();
-    setScripts([...ALL_SYSTEM_SCRIPTS, ...customScripts]);
-  }, []);
+
+    // Filter system scripts by division
+    let filteredSystemScripts = ALL_SYSTEM_SCRIPTS;
+    if (!isAdmin) {
+      filteredSystemScripts = ALL_SYSTEM_SCRIPTS.filter(
+        s => s.division === userDivision || s.division === 'both'
+      );
+    }
+
+    // Filter custom scripts by division too
+    let filteredCustomScripts = customScripts;
+    if (!isAdmin) {
+      filteredCustomScripts = customScripts.filter(
+        s => !s.division || s.division === userDivision || s.division === 'both'
+      );
+    }
+
+    setScripts([...filteredSystemScripts, ...filteredCustomScripts]);
+  }, [isAdmin, userDivision]);
 
   // Filter scripts
   const filteredScripts = scripts.filter(script => {
@@ -180,7 +209,12 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
 
     const matchesCategory = filterCategory === 'all' || script.category === filterCategory;
 
-    return matchesSearch && matchesCategory;
+    // Admin can filter by division, non-admins only see their own division
+    const matchesDivision = filterDivision === 'all' ||
+      script.division === filterDivision ||
+      script.division === 'both';
+
+    return matchesSearch && matchesCategory && matchesDivision;
   });
 
   // Open editor for new script
@@ -191,6 +225,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
       content: '',
       description: '',
       difficulty: 'all',
+      division: userDivision as Script['division'],
       tags: ''
     });
     setCurrentScript(null);
@@ -210,6 +245,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
       content: script.content,
       description: script.description,
       difficulty: script.difficulty,
+      division: script.division || userDivision as Script['division'],
       tags: script.tags.join(', ')
     });
     setCurrentScript(script);
@@ -234,6 +270,14 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
     const now = new Date().toISOString();
     const customScripts = getStoredScripts();
 
+    // Get filtered system scripts based on user's division
+    const getFilteredSystemScripts = () => {
+      if (isAdmin) return ALL_SYSTEM_SCRIPTS;
+      return ALL_SYSTEM_SCRIPTS.filter(
+        s => s.division === userDivision || s.division === 'both'
+      );
+    };
+
     if (currentScript) {
       // Update existing script
       const updatedScripts = customScripts.map(s =>
@@ -245,13 +289,17 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
               content: formData.content,
               description: formData.description,
               difficulty: formData.difficulty,
+              division: formData.division,
               tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
               updatedAt: now
             }
           : s
       );
       saveScripts(updatedScripts);
-      setScripts([...ALL_SYSTEM_SCRIPTS, ...updatedScripts]);
+
+      const filteredCustom = isAdmin ? updatedScripts :
+        updatedScripts.filter(s => !s.division || s.division === userDivision || s.division === 'both');
+      setScripts([...getFilteredSystemScripts(), ...filteredCustom]);
     } else {
       // Create new script
       const newScript: Script = {
@@ -261,6 +309,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
         content: formData.content,
         description: formData.description,
         difficulty: formData.difficulty,
+        division: formData.division,
         tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
         createdBy: user?.id || 'unknown',
         createdAt: now,
@@ -269,7 +318,10 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
       };
       const updatedScripts = [...customScripts, newScript];
       saveScripts(updatedScripts);
-      setScripts([...ALL_SYSTEM_SCRIPTS, ...updatedScripts]);
+
+      const filteredCustom = isAdmin ? updatedScripts :
+        updatedScripts.filter(s => !s.division || s.division === userDivision || s.division === 'both');
+      setScripts([...getFilteredSystemScripts(), ...filteredCustom]);
     }
 
     setIsEditing(false);
@@ -358,7 +410,7 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm text-neutral-400 mb-2">Category</label>
                 <select
@@ -371,6 +423,20 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
                   <option value="objection">Objection Handling</option>
                   <option value="follow-up">Follow-Up</option>
                   <option value="custom">Custom</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-neutral-400 mb-2">Division</label>
+                <select
+                  value={formData.division}
+                  onChange={(e) => setFormData({ ...formData, division: e.target.value as Script['division'] })}
+                  className="w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg focus:outline-none focus:border-red-500"
+                  disabled={!isAdmin}
+                >
+                  <option value="insurance">Insurance</option>
+                  <option value="retail">Retail</option>
+                  <option value="both">Both Divisions</option>
                 </select>
               </div>
 
@@ -559,6 +625,18 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
             <option value="follow-up">Follow-Up</option>
             <option value="custom">Custom</option>
           </select>
+
+          {isAdmin && (
+            <select
+              value={filterDivision}
+              onChange={(e) => setFilterDivision(e.target.value)}
+              className="px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg focus:outline-none focus:border-red-500"
+            >
+              <option value="all">All Divisions</option>
+              <option value="insurance">Insurance</option>
+              <option value="retail">Retail</option>
+            </select>
+          )}
         </div>
 
         {/* Scripts Grid */}
@@ -569,9 +647,21 @@ const ScriptEditor: React.FC<ScriptEditorProps> = ({ onBack }) => {
               className="p-5 bg-neutral-900/80 border border-neutral-800 rounded-xl hover:border-neutral-700 transition-colors"
             >
               <div className="flex items-start justify-between mb-3">
-                <span className={`px-2 py-1 rounded text-xs border ${getCategoryColor(script.category)}`}>
-                  {script.category}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-1 rounded text-xs border ${getCategoryColor(script.category)}`}>
+                    {script.category}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-xs ${
+                    script.division === 'retail'
+                      ? 'bg-purple-900/30 text-purple-400'
+                      : script.division === 'both'
+                      ? 'bg-green-900/30 text-green-400'
+                      : 'bg-blue-900/30 text-blue-400'
+                  }`}>
+                    {script.division === 'retail' ? '🏪 Retail' :
+                     script.division === 'both' ? '🏢 All' : '🏢 Insurance'}
+                  </span>
+                </div>
                 {script.createdBy === 'system' && (
                   <span className="text-xs text-neutral-500">System</span>
                 )}

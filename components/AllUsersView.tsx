@@ -70,7 +70,8 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
   const [formData, setFormData] = useState({
     name: '',
     pin: '',
-    role: 'trainee' as 'trainee' | 'manager',
+    role: 'trainee' as 'trainee' | 'insurance_manager' | 'retail_manager' | 'manager',
+    division: 'insurance' as 'insurance' | 'retail',
     avatar: '👤'
   });
 
@@ -94,7 +95,8 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
         const user: User = {
           id: apiUser.id,
           name: apiUser.name,
-          role: apiUser.role as 'trainee' | 'manager',
+          role: apiUser.role as User['role'],
+          division: (apiUser.division || 'insurance') as User['division'],
           avatar: apiUser.avatar,
           totalXp: apiUser.totalXp,
           currentLevel: apiUser.currentLevel,
@@ -178,7 +180,7 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
   // ============================================
 
   const openCreateModal = () => {
-    setFormData({ name: '', pin: '', role: 'trainee', avatar: '👤' });
+    setFormData({ name: '', pin: '', role: 'trainee', division: 'insurance', avatar: '👤' });
     setModalError(null);
     setModal({ type: 'create' });
   };
@@ -187,7 +189,8 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
     setFormData({
       name: user.name,
       pin: '',
-      role: user.role as 'trainee' | 'manager',
+      role: user.role,
+      division: user.division || 'insurance',
       avatar: user.avatar
     });
     setModalError(null);
@@ -230,6 +233,7 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
         name: formData.name.trim(),
         pin: formData.pin,
         role: formData.role,
+        division: formData.division,
         avatar: formData.avatar
       });
       closeModal();
@@ -255,6 +259,7 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
       await adminApi.updateUser(modal.user.id, {
         name: formData.name.trim(),
         role: formData.role,
+        division: formData.division,
         avatar: formData.avatar
       });
       closeModal();
@@ -353,14 +358,27 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm text-neutral-400 mb-1">Division</label>
+                  <select
+                    value={formData.division}
+                    onChange={(e) => setFormData({ ...formData, division: e.target.value as 'insurance' | 'retail' })}
+                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-red-500"
+                  >
+                    <option value="insurance">Insurance</option>
+                    <option value="retail">Retail</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm text-neutral-400 mb-1">Role</label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as 'trainee' | 'manager' })}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as 'trainee' | 'insurance_manager' | 'retail_manager' | 'manager' })}
                     className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-red-500"
                   >
                     <option value="trainee">Sales Rep (Trainee)</option>
-                    <option value="manager">Manager</option>
+                    <option value="insurance_manager">Insurance Manager</option>
+                    <option value="retail_manager">Retail Manager</option>
+                    <option value="manager">Admin (All Divisions)</option>
                   </select>
                 </div>
                 <div>
@@ -430,14 +448,27 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm text-neutral-400 mb-1">Division</label>
+                  <select
+                    value={formData.division}
+                    onChange={(e) => setFormData({ ...formData, division: e.target.value as 'insurance' | 'retail' })}
+                    className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-red-500"
+                  >
+                    <option value="insurance">Insurance</option>
+                    <option value="retail">Retail</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm text-neutral-400 mb-1">Role</label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as 'trainee' | 'manager' })}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as 'trainee' | 'insurance_manager' | 'retail_manager' | 'manager' })}
                     className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-red-500"
                   >
                     <option value="trainee">Sales Rep (Trainee)</option>
-                    <option value="manager">Manager</option>
+                    <option value="insurance_manager">Insurance Manager</option>
+                    <option value="retail_manager">Retail Manager</option>
+                    <option value="manager">Admin (All Divisions)</option>
                   </select>
                 </div>
                 <div>
@@ -580,7 +611,13 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
                 <div className="text-center">
                   <div className="text-5xl mb-3">{modal.user.avatar}</div>
                   <div className="text-lg font-bold">{modal.user.name}</div>
-                  <div className="text-sm text-neutral-400">{modal.user.role === 'manager' ? 'Manager' : 'Sales Rep'}</div>
+                  <div className="text-sm text-neutral-400">
+                    {modal.user.role === 'manager' ? 'Admin' :
+                     modal.user.role === 'insurance_manager' ? 'Insurance Manager' :
+                     modal.user.role === 'retail_manager' ? 'Retail Manager' : 'Sales Rep'}
+                    {' • '}
+                    {modal.user.division === 'retail' ? 'Retail' : 'Insurance'}
+                  </div>
                 </div>
                 <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 text-center">
                   <p className="text-red-400">
@@ -657,9 +694,18 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
               <div className="flex-1">
                 <h2 className="text-3xl font-bold mb-2">{selectedUser.user.name}</h2>
                 <div className="flex items-center space-x-4 text-sm text-neutral-400">
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-2">
+                    <span className={`px-2 py-1 rounded ${
+                      selectedUser.user.division === 'retail'
+                        ? 'bg-purple-900/30 text-purple-300'
+                        : 'bg-blue-900/30 text-blue-300'
+                    }`}>
+                      {selectedUser.user.division === 'retail' ? '🏪 Retail' : '🏢 Insurance'}
+                    </span>
                     <span className="px-2 py-1 rounded bg-neutral-800 text-neutral-300">
-                      {selectedUser.user.role === 'manager' ? '👔 Manager' : '🎯 Sales Rep'}
+                      {selectedUser.user.role === 'manager' ? '👔 Admin' :
+                       selectedUser.user.role === 'insurance_manager' ? '👔 Ins Manager' :
+                       selectedUser.user.role === 'retail_manager' ? '👔 Ret Manager' : '🎯 Sales Rep'}
                     </span>
                   </div>
                   <div className="flex items-center space-x-1">
@@ -859,8 +905,19 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
                     <h3 className="text-xl font-bold text-white truncate group-hover:text-red-400 transition-colors">
                       {user.name}
                     </h3>
-                    <div className="text-xs text-neutral-400">
-                      {user.role === 'manager' ? '👔 Manager' : '🎯 Sales Rep'}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        user.division === 'retail'
+                          ? 'bg-purple-900/30 text-purple-400'
+                          : 'bg-blue-900/30 text-blue-400'
+                      }`}>
+                        {user.division === 'retail' ? '🏪 Retail' : '🏢 Insurance'}
+                      </span>
+                      <span className="text-xs text-neutral-400">
+                        {user.role === 'manager' ? '👔 Admin' :
+                         user.role === 'insurance_manager' ? '👔 Ins Mgr' :
+                         user.role === 'retail_manager' ? '👔 Ret Mgr' : '🎯 Rep'}
+                      </span>
                     </div>
                   </div>
                 </div>

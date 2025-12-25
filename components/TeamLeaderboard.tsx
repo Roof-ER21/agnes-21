@@ -641,10 +641,23 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
       <div className="max-w-6xl mx-auto mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
-              <Trophy className="w-10 h-10 text-yellow-400" />
-              Team Leaderboard
-            </h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-4xl font-bold text-white flex items-center gap-3">
+                <Trophy className="w-10 h-10 text-yellow-400" />
+                Team Leaderboard
+              </h1>
+              {/* Division Badge */}
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                user?.division === 'retail'
+                  ? 'bg-purple-900/30 text-purple-400 border border-purple-500/30'
+                  : user?.role === 'manager'
+                  ? 'bg-green-900/30 text-green-400 border border-green-500/30'
+                  : 'bg-blue-900/30 text-blue-400 border border-blue-500/30'
+              }`}>
+                {user?.role === 'manager' ? '🏢 All Divisions' :
+                 user?.division === 'retail' ? '🏪 Retail' : '🏢 Insurance'}
+              </span>
+            </div>
             <p className="text-gray-400">Compete, dominate, and rise to the top!</p>
           </div>
 

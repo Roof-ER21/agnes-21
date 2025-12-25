@@ -21,7 +21,7 @@ import RepHistory from './components/RepHistory';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
 import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock, Globe, Video, ArrowLeft } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
-import { PHONE_SCRIPTS, PhoneScript } from './utils/phoneScripts';
+import { PHONE_SCRIPTS, PhoneScript, getScriptsByDivision } from './utils/phoneScripts';
 import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty, isManagerMode, activateManagerMode, deactivateManagerMode } from './utils/gamification';
 import { getMiniModulePrompt } from './utils/miniModulePrompts';
 
@@ -221,8 +221,17 @@ const AppContent: React.FC = () => {
   const userProgress = getUserProgress(user?.id);
   const currentLevel = userProgress.currentLevel;
 
-  // All available scripts with summaries
-  const allScripts = [
+  // Get scripts filtered by user's division
+  const userDivision = user?.division || 'insurance';
+  const isAdmin = user?.role === 'manager';
+
+  // Filter phone scripts by division (admins see all)
+  const filteredPhoneScripts = isAdmin
+    ? PHONE_SCRIPTS
+    : getScriptsByDivision(userDivision as 'insurance' | 'retail');
+
+  // Built-in scripts (Insurance division only)
+  const insuranceBuiltInScripts = [
     {
       id: 'initial',
       title: 'Initial Pitch',
@@ -236,8 +245,15 @@ const AppContent: React.FC = () => {
       category: 'Follow-Up',
       summary: 'After completing the inspection. Show damage photos, explain hail/wind damage, discuss insurance process, gather homeowner information, and explain next steps with iPad.',
       content: POST_INSPECTION_PITCH
-    },
-    ...PHONE_SCRIPTS.map(script => ({
+    }
+  ];
+
+  // All available scripts with summaries - filter by division
+  const allScripts = [
+    // Only include built-in scripts for insurance users or admins
+    ...(userDivision === 'insurance' || isAdmin ? insuranceBuiltInScripts : []),
+    // Phone scripts filtered by division
+    ...filteredPhoneScripts.map(script => ({
       id: script.id,
       title: script.title,
       category: script.category,
@@ -564,12 +580,15 @@ const AppContent: React.FC = () => {
                     onChange={(e) => setSelectedScriptId(e.target.value)}
                     className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-500"
                   >
-                    <optgroup label="Door-to-Door">
-                      <option value="initial">Initial Pitch</option>
-                      <option value="post">Post-Inspection Pitch</option>
-                    </optgroup>
+                    {/* Door-to-Door scripts (Insurance only) */}
+                    {(userDivision === 'insurance' || isAdmin) && (
+                      <optgroup label="Door-to-Door">
+                        <option value="initial">Initial Pitch</option>
+                        <option value="post">Post-Inspection Pitch</option>
+                      </optgroup>
+                    )}
                     <optgroup label="Phone Scripts">
-                      {PHONE_SCRIPTS.map(script => (
+                      {filteredPhoneScripts.map(script => (
                         <option key={script.id} value={script.id}>{script.title}</option>
                       ))}
                     </optgroup>

@@ -6,7 +6,8 @@ export const users = pgTable('users', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   email: text('email'),
-  role: text('role').notNull().default('trainee'), // 'trainee' | 'manager'
+  role: text('role').notNull().default('trainee'), // 'trainee' | 'insurance_manager' | 'retail_manager' | 'manager' (admin)
+  division: text('division').notNull().default('insurance'), // 'insurance' | 'retail'
   pinHash: text('pin_hash').notNull(),
   avatar: text('avatar').notNull().default('👤'),
   createdAt: timestamp('created_at').defaultNow().notNull(),

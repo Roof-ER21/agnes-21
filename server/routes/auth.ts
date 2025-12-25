@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db, schema } from '../db';
 import { eq } from 'drizzle-orm';
 import CryptoJS from 'crypto-js';
-import { authenticateToken, generateToken, requireManager, AuthRequest } from '../middleware/auth';
+import { authenticateToken, generateToken, requireManager, getDivisionFilter, canAccessDivision, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -56,8 +56,8 @@ router.post('/login', async (req: Request, res: Response) => {
       ipAddress: req.ip || 'unknown',
     });
 
-    // Generate token
-    const token = generateToken(user.id, user.role);
+    // Generate token with division
+    const token = generateToken(user.id, user.role, user.division);
 
     res.json({
       token,
@@ -65,6 +65,7 @@ router.post('/login', async (req: Request, res: Response) => {
         id: user.id,
         name: user.name,
         role: user.role,
+        division: user.division,
         avatar: user.avatar,
         totalXp: user.totalXp,
         currentLevel: user.currentLevel,
@@ -81,7 +82,7 @@ router.post('/login', async (req: Request, res: Response) => {
 // POST /api/auth/register
 router.post('/register', async (req: Request, res: Response) => {
   try {
-    const { name, pin, role = 'trainee', avatar = '👤' } = req.body;
+    const { name, pin, role = 'trainee', avatar = '👤', division = 'insurance' } = req.body;
 
     if (!name || !pin) {
       return res.status(400).json({ error: 'Name and PIN are required' });
@@ -89,6 +90,11 @@ router.post('/register', async (req: Request, res: Response) => {
 
     if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
       return res.status(400).json({ error: 'PIN must be 4 digits' });
+    }
+
+    // Validate division
+    if (!['insurance', 'retail'].includes(division)) {
+      return res.status(400).json({ error: 'Division must be insurance or retail' });
     }
 
     // Check if user exists
@@ -109,13 +115,14 @@ router.post('/register', async (req: Request, res: Response) => {
       id: userId,
       name,
       role,
+      division,
       pinHash: hashedPin,
       avatar,
       createdAt: new Date(),
     });
 
-    // Generate token
-    const token = generateToken(userId, role);
+    // Generate token with division
+    const token = generateToken(userId, role, division);
 
     res.status(201).json({
       token,
@@ -123,6 +130,7 @@ router.post('/register', async (req: Request, res: Response) => {
         id: userId,
         name,
         role,
+        division,
         avatar,
         totalXp: 0,
         currentLevel: 1,
@@ -152,6 +160,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
       id: user.id,
       name: user.name,
       role: user.role,
+      division: user.division,
       avatar: user.avatar,
       totalXp: user.totalXp,
       currentLevel: user.currentLevel,
@@ -171,7 +180,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
 // POST /api/auth/admin/create-user - Create new user (manager only)
 router.post('/admin/create-user', authenticateToken, requireManager, async (req: AuthRequest, res: Response) => {
   try {
-    const { name, pin, role = 'trainee', avatar = '👤' } = req.body;
+    const { name, pin, role = 'trainee', avatar = '👤', division = 'insurance' } = req.body;
 
     if (!name || !pin) {
       return res.status(400).json({ error: 'Name and PIN are required' });
@@ -179,6 +188,19 @@ router.post('/admin/create-user', authenticateToken, requireManager, async (req:
 
     if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
       return res.status(400).json({ error: 'PIN must be 4 digits' });
+    }
+
+    // Validate division
+    if (!['insurance', 'retail'].includes(division)) {
+      return res.status(400).json({ error: 'Division must be insurance or retail' });
+    }
+
+    // Division managers can only create users in their own division
+    if (req.userRole !== 'manager') {
+      const allowedDivision = getDivisionFilter(req.userRole!, req.userDivision!);
+      if (allowedDivision && division !== allowedDivision) {
+        return res.status(403).json({ error: `You can only create users in the ${allowedDivision} division` });
+      }
     }
 
     // Check if user exists
@@ -199,6 +221,7 @@ router.post('/admin/create-user', authenticateToken, requireManager, async (req:
       id: userId,
       name,
       role,
+      division,
       pinHash: hashedPin,
       avatar,
       createdAt: new Date(),
@@ -210,6 +233,7 @@ router.post('/admin/create-user', authenticateToken, requireManager, async (req:
         id: userId,
         name,
         role,
+        division,
         avatar,
         totalXp: 0,
         currentLevel: 1,
@@ -227,7 +251,7 @@ router.post('/admin/create-user', authenticateToken, requireManager, async (req:
 router.put('/admin/user/:userId', authenticateToken, requireManager, async (req: AuthRequest, res: Response) => {
   try {
     const { userId } = req.params;
-    const { name, role, avatar } = req.body;
+    const { name, role, avatar, division } = req.body;
 
     // Check if user exists
     const [existingUser] = await db
@@ -237,6 +261,13 @@ router.put('/admin/user/:userId', authenticateToken, requireManager, async (req:
 
     if (!existingUser) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Division managers can only edit users in their own division
+    if (req.userRole !== 'manager') {
+      if (!canAccessDivision(req.userRole!, req.userDivision!, existingUser.division)) {
+        return res.status(403).json({ error: 'You can only edit users in your division' });
+      }
     }
 
     // If name is changing, check it's not taken
@@ -251,11 +282,22 @@ router.put('/admin/user/:userId', authenticateToken, requireManager, async (req:
       }
     }
 
+    // Validate division if provided
+    if (division && !['insurance', 'retail'].includes(division)) {
+      return res.status(400).json({ error: 'Division must be insurance or retail' });
+    }
+
+    // Division managers cannot change a user's division
+    if (division && division !== existingUser.division && req.userRole !== 'manager') {
+      return res.status(403).json({ error: 'Only admins can change user divisions' });
+    }
+
     // Build update object
     const updates: Partial<typeof schema.users.$inferInsert> = {};
     if (name) updates.name = name;
     if (role) updates.role = role;
     if (avatar) updates.avatar = avatar;
+    if (division) updates.division = division;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No updates provided' });
@@ -278,6 +320,7 @@ router.put('/admin/user/:userId', authenticateToken, requireManager, async (req:
         id: updatedUser.id,
         name: updatedUser.name,
         role: updatedUser.role,
+        division: updatedUser.division,
         avatar: updatedUser.avatar,
         totalXp: updatedUser.totalXp,
         currentLevel: updatedUser.currentLevel,
@@ -305,6 +348,13 @@ router.put('/admin/user/:userId/reset-pin', authenticateToken, requireManager, a
 
     if (!existingUser) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Division managers can only reset PINs for users in their division
+    if (req.userRole !== 'manager') {
+      if (!canAccessDivision(req.userRole!, req.userDivision!, existingUser.division)) {
+        return res.status(403).json({ error: 'You can only reset PINs for users in your division' });
+      }
     }
 
     // Generate random PIN if not provided
@@ -365,6 +415,13 @@ router.delete('/admin/user/:userId', authenticateToken, requireManager, async (r
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
+    // Division managers can only delete users in their division
+    if (req.userRole !== 'manager') {
+      if (!canAccessDivision(req.userRole!, req.userDivision!, existingUser.division)) {
+        return res.status(403).json({ error: 'You can only delete users in your division' });
+      }
+    }
+
     // Delete user's training sessions first (cascade)
     await db
       .delete(schema.trainingSessions)
@@ -391,13 +448,17 @@ router.delete('/admin/user/:userId', authenticateToken, requireManager, async (r
 });
 
 // GET /api/auth/admin/users - Get all users (manager only)
-router.get('/admin/users', authenticateToken, requireManager, async (_req: AuthRequest, res: Response) => {
+router.get('/admin/users', authenticateToken, requireManager, async (req: AuthRequest, res: Response) => {
   try {
-    const users = await db
+    // Get division filter based on user's role
+    const divisionFilter = getDivisionFilter(req.userRole!, req.userDivision!);
+
+    let query = db
       .select({
         id: schema.users.id,
         name: schema.users.name,
         role: schema.users.role,
+        division: schema.users.division,
         avatar: schema.users.avatar,
         totalXp: schema.users.totalXp,
         currentLevel: schema.users.currentLevel,
@@ -406,8 +467,14 @@ router.get('/admin/users', authenticateToken, requireManager, async (_req: AuthR
         createdAt: schema.users.createdAt,
         lastLogin: schema.users.lastLogin,
       })
-      .from(schema.users)
-      .orderBy(schema.users.name);
+      .from(schema.users);
+
+    // Apply division filter for non-admin managers
+    if (divisionFilter) {
+      query = query.where(eq(schema.users.division, divisionFilter)) as typeof query;
+    }
+
+    const users = await query.orderBy(schema.users.name);
 
     res.json(users);
   } catch (error) {

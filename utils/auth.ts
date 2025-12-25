@@ -9,7 +9,8 @@ import { authApi, getAuthToken, setAuthToken } from './apiClient';
 export interface User {
   id: string;
   name: string;
-  role: 'trainee' | 'manager';
+  role: 'trainee' | 'insurance_manager' | 'retail_manager' | 'manager';
+  division: 'insurance' | 'retail';
   pinHash?: string;
   avatar: string;
   createdAt?: Date;
@@ -143,6 +144,7 @@ export const getUsers = (): User[] => {
     const users = JSON.parse(usersStr);
     return users.map((u: any) => ({
       ...u,
+      division: u.division || 'insurance', // Default for legacy users
       createdAt: new Date(u.createdAt),
       lastLogin: u.lastLogin ? new Date(u.lastLogin) : undefined
     }));
@@ -173,8 +175,9 @@ const generateUserId = (): string => {
 export const createUser = async (
   name: string,
   pin: string,
-  role: 'trainee' | 'manager',
-  avatar: string
+  role: 'trainee' | 'insurance_manager' | 'retail_manager' | 'manager',
+  avatar: string,
+  division: 'insurance' | 'retail' = 'insurance'
 ): Promise<User> => {
   const pinValidation = validatePIN(pin);
   if (!pinValidation.valid) {
@@ -183,11 +186,12 @@ export const createUser = async (
 
   // Try API first
   try {
-    const result = await authApi.register(name, pin, role, avatar);
+    const result = await authApi.register(name, pin, role, avatar, division);
     const user: User = {
       id: result.user.id,
       name: result.user.name,
-      role: result.user.role as 'trainee' | 'manager',
+      role: result.user.role as User['role'],
+      division: result.user.division as User['division'],
       avatar: result.user.avatar,
       totalXp: result.user.totalXp,
       currentLevel: result.user.currentLevel,
@@ -219,6 +223,7 @@ export const createUser = async (
       id: generateUserId(),
       name,
       role,
+      division,
       pinHash: hashPIN(pin),
       avatar,
       createdAt: new Date(),
@@ -253,7 +258,8 @@ export const login = async (
     const user: User = {
       id: result.user.id,
       name: result.user.name,
-      role: result.user.role as 'trainee' | 'manager',
+      role: result.user.role as User['role'],
+      division: result.user.division as User['division'],
       avatar: result.user.avatar,
       totalXp: result.user.totalXp,
       currentLevel: result.user.currentLevel,

@@ -59,6 +59,7 @@ export const authApi = {
         id: string;
         name: string;
         role: string;
+        division: string;
         avatar: string;
         totalXp: number;
         currentLevel: number;
@@ -73,13 +74,14 @@ export const authApi = {
     return result;
   },
 
-  register: async (name: string, pin: string, role = 'trainee', avatar = '👤') => {
+  register: async (name: string, pin: string, role = 'trainee', avatar = '👤', division = 'insurance') => {
     const result = await apiFetch<{
       token: string;
       user: {
         id: string;
         name: string;
         role: string;
+        division: string;
         avatar: string;
         totalXp: number;
         currentLevel: number;
@@ -88,7 +90,7 @@ export const authApi = {
       };
     }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, pin, role, avatar }),
+      body: JSON.stringify({ name, pin, role, avatar, division }),
     });
     setAuthToken(result.token);
     return result;
@@ -99,6 +101,7 @@ export const authApi = {
       id: string;
       name: string;
       role: string;
+      division: string;
       avatar: string;
       totalXp: number;
       currentLevel: number;
@@ -321,13 +324,14 @@ export const analyticsApi = {
 // Admin API (Manager only) - User CRUD operations
 export const adminApi = {
   // Create new user
-  createUser: async (data: { name: string; pin: string; role?: string; avatar?: string }) => {
+  createUser: async (data: { name: string; pin: string; role?: string; avatar?: string; division?: string }) => {
     return apiFetch<{
       success: boolean;
       user: {
         id: string;
         name: string;
         role: string;
+        division: string;
         avatar: string;
         totalXp: number;
         currentLevel: number;
@@ -341,13 +345,14 @@ export const adminApi = {
   },
 
   // Update user info
-  updateUser: async (userId: string, data: { name?: string; role?: string; avatar?: string }) => {
+  updateUser: async (userId: string, data: { name?: string; role?: string; avatar?: string; division?: string }) => {
     return apiFetch<{
       success: boolean;
       user: {
         id: string;
         name: string;
         role: string;
+        division: string;
         avatar: string;
         totalXp: number;
         currentLevel: number;
@@ -388,6 +393,7 @@ export const adminApi = {
       id: string;
       name: string;
       role: string;
+      division: string;
       avatar: string;
       totalXp: number;
       currentLevel: number;
