@@ -441,6 +441,7 @@ export const syncUtils = {
   syncPending: async () => {
     const pending = syncUtils.getPendingSync();
     const failed: typeof pending = [];
+    const syncedUserIds: string[] = [];
 
     for (const item of pending) {
       try {
@@ -450,6 +451,27 @@ export const syncUtils = {
           await sessionsApi.update(item.data.sessionId, item.data);
         } else if (item.type === 'xp') {
           await progressApi.awardXp(item.data.xp);
+        } else if (item.type === 'user_create') {
+          // Sync offline-created user to API
+          try {
+            await adminApi.createUser({
+              name: item.data.name,
+              pin: item.data.pin,
+              role: item.data.role,
+              division: item.data.division,
+              avatar: item.data.avatar,
+            });
+            syncedUserIds.push(item.data.localId);
+          } catch (userError) {
+            // Check if user already exists (409 conflict or similar)
+            const errorMsg = userError instanceof Error ? userError.message : '';
+            if (errorMsg.includes('exists') || errorMsg.includes('409')) {
+              // User already exists, mark as synced anyway
+              syncedUserIds.push(item.data.localId);
+            } else {
+              throw userError;
+            }
+          }
         }
       } catch {
         failed.push(item);
@@ -461,6 +483,34 @@ export const syncUtils = {
       localStorage.setItem('agnes_pending_sync', JSON.stringify(failed));
     }
 
-    return { synced: pending.length - failed.length, failed: failed.length };
+    return {
+      synced: pending.length - failed.length,
+      failed: failed.length,
+      syncedUserIds
+    };
+  },
+
+  // Mark local users as synced
+  markUsersSynced: (userIds: string[]) => {
+    const usersStr = localStorage.getItem('agnes_users');
+    if (!usersStr) return;
+
+    const users = JSON.parse(usersStr);
+    const updatedUsers = users.map((u: { id: string; pendingSync?: boolean }) => {
+      if (userIds.includes(u.id)) {
+        return { ...u, pendingSync: false };
+      }
+      return u;
+    });
+    localStorage.setItem('agnes_users', JSON.stringify(updatedUsers));
+  },
+
+  // Get count of users pending sync
+  getPendingUserCount: (): number => {
+    const usersStr = localStorage.getItem('agnes_users');
+    if (!usersStr) return 0;
+
+    const users = JSON.parse(usersStr);
+    return users.filter((u: { pendingSync?: boolean }) => u.pendingSync === true).length;
   },
 };

@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { getUsers, User } from '../utils/auth';
 import { getSessions, SessionData } from '../utils/sessionStorage';
-import { analyticsApi, sessionsApi, adminApi } from '../utils/apiClient';
+import { analyticsApi, sessionsApi, adminApi, syncUtils, checkApiHealth } from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import {
   ArrowLeft,
@@ -26,7 +26,9 @@ import {
   Trash2,
   X,
   Check,
-  RefreshCw
+  RefreshCw,
+  CloudOff,
+  Cloud
 } from 'lucide-react';
 import { DifficultyLevel, PitchMode } from '../types';
 
@@ -61,6 +63,11 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
+  // Sync state
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ synced: number; failed: number } | null>(null);
+  const [pendingUserCount, setPendingUserCount] = useState(0);
+
   // Modal state
   const [modal, setModal] = useState<ModalState>({ type: null });
   const [modalLoading, setModalLoading] = useState(false);
@@ -78,9 +85,55 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
   // Generated PIN state for reset
   const [generatedPin, setGeneratedPin] = useState<string | null>(null);
 
+  // Try to sync pending users when component mounts
   useEffect(() => {
-    loadAllUsersData();
+    const initializeAndSync = async () => {
+      // Check for pending users to sync
+      const pendingCount = syncUtils.getPendingUserCount();
+      setPendingUserCount(pendingCount);
+
+      if (syncUtils.hasPendingSync()) {
+        // Check if API is available before trying to sync
+        const apiAvailable = await checkApiHealth();
+        if (apiAvailable) {
+          await syncPendingUsers();
+        }
+      }
+
+      // Then load user data
+      await loadAllUsersData();
+    };
+
+    initializeAndSync();
   }, []);
+
+  // Sync pending users to API
+  const syncPendingUsers = async () => {
+    setSyncing(true);
+    setSyncStatus(null);
+
+    try {
+      const result = await syncUtils.syncPending();
+      setSyncStatus({ synced: result.synced, failed: result.failed });
+
+      // Mark synced users in localStorage
+      if (result.syncedUserIds && result.syncedUserIds.length > 0) {
+        syncUtils.markUsersSynced(result.syncedUserIds);
+      }
+
+      // Update pending count
+      setPendingUserCount(syncUtils.getPendingUserCount());
+
+      // If we synced users, reload the list from API
+      if (result.synced > 0) {
+        await loadAllUsersData();
+      }
+    } catch (error) {
+      console.error('Sync failed:', error);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const loadAllUsersData = async () => {
     setLoading(true);
@@ -874,7 +927,7 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
             </p>
           </div>
 
-          {/* Search and Create */}
+          {/* Search, Sync, and Create */}
           <div className="flex items-center gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
@@ -886,6 +939,34 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
                 className="pl-10 pr-4 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-red-500 w-64"
               />
             </div>
+
+            {/* Sync Status & Button */}
+            {(pendingUserCount > 0 || syncing || syncStatus) && (
+              <div className="flex items-center gap-2">
+                {syncing ? (
+                  <span className="flex items-center gap-2 px-3 py-2 bg-blue-600/20 border border-blue-500/50 text-blue-400 rounded-lg text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Syncing...
+                  </span>
+                ) : pendingUserCount > 0 ? (
+                  <button
+                    onClick={syncPendingUsers}
+                    className="flex items-center gap-2 px-3 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 border border-yellow-500/50 text-yellow-400 rounded-lg text-sm transition-colors"
+                    title={`${pendingUserCount} users pending sync`}
+                  >
+                    <CloudOff className="w-4 h-4" />
+                    {pendingUserCount} pending
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                ) : syncStatus && syncStatus.synced > 0 ? (
+                  <span className="flex items-center gap-2 px-3 py-2 bg-green-600/20 border border-green-500/50 text-green-400 rounded-lg text-sm">
+                    <Cloud className="w-4 h-4" />
+                    {syncStatus.synced} synced
+                  </span>
+                ) : null}
+              </div>
+            )}
+
             <button
               onClick={openCreateModal}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition-colors font-semibold"
@@ -912,7 +993,14 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
               >
                 {/* Avatar & Name */}
                 <div className="flex items-center space-x-3 mb-4">
-                  <div className="text-4xl">{user.avatar}</div>
+                  <div className="relative">
+                    <div className="text-4xl">{user.avatar}</div>
+                    {user.pendingSync && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center" title="Pending sync">
+                        <CloudOff className="w-2.5 h-2.5 text-black" />
+                      </div>
+                    )}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-xl font-bold text-white truncate group-hover:text-red-400 transition-colors">
                       {user.name}
@@ -930,6 +1018,11 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
                          user.role === 'insurance_manager' ? '👔 Ins Mgr' :
                          user.role === 'retail_manager' ? '👔 Ret Mgr' : '🎯 Rep'}
                       </span>
+                      {user.pendingSync && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-yellow-900/30 text-yellow-400">
+                          Pending sync
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -4,7 +4,7 @@
  */
 
 import CryptoJS from 'crypto-js';
-import { authApi, getAuthToken, setAuthToken } from './apiClient';
+import { authApi, getAuthToken, setAuthToken, syncUtils } from './apiClient';
 
 export interface User {
   id: string;
@@ -19,6 +19,7 @@ export interface User {
   currentLevel?: number;
   currentStreak?: number;
   longestStreak?: number;
+  pendingSync?: boolean; // True if user was created offline and needs to sync to API
 }
 
 interface LoginAttempt {
@@ -227,10 +228,24 @@ export const createUser = async (
       pinHash: hashPIN(pin),
       avatar,
       createdAt: new Date(),
+      pendingSync: true, // Mark for sync when API becomes available
     };
 
     users.push(newUser);
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
+
+    // Add to sync queue for later sync
+    syncUtils.addToPendingSync({
+      type: 'user_create',
+      data: {
+        localId: newUser.id,
+        name,
+        pin,
+        role,
+        division,
+        avatar,
+      }
+    });
 
     return newUser;
   }
