@@ -61,16 +61,24 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Clone the response before caching
-          const responseToCache = response.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          // Only cache GET requests (POST/PUT/DELETE can't be cached)
+          if (event.request.method === 'GET') {
+            const responseToCache = response.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
           return response;
         })
         .catch(() => {
-          // If network fails, try cache
-          return caches.match(event.request);
+          // If network fails, try cache (only works for GET requests)
+          if (event.request.method === 'GET') {
+            return caches.match(event.request);
+          }
+          return new Response(JSON.stringify({ error: 'Network unavailable' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' }
+          });
         })
     );
     return;
