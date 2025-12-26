@@ -24,6 +24,9 @@ import {
   Filter
 } from 'lucide-react';
 
+// Demo division type
+type DemoDivision = 'insurance' | 'retail';
+
 // Demo quality levels with scoring info
 const DEMO_LEVELS = [
   {
@@ -380,6 +383,358 @@ const OBJECTION_DEMOS: Record<string, Array<{ speaker: 'salesperson' | 'homeowne
   ]
 };
 
+// ============================================
+// RETAIL DIVISION DEMOS - Based on Official Roof ER Pitch
+// ============================================
+
+// Retail Quality Level Demos
+const RETAIL_DEMO_LEVELS = [
+  {
+    id: 'retail-excellent',
+    name: 'Excellent',
+    score: '95/100',
+    color: 'from-green-500 to-emerald-600',
+    bgColor: 'bg-green-500/20',
+    borderColor: 'border-green-500',
+    icon: Award,
+    description: 'Perfect Roof ER retail pitch - all 5 non-negotiables hit',
+    lines: 14,
+    characteristics: [
+      'Warm greeting with "Hello, how are you?"',
+      'Ice breaker showing respect for their time',
+      'Clear name introduction',
+      'Neighbor hook with POINT gesture',
+      'Free quotes framing - no pressure',
+      'Alternative close (afternoons vs evenings)',
+      'Three steps explained clearly',
+      'Perfect objection handling using official rebuttals'
+    ]
+  },
+  {
+    id: 'retail-good',
+    name: 'Good',
+    score: '75/100',
+    color: 'from-blue-500 to-cyan-600',
+    bgColor: 'bg-blue-500/20',
+    borderColor: 'border-blue-500',
+    icon: TrendingUp,
+    description: 'Solid approach but missing some pitch elements',
+    lines: 12,
+    characteristics: [
+      'Good intro but skipped ice breaker',
+      'Neighbor hook present but no POINT',
+      'Got to free quotes',
+      'Missed alternative close - asked directly',
+      'Three steps rushed at the end',
+      'Could build more rapport first'
+    ]
+  },
+  {
+    id: 'retail-bad',
+    name: 'Needs Work',
+    score: '35/100',
+    color: 'from-yellow-500 to-orange-600',
+    bgColor: 'bg-yellow-500/20',
+    borderColor: 'border-yellow-500',
+    icon: TrendingDown,
+    description: 'Skipped key elements, too pushy',
+    lines: 10,
+    characteristics: [
+      'No ice breaker - jumped straight to pitch',
+      'No neighbor hook - generic approach',
+      'Pushy about getting appointment',
+      'Didn\'t use official rebuttals',
+      'Made homeowner defensive',
+      'Burned the opportunity'
+    ]
+  },
+  {
+    id: 'retail-awful',
+    name: 'Door Slam',
+    score: '10/100',
+    color: 'from-red-500 to-rose-600',
+    bgColor: 'bg-red-500/20',
+    borderColor: 'border-red-500',
+    icon: XCircle,
+    description: 'Completely wrong approach - aggressive and pushy',
+    lines: 8,
+    characteristics: [
+      'No greeting at all',
+      'No name introduction',
+      'Aggressive pitch from first word',
+      'Ignored multiple "no" responses',
+      'Insulted homeowner when rejected',
+      'Burned all future opportunities in neighborhood'
+    ]
+  }
+];
+
+// Retail Objection Demos - Based on Official "Stop Signs"
+const RETAIL_OBJECTION_LEVELS = [
+  {
+    id: 'retail-busy',
+    name: '"I\'m Busy"',
+    score: 'Stop Sign',
+    color: 'from-purple-500 to-violet-600',
+    bgColor: 'bg-purple-500/20',
+    borderColor: 'border-purple-500',
+    icon: TrendingUp,
+    description: 'Official Roof ER rebuttal for busy objection',
+    lines: 8,
+    characteristics: [
+      'Acknowledges their time immediately',
+      'Uses official "My job is simple" rebuttal',
+      'Three steps make it feel quick',
+      'Gets name and time for callback',
+      'Leaves flyer as promised'
+    ]
+  },
+  {
+    id: 'retail-no-money',
+    name: '"No Money"',
+    score: 'Stop Sign',
+    color: 'from-purple-500 to-violet-600',
+    bgColor: 'bg-purple-500/20',
+    borderColor: 'border-purple-500',
+    icon: TrendingUp,
+    description: 'Official Roof ER rebuttal for money objection',
+    lines: 10,
+    characteristics: [
+      'Validates their concern with empathy',
+      'Uses "wait for a little while" empathy line',
+      'Not looking to rip anything out today (lol)',
+      'Frames as free info for when they\'re ready',
+      'Price on file for shopping around'
+    ]
+  },
+  {
+    id: 'retail-not-interested',
+    name: '"Not Interested"',
+    score: 'Stop Sign',
+    color: 'from-purple-500 to-violet-600',
+    bgColor: 'bg-purple-500/20',
+    borderColor: 'border-purple-500',
+    icon: TrendingUp,
+    description: 'Pivoting to other products when rejected',
+    lines: 8,
+    characteristics: [
+      'Accepts rejection gracefully: "Totally fair"',
+      'Pivots to full product range',
+      'Asks what they might want to update',
+      'Opens new conversation opportunity',
+      'No pressure, just curiosity'
+    ]
+  },
+  {
+    id: 'retail-have-guy',
+    name: '"Have a Guy"',
+    score: 'Stop Sign',
+    color: 'from-purple-500 to-violet-600',
+    bgColor: 'bg-purple-500/20',
+    borderColor: 'border-purple-500',
+    icon: TrendingUp,
+    description: 'Working with their existing relationship',
+    lines: 8,
+    characteristics: [
+      'Validates their existing contractor',
+      'Offers second opinion/price check',
+      'No harm in seeing options',
+      'Positions as helpful, not competitive',
+      'May still get the appointment'
+    ]
+  },
+  {
+    id: 'retail-spouse',
+    name: '"Talk to Spouse"',
+    score: 'Stop Sign',
+    color: 'from-purple-500 to-violet-600',
+    bgColor: 'bg-purple-500/20',
+    borderColor: 'border-purple-500',
+    icon: TrendingUp,
+    description: 'Including both decision makers',
+    lines: 8,
+    characteristics: [
+      'Recommends both be involved',
+      'Gets time for both of them',
+      'Uses three steps for simplicity',
+      'Respects the decision-making process',
+      'Sets appointment when spouse is home'
+    ]
+  },
+  {
+    id: 'retail-just-ideas',
+    name: '"Just Ideas"',
+    score: 'Stop Sign',
+    color: 'from-purple-500 to-violet-600',
+    bgColor: 'bg-purple-500/20',
+    borderColor: 'border-purple-500',
+    icon: TrendingUp,
+    description: 'Meeting them where they are',
+    lines: 6,
+    characteristics: [
+      'Validates their timeline',
+      'Frames as useful info gathering',
+      'Real pricing for when ready',
+      'No-obligation positioning',
+      'Easy yes for information'
+    ]
+  }
+];
+
+// Retail Demo Scripts - Based on Official Roof ER Pitch Flow
+const RETAIL_DEMO_SCRIPTS: Record<string, Array<{ speaker: 'salesperson' | 'homeowner'; text: string; emotion?: string; note?: string }>> = {
+  'retail-excellent': [
+    // Opening with ice breaker (1-4)
+    { speaker: 'salesperson', text: "Hello! How are you?", note: "Warm greeting" },
+    { speaker: 'homeowner', text: "I'm doing alright, just got home from work." },
+    { speaker: 'salesperson', text: "You look like you're winding down - I'll be quick! My name is Marcus.", note: "Ice breaker + time acknowledgment + name" },
+    { speaker: 'homeowner', text: "Okay, what's this about?" },
+
+    // Neighbor hook with context (5-6)
+    { speaker: 'salesperson', text: "I'm just giving the neighbors a heads up - our company Roof ER is about to do the windows for the Miller's right there. (POINTS) So before we get going, we're coming by to do free quotes.", note: "Neighbor hook with POINT + free quotes" },
+    { speaker: 'homeowner', text: "Free quotes for windows?" },
+
+    // Value and alternative close (7-8)
+    { speaker: 'salesperson', text: "Windows, siding, roofing, solar - whatever you've been thinking about. So far we're coming by for everybody in the afternoons - or are the evenings better for you?", note: "Alternative close - assumes appointment" },
+    { speaker: 'homeowner', text: "I don't know... I'm pretty busy these days.", emotion: 'hesitant' },
+
+    // Objection handling with official rebuttal (9-10)
+    { speaker: 'salesperson', text: "Totally get it - most people are these days. My job is really simple: I just get your name, find a time that ACTUALLY works around your busy schedule, and leave you with a flyer.", note: "Official 'busy' rebuttal + three steps" },
+    { speaker: 'homeowner', text: "That's it? You're not going to try to sell me something today?", emotion: 'curious' },
+
+    // Reassurance and close (11-14)
+    { speaker: 'salesperson', text: "We're not looking to rip out anyone's windows today! (laughs) Just while the team is in the area, we're leaving everyone with free information on styles and prices. That way when you ARE ready, you'll have a price on file.", note: "No pressure framing" },
+    { speaker: 'homeowner', text: "That actually makes sense. Evenings work better.", emotion: 'positive' },
+    { speaker: 'salesperson', text: "Perfect! What day works best - Tuesday or Thursday evening?", note: "Narrows to specific days" },
+    { speaker: 'homeowner', text: "Thursday would work. I'm Sarah by the way.", emotion: 'positive' }
+  ],
+
+  'retail-good': [
+    // Opening - adequate but less warm (1-3)
+    { speaker: 'salesperson', text: "Hi there! I'm Marcus from Roof ER.", note: "Good intro but no 'How are you?'" },
+    { speaker: 'homeowner', text: "Okay... what are you selling?" },
+    { speaker: 'salesperson', text: "We're doing the windows for your neighbor down the street, so I wanted to let you know we're offering free quotes.", note: "Has neighbor hook but no POINT" },
+
+    // Value communication (4-6)
+    { speaker: 'homeowner', text: "Free quotes for what exactly?" },
+    { speaker: 'salesperson', text: "Windows, siding, roofing - basically anything on the outside of your home.", note: "Good product range" },
+    { speaker: 'homeowner', text: "I'm not really in the market right now." },
+
+    // Handling objection (7-10)
+    { speaker: 'salesperson', text: "I understand. It's just free information so when you are ready, you'll know what it costs.", note: "OK rebuttal but not official wording" },
+    { speaker: 'homeowner', text: "I guess that makes sense." },
+    { speaker: 'salesperson', text: "Great! When would be a good time for us to stop by?", note: "Direct ask - missed alternative close" },
+    { speaker: 'homeowner', text: "Maybe next week sometime?", emotion: 'neutral' },
+
+    // Close (11-12)
+    { speaker: 'salesperson', text: "Works for me. My job is simple - I get your name, find a time, leave a flyer.", note: "Three steps but rushed" },
+    { speaker: 'homeowner', text: "Alright, I'm Tom. Give me a call.", emotion: 'neutral' }
+  ],
+
+  'retail-bad': [
+    // Weak opening (1-3)
+    { speaker: 'salesperson', text: "Hey, we're out doing window quotes in the neighborhood. Interested?", note: "No greeting, no name, no ice breaker" },
+    { speaker: 'homeowner', text: "Who are you with?" },
+    { speaker: 'salesperson', text: "Roof ER. Anyway, your windows look pretty old. You should probably get them replaced.", note: "Assumed problem, no rapport" },
+
+    // Poor handling (4-6)
+    { speaker: 'homeowner', text: "I'm not interested, thanks.", emotion: 'annoyed' },
+    { speaker: 'salesperson', text: "Come on, it's a free quote. What do you have to lose?", note: "Pushy, didn't acknowledge objection" },
+    { speaker: 'homeowner', text: "I said I'm not interested. I'm busy.", emotion: 'annoyed' },
+
+    // Making it worse (7-10)
+    { speaker: 'salesperson', text: "It'll only take a few minutes. Everyone in the neighborhood is doing it.", note: "Pressure tactics" },
+    { speaker: 'homeowner', text: "I don't care what everyone else is doing.", emotion: 'angry' },
+    { speaker: 'salesperson', text: "Fine, but don't complain when your heating bill goes up.", note: "Passive aggressive" },
+    { speaker: 'homeowner', text: "Please leave.", emotion: 'angry' }
+  ],
+
+  'retail-awful': [
+    // Terrible opening (1-3)
+    { speaker: 'salesperson', text: "Your windows are a mess. You need new ones.", note: "No intro, immediate criticism" },
+    { speaker: 'homeowner', text: "Excuse me? Who are you?", emotion: 'shocked' },
+    { speaker: 'salesperson', text: "Doesn't matter. Point is, your house needs work and we can fix it. Sign up now.", note: "Aggressive, no rapport" },
+
+    // Ignoring objections (4-6)
+    { speaker: 'homeowner', text: "No thanks. Please leave.", emotion: 'angry' },
+    { speaker: 'salesperson', text: "You're making a mistake. Everyone else in the neighborhood already signed up.", note: "Lying and manipulative" },
+    { speaker: 'homeowner', text: "I don't believe you. Leave my property.", emotion: 'angry' },
+
+    // Complete failure (7-8)
+    { speaker: 'salesperson', text: "Whatever, enjoy your drafty windows.", note: "Insulting exit" },
+    { speaker: 'homeowner', text: "[Door slams]", emotion: 'door_slam' }
+  ]
+};
+
+// Retail Objection Demo Scripts - Using Official "Stop Signs" Rebuttals
+const RETAIL_OBJECTION_DEMOS: Record<string, Array<{ speaker: 'salesperson' | 'homeowner'; text: string; emotion?: string; note?: string }>> = {
+  'retail-busy': [
+    { speaker: 'salesperson', text: "Hello! How are you? My name is Marcus with Roof ER.", note: "Warm greeting with name" },
+    { speaker: 'homeowner', text: "I'm really busy right now.", emotion: 'rushed' },
+    { speaker: 'salesperson', text: "Totally get it - most people are these days. My job is really simple: I just get your name, find a time that ACTUALLY works around your busy schedule, and leave you with a flyer.", note: "Official 'busy' rebuttal" },
+    { speaker: 'homeowner', text: "That's it?", emotion: 'curious' },
+    { speaker: 'salesperson', text: "That's it! I'm just giving the neighbors a heads up - we're about to do the windows for the family right there (POINTS). So what works better for you - afternoons or evenings?", note: "Neighbor hook + alternative close" },
+    { speaker: 'homeowner', text: "Evenings I guess." },
+    { speaker: 'salesperson', text: "Perfect. I'm Marcus - what's your name so I can leave this flyer with you?", note: "Gets name naturally" },
+    { speaker: 'homeowner', text: "It's Jennifer. Thanks for being quick about this.", emotion: 'positive' }
+  ],
+
+  'retail-no-money': [
+    { speaker: 'salesperson', text: "Hello! How are you? I'm Marcus, giving the neighbors a heads up...", note: "Standard opening" },
+    { speaker: 'homeowner', text: "Look, I don't have the money for that right now.", emotion: 'stressed' },
+    { speaker: 'salesperson', text: "Makes sense - the windows are going to have to wait for a little while, huh?", note: "Empathy first" },
+    { speaker: 'homeowner', text: "Yeah, exactly." },
+    { speaker: 'salesperson', text: "To be totally honest with you, that's exactly why we're coming by. We're not looking to rip out anyone's windows today (laughs) - just while the team is in the area, we're leaving everyone with free information on styles and prices.", note: "Official 'no money' rebuttal" },
+    { speaker: 'homeowner', text: "So it's just information?", emotion: 'curious' },
+    { speaker: 'salesperson', text: "Exactly! That way when you ARE ready, you'll have a price on file and can use it to shop around and see who gives you the best deal. No pressure, just useful info.", note: "Price on file framing" },
+    { speaker: 'homeowner', text: "Alright, that actually makes sense.", emotion: 'neutral' },
+    { speaker: 'salesperson', text: "Great! Afternoons or evenings work better for you?", note: "Alternative close" },
+    { speaker: 'homeowner', text: "Afternoons are fine.", emotion: 'neutral' }
+  ],
+
+  'retail-not-interested': [
+    { speaker: 'salesperson', text: "Hello! How are you today?", note: "Warm greeting" },
+    { speaker: 'homeowner', text: "I'm not interested, thanks.", emotion: 'dismissive' },
+    { speaker: 'salesperson', text: "Totally fair. We do a lot more than just roofs – windows, siding, doors, solar, gutters. If there's a part of the home you've thought about updating, what do you think will be next for you guys?", note: "Official 'not interested' pivot rebuttal" },
+    { speaker: 'homeowner', text: "Well... I have been thinking about the siding. It's looking pretty rough.", emotion: 'curious' },
+    { speaker: 'salesperson', text: "Siding's a big one! We actually just finished a siding job for your neighbor at 1847. My job is simple - I get your name, find a time that works, and leave you with info on styles and prices.", note: "Pivot to new product + three steps" },
+    { speaker: 'homeowner', text: "I guess it couldn't hurt to get some information.", emotion: 'neutral' },
+    { speaker: 'salesperson', text: "No pressure at all. Afternoons or evenings better for you?", note: "Alternative close" },
+    { speaker: 'homeowner', text: "Afternoons work.", emotion: 'neutral' }
+  ],
+
+  'retail-have-guy': [
+    { speaker: 'salesperson', text: "Hello! How are you? I'm Marcus with Roof ER, giving neighbors a heads up...", note: "Standard opening" },
+    { speaker: 'homeowner', text: "Oh, we already have a guy who does that.", emotion: 'polite' },
+    { speaker: 'salesperson', text: "That's great – always smart to have someone you trust. We'd still love to give you a second opinion and a competitive quote.", note: "Official 'have a guy' rebuttal" },
+    { speaker: 'homeowner', text: "I don't want to be disloyal to him though." },
+    { speaker: 'salesperson', text: "Totally understand. Worst case, you get a price check and some new ideas. No harm in seeing options, right? You can even share our quote with your guy.", note: "Positions as helping relationship" },
+    { speaker: 'homeowner', text: "That's true. He might even match it.", emotion: 'curious' },
+    { speaker: 'salesperson', text: "Exactly! My job is simple - I get your name, find a time, and leave you with a flyer. No pressure.", note: "Three steps" },
+    { speaker: 'homeowner', text: "Alright, I'm David. What works for you?", emotion: 'positive' }
+  ],
+
+  'retail-spouse': [
+    { speaker: 'salesperson', text: "Hello! How are you? I'm Marcus with Roof ER...", note: "Standard opening" },
+    { speaker: 'homeowner', text: "I have to talk to my spouse about anything like this.", emotion: 'unsure' },
+    { speaker: 'salesperson', text: "Of course – we always recommend both decision-makers are involved. Makes sense, that's usually something you guys talk about together, right?", note: "Official 'spouse' rebuttal" },
+    { speaker: 'homeowner', text: "Yeah, we make all big decisions together." },
+    { speaker: 'salesperson', text: "Smart! My job is simple - I just get your name, find a time that works for BOTH of you, and leave you with a flyer. We'll lay out all the options so you two can decide together.", note: "Include spouse in appointment" },
+    { speaker: 'homeowner', text: "That sounds reasonable.", emotion: 'neutral' },
+    { speaker: 'salesperson', text: "When's your spouse usually home? Afternoons or evenings?", note: "Gets time for both" },
+    { speaker: 'homeowner', text: "Evenings after 6. I'm Karen.", emotion: 'positive' }
+  ],
+
+  'retail-just-ideas': [
+    { speaker: 'salesperson', text: "Hello! How are you? I'm Marcus, giving neighbors a heads up...", note: "Standard opening" },
+    { speaker: 'homeowner', text: "We're just getting ideas right now. Not ready for anything.", emotion: 'casual' },
+    { speaker: 'salesperson', text: "Perfect! Our goal is to give you real pricing and recommendations so you're ready when the time comes.", note: "Official 'just ideas' rebuttal" },
+    { speaker: 'homeowner', text: "So no pressure to buy anything?" },
+    { speaker: 'salesperson', text: "None at all. That's exactly what this is for - useful info and professional insight on your home. When you're ready, you'll have everything you need.", note: "Frames as valuable info gathering" },
+    { speaker: 'homeowner', text: "Okay, that works for me.", emotion: 'positive' }
+  ]
+};
+
 interface Props {
   onBack?: () => void;
 }
@@ -413,32 +768,41 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+  const [divisionFilter, setDivisionFilter] = useState<DemoDivision>('insurance');
+
+  // Select demo levels based on division
+  const currentQualityLevels = divisionFilter === 'insurance' ? DEMO_LEVELS : RETAIL_DEMO_LEVELS;
+  const currentObjectionLevels = divisionFilter === 'insurance' ? OBJECTION_LEVELS : RETAIL_OBJECTION_LEVELS;
+  const currentDemoScripts = divisionFilter === 'insurance' ? DEMO_SCRIPTS : RETAIL_DEMO_SCRIPTS;
+  const currentObjectionScripts = divisionFilter === 'insurance' ? OBJECTION_DEMOS : RETAIL_OBJECTION_DEMOS;
 
   // Filter demos based on search query
   const filteredQualityDemos = useMemo(() => {
-    return DEMO_LEVELS.filter(demo =>
+    return currentQualityLevels.filter(demo =>
       demo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       demo.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       demo.characteristics.some(c => c.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-  }, [searchQuery]);
+  }, [searchQuery, currentQualityLevels]);
 
   const filteredObjectionDemos = useMemo(() => {
-    return OBJECTION_LEVELS.filter(demo =>
+    return currentObjectionLevels.filter(demo =>
       demo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       demo.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       demo.characteristics.some(c => c.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-  }, [searchQuery]);
+  }, [searchQuery, currentObjectionLevels]);
 
-  // Find the selected demo from either quality or objection levels
+  // Find the selected demo from either quality or objection levels (check both divisions)
   const selectedDemo = demoType === 'quality'
-    ? DEMO_LEVELS.find(d => d.id === selectedLevel)
-    : OBJECTION_LEVELS.find(d => d.id === selectedLevel);
+    ? (DEMO_LEVELS.find(d => d.id === selectedLevel) || RETAIL_DEMO_LEVELS.find(d => d.id === selectedLevel))
+    : (OBJECTION_LEVELS.find(d => d.id === selectedLevel) || RETAIL_OBJECTION_LEVELS.find(d => d.id === selectedLevel));
 
-  // Get script from appropriate source
+  // Get script from appropriate source (check both divisions)
   const script = selectedLevel
-    ? (demoType === 'quality' ? DEMO_SCRIPTS[selectedLevel] : OBJECTION_DEMOS[selectedLevel]) || []
+    ? (demoType === 'quality'
+        ? (DEMO_SCRIPTS[selectedLevel] || RETAIL_DEMO_SCRIPTS[selectedLevel])
+        : (OBJECTION_DEMOS[selectedLevel] || RETAIL_OBJECTION_DEMOS[selectedLevel])) || []
     : [];
 
   // Handle level selection with type tracking
@@ -618,6 +982,41 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
             </p>
           </div>
 
+          {/* Division Toggle */}
+          <div className="flex justify-center mb-6">
+            <div className="inline-flex bg-slate-800/50 rounded-xl p-1 border border-slate-700">
+              <button
+                onClick={() => setDivisionFilter('insurance')}
+                className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  divisionFilter === 'insurance'
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'text-gray-400 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                🏠 Insurance Division
+              </button>
+              <button
+                onClick={() => setDivisionFilter('retail')}
+                className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  divisionFilter === 'retail'
+                    ? 'bg-green-600 text-white shadow-lg'
+                    : 'text-gray-400 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                🏪 Retail Division
+              </button>
+            </div>
+          </div>
+
+          {/* Division Description */}
+          <div className="text-center mb-6">
+            <p className="text-sm text-gray-500">
+              {divisionFilter === 'insurance'
+                ? 'Storm damage inspections • Insurance claims • Free roof inspections'
+                : 'Door-to-door appointment setting • Windows, Siding, Roofing, Solar • Free quotes'}
+            </p>
+          </div>
+
           {/* Search and Filter Bar */}
           <div className="mb-8 space-y-4">
             {/* Search Input */}
@@ -645,9 +1044,9 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
               <Filter className="w-4 h-4 text-gray-500" />
               <div className="flex gap-2">
                 {([
-                  { id: 'all', label: 'All Demos', count: DEMO_LEVELS.length + OBJECTION_LEVELS.length },
+                  { id: 'all', label: 'All Demos', count: currentQualityLevels.length + currentObjectionLevels.length },
                   { id: 'quality', label: 'Quality Levels', count: filteredQualityDemos.length },
-                  { id: 'objection', label: 'Objection Handling', count: filteredObjectionDemos.length }
+                  { id: 'objection', label: divisionFilter === 'retail' ? 'Stop Signs' : 'Objection Handling', count: filteredObjectionDemos.length }
                 ] as { id: CategoryFilter; label: string; count: number }[]).map(tab => (
                   <button
                     key={tab.id}
@@ -678,8 +1077,14 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
               <Award className="w-6 h-6 text-yellow-400" />
-              <h2 className="text-xl font-bold text-white">Quality Level Demos</h2>
-              <span className="text-sm text-gray-500">Full pitch demonstrations rated by effectiveness</span>
+              <h2 className="text-xl font-bold text-white">
+                {divisionFilter === 'retail' ? 'Roof ER Retail Quality Demos' : 'Quality Level Demos'}
+              </h2>
+              <span className="text-sm text-gray-500">
+                {divisionFilter === 'retail'
+                  ? 'Door-to-door pitch demonstrations using official Roof ER flow'
+                  : 'Full pitch demonstrations rated by effectiveness'}
+              </span>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {filteredQualityDemos.map((level) => {
@@ -722,8 +1127,14 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
               <MessageCircle className="w-6 h-6 text-purple-400" />
-              <h2 className="text-xl font-bold text-white">Objection Handling</h2>
-              <span className="text-sm text-gray-500">Master responses to common pushbacks</span>
+              <h2 className="text-xl font-bold text-white">
+                {divisionFilter === 'retail' ? 'Roof ER "Stop Signs" Rebuttals' : 'Objection Handling'}
+              </h2>
+              <span className="text-sm text-gray-500">
+                {divisionFilter === 'retail'
+                  ? 'Official Roof ER rebuttals for common door-to-door objections'
+                  : 'Master responses to common pushbacks'}
+              </span>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredObjectionDemos.map((level) => {

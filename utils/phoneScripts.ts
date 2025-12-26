@@ -199,6 +199,283 @@ Key Points:
 - Leave with contact info collected and scheduled time
 
 Voice Selection: This script works best with Agnes 21 or 21 voice for TTS playback.`
+  },
+  {
+    id: 'retail-stop-signs',
+    title: 'Retail "Stop Signs" & Official Rebuttals',
+    category: 'retail',
+    division: 'retail',
+    description: 'Official Roof ER rebuttals for the 7 common retail objections',
+    content: `Roof ER "Stop Signs" & Rebuttals for Field Marketers
+(Goal: Overcome, reframe, and redirect to schedule a free estimate)
+
+═══════════════════════════════════════════════════════════
+STOP SIGN #1: "I'm not interested."
+═══════════════════════════════════════════════════════════
+Customer Type: Good S.E.E. Factors (Signs, Equity, Energy bill)
+
+REBUTTAL:
+"Totally fair. We do a lot more than just roofs – windows, siding, doors, solar, gutters. If there's a part of the home you've thought about updating, what do you think will be next for you guys?"
+
+WHY IT WORKS:
+✓ Accepts rejection gracefully
+✓ Pivots to full product range
+✓ Opens new conversation opportunity
+✓ No pressure, just curiosity
+
+═══════════════════════════════════════════════════════════
+STOP SIGN #2: "I'm busy."
+═══════════════════════════════════════════════════════════
+
+REBUTTAL (Standard):
+"Totally get it - most people are - these days. My job is really simple, I just get your name, I'll find a time that ACTUALLY works around your busy schedule, and I'll leave a flyer"
+
+REBUTTAL (If busy right this second):
+"We won't take more than 60 seconds now, just to qualify your home."
+
+WHY IT WORKS:
+✓ Acknowledges their time immediately
+✓ Three steps make it feel quick and simple
+✓ Offers flexibility for their schedule
+✓ Low commitment ask
+
+═══════════════════════════════════════════════════════════
+STOP SIGN #3: "I don't have the money right now."
+═══════════════════════════════════════════════════════════
+
+REBUTTAL:
+"Makes sense, the [Product] is going to have to wait for a little while, huh? To be totally honest with you, that's exactly why we're coming by. We're not looking to rip out anyone's windows today (lol) just while the team is in the area, we are going to leave everyone with that free information on like styles and prices, so that way when you are ready, you'll have a price on file, and you can use that to shop around and see who gives you the best deal"
+
+WHY IT WORKS:
+✓ Validates their financial concern with empathy
+✓ "Wait for a little while" shows understanding
+✓ "Not ripping anything out today" removes pressure
+✓ "Price on file" gives future value
+✓ "Shop around" empowers their decision
+
+═══════════════════════════════════════════════════════════
+STOP SIGN #4: "I already have a guy who does that."
+═══════════════════════════════════════════════════════════
+
+REBUTTAL:
+"That's great — always smart to have someone. We'd still love to give you a second opinion and a competitive quote. Worst case, you get a price check and some new ideas. No harm in seeing options, right?"
+
+WHY IT WORKS:
+✓ Validates their existing relationship
+✓ Positions as helpful, not competitive
+✓ "Second opinion" is non-threatening
+✓ "No harm" removes risk
+
+═══════════════════════════════════════════════════════════
+STOP SIGN #5: "I have to talk to my spouse."
+═══════════════════════════════════════════════════════════
+
+REBUTTAL (Primary):
+"Of course — we always recommend both decision-makers are involved. We'll lay out all the options, and you two can decide together from there. What's the best time for both of you?"
+
+REBUTTAL (Alternative):
+"Makes sense..that's usually something you guys talk about together, right? The [product]? (lol) My job is simple, I just get your name, a time that will work for both of you, and leave you with a flyer"
+
+WHY IT WORKS:
+✓ Respects the decision-making process
+✓ Includes spouse in the appointment
+✓ Three steps for simplicity
+✓ Gets commitment for when both are home
+
+═══════════════════════════════════════════════════════════
+STOP SIGN #6: "We're just getting ideas right now."
+═══════════════════════════════════════════════════════════
+
+REBUTTAL (Primary):
+"Perfect! Our goal is to give you real pricing and recommendations so you're ready when the time comes."
+
+REBUTTAL (Alternative):
+"That's exactly what this is for - useful info and professional insight on your home."
+
+WHY IT WORKS:
+✓ Validates their timeline
+✓ Frames appointment as useful info gathering
+✓ "When the time comes" respects their pace
+✓ Easy yes for information
+
+═══════════════════════════════════════════════════════════
+STOP SIGN #7: "I don't think we need anything right now."
+═══════════════════════════════════════════════════════════
+
+REBUTTAL:
+Use the "No Money" rebuttal - same approach applies.
+
+"Makes sense, the [Product] is going to have to wait for a little while, huh? That's exactly why we're coming by - free info so you have a price on file when you're ready."
+
+═══════════════════════════════════════════════════════════
+PRO TIPS FOR ALL STOP SIGNS
+═══════════════════════════════════════════════════════════
+
+1. NEVER get defensive or argue
+2. Always acknowledge their concern FIRST
+3. Keep your tone friendly and conversational
+4. Remember: you're helping, not selling
+5. If they say no twice, leave gracefully with a flyer
+6. The goal is to book an appointment, not close a sale`
+  },
+  {
+    id: 'retail-rehash',
+    title: 'REHASH - Appointment Confirmation Script',
+    category: 'retail',
+    division: 'retail',
+    description: 'Script for confirming retail appointment details with homeowner',
+    content: `REHASH - Appointment Confirmation Script
+(Use this to confirm all details before leaving)
+
+═══════════════════════════════════════════════════════════
+THE REHASH SCRIPT
+═══════════════════════════════════════════════════════════
+
+"Alright, [Homeowner Name], you're all set for your free estimate on the [product — e.g., roof, windows, siding].
+
+Just to make sure everything's spot-on, I've got:
+– [Confirm Full Address]
+– [Confirm Phone]
+– [Confirm Email]
+
+And you mentioned [confirm the issue/need briefly — e.g., 'your windows are getting drafty,' or 'your roof's about 20 years old'], right?
+
+═══════════════════════════════════════════════════════════
+WHAT TO EXPECT (READ TO HOMEOWNER)
+═══════════════════════════════════════════════════════════
+
+"Our specialist is going to walk you through everything you need to know—they'll:
+• Inspect the [product]
+• Take some quick measurements
+• Show you the different styles and options we have available
+• Give you clear pricing options
+• Help build a plan that fits your budget
+
+Super straightforward.
+
+Again, we're not looking to rip out any windows on the spot or anything (lol), but if it makes sense and you love what you see, a lot of our homeowners choose to move forward.
+
+It's important that both decision-makers can be there, it helps speed things up and avoid back-and-forth."
+
+═══════════════════════════════════════════════════════════
+OPTIONAL CLOSE-OUT (If they're hesitant)
+═══════════════════════════════════════════════════════════
+
+"Worst case, you get expert advice and numbers to plan for later. Best case, we help you knock it out and get it done the right way. Either way, it's a win."
+
+═══════════════════════════════════════════════════════════
+REHASH CHECKLIST
+═══════════════════════════════════════════════════════════
+
+Before you leave, confirm:
+☐ Full address correct
+☐ Best phone number
+☐ Email for follow-up
+☐ The issue/need they mentioned
+☐ Both decision-makers will be present
+☐ Appointment date and time
+☐ Left flyer with your info`
+  },
+  {
+    id: 'retail-qualifiers',
+    title: 'Product Minimum Qualifiers',
+    category: 'retail',
+    division: 'retail',
+    description: 'Minimum requirements for each retail product type',
+    content: `Product Minimum Qualifiers
+(Know these before setting an appointment)
+
+═══════════════════════════════════════════════════════════
+🪟 WINDOWS
+═══════════════════════════════════════════════════════════
+
+Minimum Requirements:
+• 4 windows (common residential sizes)
+  OR
+• 1 Bay or Bow window
+• 10 years old or older
+
+Quick Questions to Ask:
+- "About how many windows are you thinking about?"
+- "How old are your current windows?"
+- "Are they single or double pane?"
+
+Don't Set Appointment If:
+✗ Less than 4 windows
+✗ Windows less than 10 years old
+✗ Already has brand new windows
+
+═══════════════════════════════════════════════════════════
+🏠 SIDING
+═══════════════════════════════════════════════════════════
+
+Minimum Requirements:
+• 75% coverage of home
+  OR
+• Entire level of home (e.g., split level)
+• 10 years old or older
+
+Quick Questions to Ask:
+- "Are you thinking about the whole house or just part of it?"
+- "Is it the original siding or has it been replaced?"
+- "How old is the current siding?"
+
+Don't Set Appointment If:
+✗ Just a small patch or repair
+✗ Less than 75% coverage
+✗ Siding less than 10 years old
+
+═══════════════════════════════════════════════════════════
+🏗️ ROOFING
+═══════════════════════════════════════════════════════════
+
+Minimum Requirements:
+• Full replacement estimate only
+• 15 years old or older
+
+Quick Questions to Ask:
+- "How old is your current roof?"
+- "Have you had any leaks or issues?"
+- "Is it the original roof or has it been replaced?"
+
+Don't Set Appointment If:
+✗ Just needs a repair (refer to service dept)
+✗ Roof less than 15 years old
+✗ Recently replaced
+
+═══════════════════════════════════════════════════════════
+☀️ SOLAR
+═══════════════════════════════════════════════════════════
+
+Minimum Requirements:
+• Rear of home predominantly south facing
+• No tree coverage / interference
+• Targeted zip code preferred
+• 4KW system capability
+• Utility bill gathering preferred
+
+Quick Questions to Ask:
+- "Which direction does your roof face?"
+- "Are there any trees that shade your roof?"
+- "Do you own the home?"
+- "What's your average monthly electric bill?"
+
+Don't Set Appointment If:
+✗ North-facing roof only
+✗ Heavy tree coverage
+✗ Renter (not owner)
+✗ Very low electric bill (under $100/month)
+
+═══════════════════════════════════════════════════════════
+QUALIFYING TIPS
+═══════════════════════════════════════════════════════════
+
+1. Ask qualifying questions naturally in conversation
+2. Don't interrogate - keep it friendly
+3. If they don't qualify, pivot to another product:
+   "Windows might not make sense right now, but what about the roof? How old is that?"
+4. Always leave a flyer even if they don't qualify
+5. A good lead today is worth more than a wasted appointment`
   }
 ];
 
