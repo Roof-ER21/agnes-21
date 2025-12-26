@@ -102,6 +102,8 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
           currentLevel: apiUser.currentLevel,
           currentStreak: apiUser.currentStreak,
           longestStreak: apiUser.longestStreak,
+          createdAt: apiUser.createdAt ? new Date(apiUser.createdAt) : new Date(),
+          lastLogin: apiUser.lastLogin ? new Date(apiUser.lastLogin) : undefined,
         };
 
         // For now, sessions will be empty - we'll fetch them when user is selected
@@ -120,7 +122,17 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
       setUsersWithSessions(usersData);
     } catch (error) {
       console.warn('Failed to fetch users from API, using localStorage:', error);
-      setApiError('Using offline data');
+      // Provide specific error messages based on the error type
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('401') || errorMessage.includes('token')) {
+        setApiError('Session expired - please log in again');
+      } else if (errorMessage.includes('403') || errorMessage.includes('Manager')) {
+        setApiError('Manager access required');
+      } else if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
+        setApiError('Server unavailable - using offline data');
+      } else {
+        setApiError('Using offline data');
+      }
 
       // Fallback to localStorage
       const users = getUsers();
