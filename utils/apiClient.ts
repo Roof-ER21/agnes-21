@@ -513,4 +513,68 @@ export const syncUtils = {
     const users = JSON.parse(usersStr);
     return users.filter((u: { pendingSync?: boolean }) => u.pendingSync === true).length;
   },
+
+  // Find and queue orphan localStorage users that aren't in the API database
+  // This handles users created before the sync feature was added
+  findAndQueueOrphanUsers: async (): Promise<{ found: number; queued: number }> => {
+    const usersStr = localStorage.getItem('agnes_users');
+    if (!usersStr) return { found: 0, queued: 0 };
+
+    const localUsers = JSON.parse(usersStr);
+    let found = 0;
+    let queued = 0;
+
+    try {
+      // Fetch all users from API
+      const apiUsers = await analyticsApi.getAllUsers();
+      const apiUserNames = new Set(apiUsers.map(u => u.name.toLowerCase()));
+
+      // Find local users that don't exist in API (by name match)
+      const orphanUsers = localUsers.filter((localUser: { name: string; pendingSync?: boolean; pinHash?: string }) => {
+        const isOrphan = !apiUserNames.has(localUser.name.toLowerCase());
+        const notAlreadyPending = localUser.pendingSync !== true;
+        return isOrphan && notAlreadyPending && localUser.pinHash; // Must have pinHash (local-created)
+      });
+
+      found = orphanUsers.length;
+
+      // Queue orphan users for sync
+      for (const orphan of orphanUsers) {
+        // We can't sync without the original PIN, so we'll generate a temporary one
+        // The user will need to reset their PIN after sync
+        const tempPin = Math.floor(1000 + Math.random() * 9000).toString();
+
+        syncUtils.addToPendingSync({
+          type: 'user_create',
+          data: {
+            localId: orphan.id,
+            name: orphan.name,
+            pin: tempPin,
+            role: orphan.role || 'trainee',
+            division: orphan.division || 'insurance',
+            avatar: orphan.avatar || '👤',
+          }
+        });
+
+        queued++;
+      }
+
+      // Mark these users as pendingSync in localStorage
+      if (queued > 0) {
+        const updatedUsers = localUsers.map((u: { id: string; pendingSync?: boolean }) => {
+          const isOrphan = orphanUsers.some((o: { id: string }) => o.id === u.id);
+          if (isOrphan) {
+            return { ...u, pendingSync: true, needsPinReset: true };
+          }
+          return u;
+        });
+        localStorage.setItem('agnes_users', JSON.stringify(updatedUsers));
+      }
+
+      return { found, queued };
+    } catch (error) {
+      console.warn('Failed to check for orphan users:', error);
+      return { found: 0, queued: 0 };
+    }
+  },
 };

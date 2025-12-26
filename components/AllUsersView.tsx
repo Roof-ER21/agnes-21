@@ -88,16 +88,24 @@ const AllUsersView: React.FC<AllUsersViewProps> = ({ onBack }) => {
   // Try to sync pending users when component mounts
   useEffect(() => {
     const initializeAndSync = async () => {
+      // Check if API is available
+      const apiAvailable = await checkApiHealth();
+
+      if (apiAvailable) {
+        // First, find any orphan localStorage users that need syncing
+        // (users created before sync feature was added)
+        const orphanResult = await syncUtils.findAndQueueOrphanUsers();
+        if (orphanResult.queued > 0) {
+          console.log(`Found ${orphanResult.queued} orphan users to sync`);
+        }
+      }
+
       // Check for pending users to sync
       const pendingCount = syncUtils.getPendingUserCount();
       setPendingUserCount(pendingCount);
 
-      if (syncUtils.hasPendingSync()) {
-        // Check if API is available before trying to sync
-        const apiAvailable = await checkApiHealth();
-        if (apiAvailable) {
-          await syncPendingUsers();
-        }
+      if (syncUtils.hasPendingSync() && apiAvailable) {
+        await syncPendingUsers();
       }
 
       // Then load user data
