@@ -46,26 +46,17 @@ const TeamContests: React.FC<TeamContestsProps> = ({ userId, userName, isManager
   useEffect(() => {
     const stored = localStorage.getItem('agnes_team_contests');
     if (stored) {
-      setContests(JSON.parse(stored));
+      const parsedContests = JSON.parse(stored);
+      // Filter out old sample contests created by 'system'
+      const realContests = parsedContests.filter((c: TeamContest) => c.createdBy !== 'system');
+      setContests(realContests);
+      // Save filtered list if we removed sample contests
+      if (realContests.length !== parsedContests.length) {
+        localStorage.setItem('agnes_team_contests', JSON.stringify(realContests));
+      }
     } else {
-      // Initialize with a sample contest
-      const sampleContests: TeamContest[] = [
-        {
-          id: 'contest_1',
-          title: 'December Training Challenge',
-          description: 'Complete the most training sessions this month!',
-          type: 'sessions',
-          target: 20,
-          startDate: '2025-12-01',
-          endDate: '2025-12-31',
-          prize: 'Featured on Leaderboard + Bragging Rights',
-          participants: [],
-          status: 'active',
-          createdBy: 'system'
-        }
-      ];
-      localStorage.setItem('agnes_team_contests', JSON.stringify(sampleContests));
-      setContests(sampleContests);
+      // Initialize empty - managers can create contests
+      setContests([]);
     }
   }, []);
 

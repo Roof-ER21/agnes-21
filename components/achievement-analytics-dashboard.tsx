@@ -40,8 +40,9 @@ export function AchievementAnalyticsDashboard({
 }: AchievementAnalyticsDashboardProps) {
   const [timeframe, setTimeframe] = useState("30")
 
-  // Mock achievement data for demonstration
-  const mockAchievements: CustomAchievement[] = [
+  // Use passed achievements if available, otherwise show sample data for demo
+  // Sample achievement data for demonstration when no real data exists
+  const sampleAchievements: CustomAchievement[] = [
     {
       id: "1",
       name: "Revenue Champion",
@@ -113,8 +114,12 @@ export function AchievementAnalyticsDashboard({
     },
   ]
 
-  // Mock earned achievements data
-  const mockEarnedAchievements = [
+  // Use props or fall back to sample data
+  const displayAchievements = achievements && achievements.length > 0 ? achievements : sampleAchievements
+  const isUsingDemoData = !achievements || achievements.length === 0
+
+  // Sample earned achievements data (only used in demo mode)
+  const sampleEarnedAchievements = [
     { userId: "1", achievementId: "1", earnedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() },
     { userId: "2", achievementId: "1", earnedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
     { userId: "3", achievementId: "2", earnedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() },
@@ -122,14 +127,25 @@ export function AchievementAnalyticsDashboard({
     { userId: "4", achievementId: "2", earnedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
   ]
 
-  const activeAchievements = mockAchievements.filter((a) => a.isActive)
-  const totalEarned = mockEarnedAchievements.length
-  const totalRewards = mockEarnedAchievements.reduce((sum, earned) => {
-    const achievement = mockAchievements.find((a) => a.id === earned.achievementId)
+  // In demo mode, use sample data; otherwise, build earned achievements from users
+  const earnedAchievements = isUsingDemoData
+    ? sampleEarnedAchievements
+    : users.flatMap(user =>
+        user.achievements.map(ach => ({
+          userId: user.id,
+          achievementId: ach.id || ach.title,
+          earnedAt: ach.unlockedAt || new Date().toISOString()
+        }))
+      )
+
+  const activeAchievements = displayAchievements.filter((a) => a.isActive)
+  const totalEarned = earnedAchievements.length
+  const totalRewards = earnedAchievements.reduce((sum, earned) => {
+    const achievement = displayAchievements.find((a) => a.id === earned.achievementId)
     return sum + (achievement?.rewards.bonusAmount || 0)
   }, 0)
   const engagementRate =
-    users.length > 0 ? (new Set(mockEarnedAchievements.map((e) => e.userId)).size / users.length) * 100 : 0
+    users.length > 0 ? (new Set(earnedAchievements.map((e) => e.userId)).size / users.length) * 100 : 0
 
   // Achievement categories for overview
   const achievementCategories = [
@@ -140,9 +156,9 @@ export function AchievementAnalyticsDashboard({
   ]
 
   // Most popular achievements
-  const popularAchievements = mockAchievements
+  const popularAchievements = displayAchievements
     .map((achievement) => {
-      const earnedCount = mockEarnedAchievements.filter((e) => e.achievementId === achievement.id).length
+      const earnedCount = earnedAchievements.filter((e) => e.achievementId === achievement.id).length
       const successRate = users.length > 0 ? (earnedCount / users.length) * 100 : 0
       return {
         ...achievement,
@@ -153,15 +169,15 @@ export function AchievementAnalyticsDashboard({
     .sort((a, b) => b.earnedCount - a.earnedCount)
 
   // Performance data for charts
-  const performanceData = mockAchievements.map((achievement) => ({
+  const performanceData = displayAchievements.map((achievement) => ({
     name: achievement.name.substring(0, 15) + "...",
-    earned: mockEarnedAchievements.filter((e) => e.achievementId === achievement.id).length,
+    earned: earnedAchievements.filter((e) => e.achievementId === achievement.id).length,
     successRate:
       users.length > 0
-        ? (mockEarnedAchievements.filter((e) => e.achievementId === achievement.id).length / users.length) * 100
+        ? (earnedAchievements.filter((e) => e.achievementId === achievement.id).length / users.length) * 100
         : 0,
     rewards:
-      mockEarnedAchievements.filter((e) => e.achievementId === achievement.id).length *
+      earnedAchievements.filter((e) => e.achievementId === achievement.id).length *
       (achievement.rewards.bonusAmount || 0),
   }))
 
@@ -178,9 +194,9 @@ export function AchievementAnalyticsDashboard({
   // Top earners leaderboard
   const topEarners = users
     .map((user) => {
-      const userAchievements = mockEarnedAchievements.filter((e) => e.userId === user.id)
-      const totalRewards = userAchievements.reduce((sum, earned) => {
-        const achievement = mockAchievements.find((a) => a.id === earned.achievementId)
+      const userAchievements = earnedAchievements.filter((e) => e.userId === user.id)
+      const userTotalRewards = userAchievements.reduce((sum, earned) => {
+        const achievement = displayAchievements.find((a) => a.id === earned.achievementId)
         return sum + (achievement?.rewards.bonusAmount || 0)
       }, 0)
       const lastEarned =
@@ -189,7 +205,7 @@ export function AchievementAnalyticsDashboard({
       return {
         ...user,
         achievementCount: userAchievements.length,
-        totalRewards,
+        totalRewards: userTotalRewards,
         lastEarned: lastEarned > 0 ? new Date(lastEarned) : null,
       }
     })
@@ -238,7 +254,7 @@ export function AchievementAnalyticsDashboard({
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Achievements</p>
                 <p className="text-3xl font-bold text-gray-900">{activeAchievements.length}</p>
-                <p className="text-sm text-gray-500">{mockAchievements.length - activeAchievements.length} inactive</p>
+                <p className="text-sm text-gray-500">{displayAchievements.length - activeAchievements.length} inactive{isUsingDemoData && " (demo)"}</p>
               </div>
               <Award className="h-12 w-12 text-blue-500" />
             </div>

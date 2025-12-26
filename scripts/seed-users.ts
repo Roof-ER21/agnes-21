@@ -20,12 +20,14 @@ const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
-// Default users to seed
+// Default users to seed (production-ready accounts only)
+// Note: Demo users removed - these are admin accounts only
 const defaultUsers = [
   {
     name: 'Admin',
     pin: '2121',
     role: 'manager' as const,
+    division: 'insurance' as const,
     avatar: '👔',
     email: 'admin@theroofdocs.com',
   },
@@ -33,22 +35,9 @@ const defaultUsers = [
     name: 'Manager',
     pin: '2121',
     role: 'manager' as const,
+    division: 'insurance' as const,
     avatar: '👨‍💼',
     email: 'manager@theroofdocs.com',
-  },
-  {
-    name: 'Trainee',
-    pin: '1357',
-    role: 'trainee' as const,
-    avatar: '🎓',
-    email: null,
-  },
-  {
-    name: 'Demo',
-    pin: '0101',
-    role: 'trainee' as const,
-    avatar: '⭐',
-    email: null,
   },
 ];
 
@@ -76,6 +65,7 @@ async function seedUsers() {
       name: userData.name,
       email: userData.email,
       role: userData.role,
+      division: userData.division,
       pinHash: pinHash,
       avatar: userData.avatar,
       createdAt: new Date(),
@@ -89,11 +79,9 @@ async function seedUsers() {
   }
 
   console.log('\n🎉 Seed complete!\n');
-  console.log('Default logins:');
-  console.log('  Admin    / 2121 (manager)');
-  console.log('  Manager  / 2121 (manager)');
-  console.log('  Trainee  / 1357 (trainee)');
-  console.log('  Demo     / 0101 (trainee)');
+  console.log('Default admin logins:');
+  console.log('  Admin    / 2121 (manager, insurance)');
+  console.log('  Manager  / 2121 (manager, insurance)');
 }
 
 // Run the seed

@@ -141,7 +141,7 @@ router.get('/trends', authenticateToken, requireManager, async (_req: AuthReques
       .from(schema.trainingSessions)
       .where(gte(schema.trainingSessions.createdAt, startOfMonth))
       .groupBy(schema.trainingSessions.userId)
-      .orderBy(sql`total_xp DESC`)
+      .orderBy(desc(sql<number>`COALESCE(SUM(${schema.trainingSessions.xpEarned}), 0)`))
       .limit(10);
 
     // Get user details
