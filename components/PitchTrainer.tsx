@@ -339,8 +339,22 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                 const wasRequestingScore = isRequestingScoreRef.current;
 
                 // Parse score ONLY if we explicitly requested it (prevents interim scores)
-                const scoreMatch = textContent.match(/AGNES SCORE:?\s*(\d+)/i);
-                const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
+                // Check multiple formats the AI might return
+                const scorePatterns = [
+                  /AGNES SCORE:?\s*(\d+)/i,                    // "AGNES SCORE: 85" or "AGNES SCORE 85"
+                  /(?:final\s+)?score:?\s*(\d+)\s*(?:\/\s*100)?/i,  // "Score: 85" or "Final Score: 85/100"
+                  /(\d+)\s*(?:\/\s*100|\s*out\s+of\s+100|\s*points)/i,  // "85/100" or "85 out of 100" or "85 points"
+                  /you(?:'ve)?\s+(?:scored|earned|got)\s+(\d+)/i  // "You scored 85" or "You've earned 85"
+                ];
+
+                let scoreMatch: RegExpMatchArray | null = null;
+                for (const pattern of scorePatterns) {
+                  scoreMatch = textContent.match(pattern);
+                  if (scoreMatch) break;
+                }
+                const parsedScore = scoreMatch ? parseInt(scoreMatch[1]) : null;
+                // Validate score is in reasonable range (0-100)
+                const score = (parsedScore !== null && parsedScore >= 0 && parsedScore <= 100) ? parsedScore : null;
 
                 // Only update currentScore if we explicitly requested scoring
                 if (score !== null && wasRequestingScore) {
@@ -1054,9 +1068,12 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
     return new Promise<void>(async (resolve) => {
       try {
-        // Clean up the text (remove score markers, etc.)
+        // Clean up the text (remove score markers in all formats, etc.)
         const cleanText = text
           .replace(/AGNES SCORE:?\s*\d+/gi, '')
+          .replace(/(?:final\s+)?score:?\s*\d+\s*(?:\/\s*100)?/gi, '')
+          .replace(/\d+\s*(?:\/\s*100|\s*out\s+of\s+100|\s*points)/gi, '')
+          .replace(/you(?:'ve)?\s+(?:scored|earned|got)\s+\d+/gi, '')
           .replace(/\n{3,}/g, '\n\n')
           .trim();
 
