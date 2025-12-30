@@ -335,3 +335,12 @@ button:active, a:active {
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out forwards;
 }
+
+/* ===== Mobile Safe Area Utilities ===== */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0);
+}

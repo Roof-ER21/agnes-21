@@ -1268,7 +1268,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   return (
     <div className="relative h-screen w-full bg-black flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 p-6 z-10 flex justify-between items-center bg-gradient-to-b from-black/90 to-transparent">
+      <div className="absolute top-0 left-0 right-0 p-3 sm:p-4 md:p-6 z-10 flex justify-between items-center bg-gradient-to-b from-black/90 to-transparent">
         <div className="flex items-center space-x-3">
            <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-red-600 animate-pulse' : 'bg-neutral-600'}`}></div>
            <span className="font-mono font-bold text-white tracking-widest text-lg">AGNES 21 <span className="text-red-600">//</span> LIVE</span>
@@ -1309,7 +1309,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                const newState = toggleSounds();
                setSoundsOn(newState);
              }}
-             className="p-2 rounded-full bg-neutral-900/50 border border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700 transition-all duration-300"
+             className="p-2.5 sm:p-2 min-w-[44px] min-h-[44px] rounded-full bg-neutral-900/50 border border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700 transition-all duration-300 flex items-center justify-center"
              title={soundsOn ? 'Mute celebration sounds' : 'Enable celebration sounds'}
              aria-label={soundsOn ? 'Mute celebration sounds' : 'Enable celebration sounds'}
            >
@@ -1327,7 +1327,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                  setUseCustomVoice(!useCustomVoice);
                }
              }}
-             className={`p-2 rounded-full transition-all duration-300 relative ${
+             className={`p-2.5 sm:p-2 min-w-[44px] min-h-[44px] rounded-full transition-all duration-300 relative flex items-center justify-center ${
                ttsAvailable === null
                  ? 'bg-neutral-900/50 border border-neutral-800 text-neutral-600 cursor-wait'
                  : !ttsAvailable
@@ -1382,7 +1382,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
            {/* Keyboard Hints Toggle */}
            <button
              onClick={() => setShowKeyboardHints(!showKeyboardHints)}
-             className="p-2 rounded-full bg-neutral-900/50 border border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700 text-neutral-400 hover:text-white transition-all duration-300"
+             className="p-2.5 sm:p-2 min-w-[44px] min-h-[44px] rounded-full bg-neutral-900/50 border border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700 text-neutral-400 hover:text-white transition-all duration-300 flex items-center justify-center"
              title="Show keyboard shortcuts (or press ?)"
            >
              <Keyboard className="w-5 h-5" />
@@ -1394,7 +1394,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       <div className="flex-1 flex flex-col items-center justify-center relative p-6">
          
          {/* Visualizers Container */}
-         <div className="w-full max-w-5xl grid md:grid-cols-2 gap-12 items-center justify-items-center mb-10">
+         <div className="w-full max-w-5xl grid md:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center justify-items-center mb-6 sm:mb-10">
              
              {/* LEFT: USER */}
              <div className="flex flex-col items-center space-y-6">
@@ -1435,12 +1435,12 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
          </div>
 
          {/* Mic Level Meter - Positioned between user video and controls */}
-         <div className="absolute bottom-32 left-8 w-full max-w-xs z-20">
+         <div className="absolute bottom-24 sm:bottom-32 left-2 sm:left-4 md:left-8 w-full max-w-[280px] sm:max-w-xs z-20">
            <MicLevelMeter analyser={micAnalyserRef.current} isActive={!isMuted && isConnected} />
          </div>
          
          {/* Transcript Overlay (LEFT) */}
-         <div className={`absolute bottom-24 left-8 w-full max-w-md transition-all duration-500 ease-in-out ${isTranscriptExpanded ? 'h-[65vh] opacity-100' : 'h-14 opacity-90'} bg-neutral-900/90 backdrop-blur-xl border border-neutral-800 rounded-t-2xl overflow-hidden flex flex-col shadow-2xl z-30`}>
+         <div className={`absolute bottom-20 sm:bottom-24 left-2 sm:left-4 md:left-8 w-full max-w-[calc(100vw-1rem)] sm:max-w-xs md:max-w-md transition-all duration-500 ease-in-out ${isTranscriptExpanded ? 'h-[65vh] opacity-100' : 'h-14 opacity-90'} bg-neutral-900/90 backdrop-blur-xl border border-neutral-800 rounded-t-2xl overflow-hidden flex flex-col shadow-2xl z-30`}>
             <button
               onClick={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
               className="w-full p-4 flex items-center justify-between text-neutral-400 hover:text-white border-b border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800 transition-colors"
@@ -1489,7 +1489,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
          </div>
 
          {/* Script Overlay (RIGHT) */}
-         <div className={`absolute bottom-24 right-8 w-full max-w-md transition-all duration-500 ease-in-out ${isScriptExpanded ? 'h-[65vh] opacity-100' : 'h-14 opacity-90'} bg-neutral-900/90 backdrop-blur-xl border border-neutral-800 rounded-t-2xl overflow-hidden flex flex-col shadow-2xl z-30`}>
+         <div className={`absolute bottom-20 sm:bottom-24 right-2 sm:right-4 md:right-8 w-full max-w-[calc(100vw-1rem)] sm:max-w-xs md:max-w-md transition-all duration-500 ease-in-out ${isScriptExpanded ? 'h-[65vh] opacity-100' : 'h-14 opacity-90'} bg-neutral-900/90 backdrop-blur-xl border border-neutral-800 rounded-t-2xl overflow-hidden flex flex-col shadow-2xl z-30`}>
             <button
               onClick={() => setIsScriptExpanded(!isScriptExpanded)}
               className="w-full p-4 flex items-center justify-between text-neutral-400 hover:text-white border-b border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800 transition-colors"
@@ -1507,12 +1507,12 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       </div>
 
       {/* Bottom Controls */}
-      <div className="h-24 bg-black border-t border-neutral-900 flex items-center justify-center space-x-6 z-20">
+      <div className="h-20 sm:h-24 bg-black border-t border-neutral-900 flex items-center justify-center space-x-3 sm:space-x-6 z-20 pb-safe">
           {/* Voice Mode Toggle */}
           <div className="flex items-center bg-neutral-900/80 rounded-lg p-1 border border-neutral-700">
             <button
               onClick={() => { setVoiceMode('continuous'); setIsMuted(false); }}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center space-x-1 ${
+              className={`px-3 py-2.5 sm:py-1.5 rounded text-xs font-medium transition-all flex items-center space-x-1 min-h-[44px] sm:min-h-0 ${
                 voiceMode === 'continuous'
                   ? 'bg-emerald-600 text-white'
                   : 'text-neutral-400 hover:text-white'
@@ -1524,7 +1524,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
             </button>
             <button
               onClick={() => { setVoiceMode('push-to-talk'); setIsMuted(true); }}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center space-x-1 ${
+              className={`px-3 py-2.5 sm:py-1.5 rounded text-xs font-medium transition-all flex items-center space-x-1 min-h-[44px] sm:min-h-0 ${
                 voiceMode === 'push-to-talk'
                   ? 'bg-blue-600 text-white'
                   : 'text-neutral-400 hover:text-white'
@@ -1551,6 +1551,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
               onMouseLeave={handlePTTEnd}
               onTouchStart={handlePTTStart}
               onTouchEnd={handlePTTEnd}
+              onTouchCancel={handlePTTEnd}
               className={`p-5 rounded-full transition-all duration-150 flex flex-col items-center ${
                 isPTTActive
                   ? 'bg-emerald-500 text-white scale-110 shadow-[0_0_30px_rgba(16,185,129,0.5)]'
@@ -1632,8 +1633,8 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
       {/* Scoring Overlay - Shows when Agnes is scoring */}
       {isRequestingScore && (
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center">
-          <div className="bg-neutral-900/95 border border-yellow-500/30 rounded-2xl p-8 shadow-2xl shadow-yellow-500/10 max-w-md text-center animate-pulse">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+          <div className="bg-neutral-900/95 border border-yellow-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-8 shadow-2xl shadow-yellow-500/10 max-w-[calc(100vw-2rem)] sm:max-w-md text-center animate-pulse">
             <div className="flex justify-center mb-4">
               <div className="relative">
                 <div className="absolute inset-0 w-16 h-16 bg-yellow-500/30 rounded-full animate-ping" />
@@ -1664,7 +1665,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
       {/* Keyboard Shortcuts Panel */}
       {showKeyboardHints && (
-        <div className="absolute top-24 right-8 bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-xl p-6 shadow-2xl z-50 max-w-sm">
+        <div className="absolute top-20 sm:top-24 right-2 sm:right-4 md:right-8 bg-neutral-900/95 backdrop-blur-xl border border-neutral-800 rounded-xl p-4 sm:p-6 shadow-2xl z-50 max-w-[calc(100vw-1rem)] sm:max-w-xs md:max-w-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-bold tracking-wider text-sm flex items-center space-x-2">
               <Keyboard className="w-4 h-4 text-blue-400" />
@@ -1727,14 +1728,14 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       {/* End Session Confirmation Modal */}
       {showEndSessionModal && (
         <div
-          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-8"
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-8"
           role="dialog"
           aria-modal="true"
           aria-labelledby="end-session-title"
           aria-describedby="end-session-description"
         >
           <div
-            className="bg-neutral-900 rounded-xl border border-neutral-800 max-w-lg w-full p-6 space-y-6"
+            className="bg-neutral-900 rounded-xl border border-neutral-800 max-w-[calc(100vw-2rem)] sm:max-w-lg w-full p-4 sm:p-6 space-y-4 sm:space-y-6"
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 setShowEndSessionModal(false);
@@ -1845,14 +1846,14 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       {/* Post-Session Success Modal */}
       {showSuccessModal && (
         <div
-          className="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 flex items-center justify-center p-8"
+          className="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-8"
           role="dialog"
           aria-modal="true"
           aria-labelledby="success-title"
           aria-describedby="success-description"
         >
           <div
-            className="bg-neutral-900 rounded-xl border border-green-500/30 max-w-md w-full p-8 space-y-6 text-center"
+            className="bg-neutral-900 rounded-xl border border-green-500/30 max-w-[calc(100vw-2rem)] sm:max-w-md w-full p-4 sm:p-8 space-y-4 sm:space-y-6 text-center"
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 returnToHome();

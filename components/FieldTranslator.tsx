@@ -593,7 +593,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
     return (
       <div className="fixed inset-0 bg-black/95 z-50 flex flex-col">
         <div className="flex-1 overflow-y-auto p-4">
-          <div className="max-w-md mx-auto">
+          <div className="max-w-[calc(100vw-2rem)] sm:max-w-md mx-auto">
             <div className="text-center mb-6 pt-4">
               <Globe className="w-10 h-10 text-cyan-400 mx-auto mb-3" />
               <h2 className="text-lg font-bold text-white mb-1">
