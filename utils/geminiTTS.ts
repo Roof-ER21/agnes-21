@@ -207,6 +207,329 @@ Speak clearly and warmly like a professional translator.`
 const geminiEnglish = new GeminiEnglishTTS();
 
 // ============================================
+// Gemini TTS for ALL Languages (Premium Quality)
+// ============================================
+
+/**
+ * Gemini supported language codes for Live TTS API
+ * Maps our language/dialect codes to Gemini's BCP-47 language codes
+ */
+const GEMINI_TTS_LANGUAGES: Record<string, string> = {
+  // Primary languages (21 total)
+  'en': 'en-US',
+  'es': 'es-MX',  // Default to Mexican Spanish
+  'zh': 'cmn-CN', // Mandarin Chinese
+  'vi': 'vi-VN',
+  'ko': 'ko-KR',
+  'pt': 'pt-BR',  // Brazilian Portuguese
+  'ar': 'ar-XA',  // Arabic (general)
+  'fr': 'fr-FR',
+  'ru': 'ru-RU',
+  'tl': 'fil-PH', // Filipino/Tagalog
+  'hi': 'hi-IN',
+  'ja': 'ja-JP',
+  'de': 'de-DE',
+  'it': 'it-IT',
+  'pl': 'pl-PL',
+  'uk': 'uk-UA',
+  'th': 'th-TH',
+  'bn': 'bn-IN',  // Bengali
+  'fa': 'fa-IR',  // Persian/Farsi
+  'ht': 'fr-HT',  // Haitian Creole (use French as base, closest supported)
+  'pa': 'pa-IN',  // Punjabi
+
+  // Spanish dialects (5)
+  'es-mx': 'es-MX',  // Mexican
+  'es-pr': 'es-US',  // Puerto Rican (US Spanish)
+  'es-es': 'es-ES',  // Castilian
+  'es-ar': 'es-AR',  // Argentine
+  'es-co': 'es-CO',  // Colombian
+
+  // Arabic dialects (5)
+  'ar-eg': 'ar-EG',  // Egyptian
+  'ar-lb': 'ar-LB',  // Lebanese
+  'ar-sa': 'ar-SA',  // Saudi
+  'ar-ma': 'ar-MA',  // Moroccan
+  'ar-ae': 'ar-AE',  // Gulf/UAE
+};
+
+/**
+ * Gemini voice names optimized for each language
+ * Uses warm, professional voices suitable for business translation
+ */
+const GEMINI_VOICE_BY_LANGUAGE: Record<string, string> = {
+  // Romance languages - warm, melodic voices
+  'en': 'Kore',      // English - warm female
+  'es': 'Aoede',     // Spanish - natural, warm
+  'es-mx': 'Aoede',
+  'es-es': 'Aoede',
+  'es-ar': 'Aoede',
+  'es-co': 'Aoede',
+  'es-pr': 'Aoede',
+  'pt': 'Aoede',     // Portuguese
+  'fr': 'Aoede',     // French
+  'it': 'Aoede',     // Italian
+
+  // Germanic languages
+  'de': 'Fenrir',    // German
+
+  // Asian languages
+  'zh': 'Puck',      // Chinese
+  'ja': 'Puck',      // Japanese
+  'ko': 'Puck',      // Korean
+  'vi': 'Kore',      // Vietnamese
+  'th': 'Kore',      // Thai
+  'hi': 'Kore',      // Hindi
+  'bn': 'Kore',      // Bengali
+
+  // Slavic languages
+  'ru': 'Charon',    // Russian
+  'pl': 'Charon',    // Polish
+  'uk': 'Charon',    // Ukrainian
+
+  // Semitic languages
+  'ar': 'Charon',    // Arabic
+  'ar-eg': 'Charon',
+  'ar-lb': 'Charon',
+  'ar-sa': 'Charon',
+  'ar-ma': 'Charon',
+  'ar-ae': 'Charon',
+
+  // Other languages
+  'tl': 'Kore',      // Tagalog
+  'fa': 'Charon',    // Persian
+  'ht': 'Aoede',     // Haitian Creole (French-based, use warm voice)
+  'pa': 'Kore',      // Punjabi
+
+  // Default fallback
+  'default': 'Kore',
+};
+
+/**
+ * Multi-language Gemini TTS class
+ * Supports all languages with premium Gemini voices
+ */
+class GeminiMultiLanguageTTS {
+  private aiClient: GoogleGenAI | null = null;
+  private sessions: Map<string, any> = new Map();
+  private audioContext: AudioContext | null = null;
+  private audioQueue: AudioBufferSourceNode[] = [];
+  private resolveCallback: (() => void) | null = null;
+  private isInitialized: boolean = false;
+  private nextStartTime: number = 0;
+
+  async init(): Promise<boolean> {
+    if (this.isInitialized) return true;
+
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.warn('Gemini API key not found');
+        return false;
+      }
+
+      this.aiClient = new GoogleGenAI({ apiKey });
+
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      this.audioContext = new AudioContextClass({ sampleRate: 24000 });
+
+      this.isInitialized = true;
+      console.log('🌍 Gemini Multi-Language TTS initialized');
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize Gemini Multi-Language TTS:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get or create a session for a specific language
+   */
+  private async getSession(langCode: string): Promise<any> {
+    if (!this.aiClient) return null;
+
+    // Check for existing session
+    if (this.sessions.has(langCode)) {
+      return this.sessions.get(langCode);
+    }
+
+    try {
+      const geminiLangCode = GEMINI_TTS_LANGUAGES[langCode] || GEMINI_TTS_LANGUAGES['en'];
+      const voiceName = GEMINI_VOICE_BY_LANGUAGE[langCode] || GEMINI_VOICE_BY_LANGUAGE['default'];
+
+      console.log(`🔌 Connecting Gemini TTS for ${langCode} (${geminiLangCode}, voice: ${voiceName})...`);
+
+      const session = await this.aiClient.live.connect({
+        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        callbacks: {
+          onopen: () => {
+            console.log(`✅ Gemini TTS session opened for ${langCode}`);
+          },
+          onmessage: async (message: LiveServerMessage) => {
+            const serverContent = message.serverContent;
+
+            // Handle audio
+            const base64Audio = serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+            if (base64Audio) {
+              await this.playAudioChunk(base64Audio);
+            }
+
+            // Check if done
+            if (serverContent?.turnComplete) {
+              setTimeout(() => {
+                this.resolveCallback?.();
+                this.resolveCallback = null;
+              }, 200);
+            }
+          },
+          onclose: () => {
+            console.log(`Gemini TTS session closed for ${langCode}`);
+            this.sessions.delete(langCode);
+          },
+          onerror: (error) => {
+            console.error(`Gemini TTS error for ${langCode}:`, error);
+            this.sessions.delete(langCode);
+            this.resolveCallback?.();
+          }
+        },
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName } },
+            languageCode: geminiLangCode
+          },
+          systemInstruction: `You are Agnes, a professional multilingual translator.
+Your task is to read text aloud naturally in the target language.
+Do NOT add commentary or translate - just speak the exact text given.
+Speak clearly and warmly like a professional translator.
+Use natural pacing and intonation for the language.`
+        }
+      });
+
+      this.sessions.set(langCode, session);
+      return session;
+    } catch (error) {
+      console.error(`Failed to create Gemini session for ${langCode}:`, error);
+      return null;
+    }
+  }
+
+  private async playAudioChunk(base64Audio: string): Promise<void> {
+    if (!this.audioContext) return;
+
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+
+    try {
+      const audioBuffer = await decodeAudioData(
+        base64ToUint8Array(base64Audio),
+        this.audioContext
+      );
+
+      const source = this.audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.audioContext.destination);
+
+      const currentTime = this.audioContext.currentTime;
+      if (this.nextStartTime < currentTime) {
+        this.nextStartTime = currentTime;
+      }
+
+      source.start(this.nextStartTime);
+      this.nextStartTime += audioBuffer.duration;
+
+      this.audioQueue.push(source);
+      source.onended = () => {
+        const idx = this.audioQueue.indexOf(source);
+        if (idx > -1) this.audioQueue.splice(idx, 1);
+      };
+    } catch (error) {
+      console.error('Error playing audio:', error);
+    }
+  }
+
+  /**
+   * Check if a language is supported by Gemini TTS
+   */
+  isLanguageSupported(langCode: string): boolean {
+    return langCode in GEMINI_TTS_LANGUAGES;
+  }
+
+  /**
+   * Speak text in any supported language
+   */
+  async speak(text: string, langCode: string): Promise<boolean> {
+    if (!this.isInitialized) {
+      const ok = await this.init();
+      if (!ok) return false;
+    }
+
+    // Check if language is supported
+    if (!this.isLanguageSupported(langCode)) {
+      console.log(`⚠️ Language ${langCode} not supported by Gemini TTS`);
+      return false;
+    }
+
+    const session = await this.getSession(langCode);
+    if (!session) {
+      console.warn(`Gemini session not available for ${langCode}`);
+      return false;
+    }
+
+    console.log(`🔊 Gemini speaking in ${langCode}: "${text.substring(0, 50)}..."`);
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        console.warn(`Gemini speech timeout for ${langCode}`);
+        this.resolveCallback = null;
+        resolve(false);
+      }, 15000);
+
+      this.resolveCallback = () => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+
+      try {
+        session.sendClientContent({
+          turns: [{
+            role: 'user',
+            parts: [{ text: `Read this aloud: "${text}"` }]
+          }],
+          turnComplete: true
+        });
+      } catch (error) {
+        console.error(`Error sending to Gemini for ${langCode}:`, error);
+        clearTimeout(timeout);
+        resolve(false);
+      }
+    });
+  }
+
+  stop(): void {
+    this.audioQueue.forEach(s => { try { s.stop(); } catch {} });
+    this.audioQueue = [];
+    this.nextStartTime = 0;
+    this.resolveCallback?.();
+    this.resolveCallback = null;
+  }
+
+  async cleanup(): Promise<void> {
+    this.stop();
+    this.sessions.clear();
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      await this.audioContext.close();
+    }
+    this.audioContext = null;
+    this.isInitialized = false;
+  }
+}
+
+// Singleton for multi-language Gemini TTS
+const geminiMultiLang = new GeminiMultiLanguageTTS();
+
+// ============================================
 // Web Speech API for Other Languages
 // ============================================
 
@@ -249,18 +572,18 @@ const VOICE_PREFERENCES: Record<string, string[]> = {
   ar: ['laila', 'mariam', 'maged', 'siri', 'enhanced'],
   fr: ['amélie', 'amelie', 'audrey', 'siri', 'enhanced'],
   ru: ['milena', 'katya', 'yuri', 'siri', 'enhanced'],
-  tl: ['siri', 'enhanced'],
+  tl: ['siri', 'google filipino', 'microsoft', 'enhanced', 'google', 'natural'],
   hi: ['lekha', 'siri', 'enhanced'],
   ja: ['kyoko', 'otoya', 'siri', 'enhanced'],
   de: ['anna', 'petra', 'helena', 'siri', 'enhanced'],
   it: ['alice', 'federica', 'elsa', 'siri', 'enhanced'],
   pl: ['zosia', 'ewa', 'siri', 'enhanced'],
-  uk: ['siri', 'enhanced'],
-  fa: ['siri', 'enhanced'],
-  th: ['kanya', 'siri', 'enhanced'],
-  bn: ['siri', 'enhanced'],
-  ht: ['siri', 'enhanced'],
-  pa: ['siri', 'enhanced'],
+  uk: ['siri', 'lesya', 'enhanced'],
+  fa: ['siri', 'google farsi', 'google persian', 'microsoft', 'enhanced', 'natural'],
+  th: ['kanya', 'narisa', 'siri', 'google thai', 'microsoft', 'enhanced', 'natural'],
+  bn: ['siri', 'google bengali', 'google bangla', 'microsoft', 'enhanced', 'natural'],
+  ht: ['amélie', 'amelie', 'audrey', 'thomas', 'google french', 'microsoft french', 'french', 'enhanced', 'natural'],
+  pa: ['siri', 'google punjabi', 'google gurmukhi', 'microsoft', 'enhanced', 'natural'],
 };
 
 // Dialect-specific voice preferences (US-focused dialects)
@@ -452,11 +775,12 @@ const speakWithWebSpeech = async (
 // ============================================
 
 /**
- * Agnes speaks - uses Gemini for English, Web Speech for others
+ * Agnes speaks - uses Gemini TTS for all supported languages with premium quality
+ * Falls back to Web Speech API when Gemini is unavailable
  */
 export const agnesVoiceSpeak = async (
   text: string,
-  lang: SupportedLanguage = 'en',
+  lang: SupportedLanguage | SupportedDialect = 'en',
   options?: {
     onEnd?: () => void;
     onError?: (error: string) => void;
@@ -471,19 +795,24 @@ export const agnesVoiceSpeak = async (
 
   console.log(`🔊 Agnes speaking in ${lang}: "${text.substring(0, 50)}..."`);
 
-  // Try Gemini for English
-  if (lang === 'en') {
-    const success = await geminiEnglish.speak(text);
+  // Try Gemini TTS for all supported languages (premium quality)
+  if (geminiMultiLang.isLanguageSupported(lang)) {
+    const success = await geminiMultiLang.speak(text, lang);
     if (success) {
-      console.log('✅ Gemini English TTS success');
+      console.log(`✅ Gemini TTS success for ${lang}`);
       onEnd?.();
       return;
     }
-    console.log('⚠️ Gemini failed, falling back to Web Speech');
+    console.log(`⚠️ Gemini TTS failed for ${lang}, falling back to Web Speech`);
+  } else {
+    console.log(`ℹ️ Language ${lang} not in Gemini TTS, using Web Speech`);
   }
 
-  // Use Web Speech for other languages or as fallback
-  await speakWithWebSpeech(text, lang, onEnd, onError);
+  // Extract base language for Web Speech API
+  const baseLang = lang.includes('-') ? lang.split('-')[0] as SupportedLanguage : lang as SupportedLanguage;
+
+  // Use Web Speech for unsupported languages or as fallback
+  await speakWithWebSpeech(text, baseLang, onEnd, onError);
 };
 
 /**
@@ -491,6 +820,7 @@ export const agnesVoiceSpeak = async (
  */
 export const agnesVoiceStop = (): void => {
   geminiEnglish.stop();
+  geminiMultiLang.stop();
   speechSynthesis.cancel();
 };
 
@@ -507,9 +837,10 @@ export const isAgnesSpeaking = (): boolean => {
 export const initGeminiTTS = async (): Promise<void> => {
   await Promise.all([
     geminiEnglish.init(),
+    geminiMultiLang.init(),
     getVoices()
   ]);
-  console.log('🎤 Agnes voice system initialized (hybrid mode)');
+  console.log('🎤 Agnes voice system initialized (multi-language Gemini TTS + Web Speech fallback)');
 };
 
 /**
@@ -517,7 +848,10 @@ export const initGeminiTTS = async (): Promise<void> => {
  */
 export const cleanupGeminiTTS = async (): Promise<void> => {
   agnesVoiceStop();
-  await geminiEnglish.cleanup();
+  await Promise.all([
+    geminiEnglish.cleanup(),
+    geminiMultiLang.cleanup()
+  ]);
 };
 
 // Legacy exports

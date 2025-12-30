@@ -50,8 +50,8 @@ const PREMIUM_VOICES_BY_LANG: Record<string, string[]> = {
   fr: ['siri', 'amélie', 'amelie', 'thomas', 'audrey', 'marie'],
   // Russian
   ru: ['siri', 'milena', 'katya', 'yuri'],
-  // Tagalog
-  tl: ['siri'],
+  // Tagalog - Filipino voices + fallback to general
+  tl: ['siri', 'google filipino', 'microsoft', 'enhanced', 'google', 'natural'],
   // Hindi
   hi: ['siri', 'lekha', 'rishi'],
   // Japanese
@@ -64,16 +64,36 @@ const PREMIUM_VOICES_BY_LANG: Record<string, string[]> = {
   pl: ['siri', 'zosia', 'ewa'],
   // Ukrainian
   uk: ['siri', 'lesya'],
-  // Persian
-  fa: ['siri'],
-  // Thai
-  th: ['siri', 'kanya', 'narisa'],
-  // Bengali
-  bn: ['siri'],
-  // Haitian Creole
-  ht: [],
-  // Punjabi
-  pa: ['siri'],
+  // Persian - Farsi voices + fallback
+  fa: ['siri', 'google farsi', 'google persian', 'microsoft', 'enhanced', 'natural'],
+  // Thai - Kanya is macOS voice
+  th: ['siri', 'kanya', 'narisa', 'google thai', 'microsoft', 'enhanced', 'natural'],
+  // Bengali - Google/Microsoft have Bengali TTS
+  bn: ['siri', 'google bengali', 'google bangla', 'microsoft', 'enhanced', 'natural'],
+  // Haitian Creole - Use French-based voices as fallback (closely related)
+  ht: ['siri', 'amélie', 'amelie', 'audrey', 'thomas', 'google french', 'microsoft french', 'french', 'enhanced', 'natural'],
+  // Punjabi - Google/Microsoft have Punjabi TTS
+  pa: ['siri', 'google punjabi', 'google gurmukhi', 'microsoft', 'enhanced', 'natural'],
+};
+
+/**
+ * Dialect-specific premium voice preferences
+ * These override base language when a dialect is selected
+ */
+const DIALECT_VOICE_PREFERENCES: Record<string, string[]> = {
+  // Spanish dialects - US focus with regional preferences
+  'es-mx': ['paulina', 'juan', 'mónica', 'monica', 'siri', 'enhanced', 'natural'],      // Mexican
+  'es-pr': ['paulina', 'mónica', 'monica', 'siri', 'enhanced', 'natural'],              // Puerto Rican (Caribbean)
+  'es-es': ['jorge', 'mónica', 'monica', 'lucia', 'siri', 'enhanced', 'natural'],       // Castilian Spanish
+  'es-ar': ['diego', 'mónica', 'monica', 'siri', 'enhanced', 'natural'],                // Argentine
+  'es-co': ['mónica', 'monica', 'paulina', 'siri', 'enhanced', 'natural'],              // Colombian
+
+  // Arabic dialects - regional voice preferences
+  'ar-eg': ['laila', 'maged', 'majed', 'tarik', 'siri', 'enhanced', 'natural'],         // Egyptian
+  'ar-lb': ['laila', 'mariam', 'siri', 'enhanced', 'natural'],                          // Lebanese
+  'ar-sa': ['maged', 'majed', 'mishaal', 'siri', 'enhanced', 'natural'],                // Saudi
+  'ar-ma': ['laila', 'mariam', 'siri', 'enhanced', 'natural'],                          // Moroccan
+  'ar-ae': ['maged', 'majed', 'mishaal', 'siri', 'enhanced', 'natural'],                // Gulf (UAE)
 };
 
 /**
@@ -94,14 +114,34 @@ const PREMIUM_VOICE_KEYWORDS = [
 ];
 
 /**
- * Get the best voice for a language - prioritizes natural-sounding voices
+ * Get the best voice for a language OR dialect - prioritizes natural-sounding voices
+ * Now supports full dialect codes (e.g., 'es-mx', 'ar-eg') for regional voice selection
  */
-export const getBestVoice = (langCode: SupportedLanguage): SpeechSynthesisVoice | null => {
-  const voices = getVoicesForLanguage(langCode);
+export const getBestVoice = (langOrDialect: SupportedLanguage | SupportedDialect | string): SpeechSynthesisVoice | null => {
+  // Determine base language and dialect preferences
+  const isDialect = langOrDialect.includes('-');
+  const baseLangCode = isDialect
+    ? langOrDialect.split('-')[0] as SupportedLanguage
+    : langOrDialect as SupportedLanguage;
+
+  const voices = getVoicesForLanguage(baseLangCode);
   if (voices.length === 0) return null;
 
-  // Get language-specific premium voices
-  const langPremiumVoices = PREMIUM_VOICES_BY_LANG[langCode] || [];
+  // Get voice preferences - prefer dialect-specific if available
+  const dialectVoices = isDialect ? DIALECT_VOICE_PREFERENCES[langOrDialect] : undefined;
+  const langPremiumVoices = PREMIUM_VOICES_BY_LANG[baseLangCode] || [];
+  const preferredVoices = dialectVoices || langPremiumVoices;
+
+  // Get the expected voice code for this dialect/language
+  let expectedVoiceCode: string | undefined;
+  if (isDialect) {
+    const dialectConfig = DIALECT_VARIANTS.find(d => d.code === langOrDialect);
+    expectedVoiceCode = dialectConfig?.voiceCode;
+  }
+  if (!expectedVoiceCode) {
+    const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === baseLangCode);
+    expectedVoiceCode = langConfig?.voiceCode;
+  }
 
   // Score voices based on quality indicators
   const scoredVoices = voices.map(voice => {
@@ -118,19 +158,27 @@ export const getBestVoice = (langCode: SupportedLanguage): SpeechSynthesisVoice 
       score += 300;
     }
 
-    // HIGH: Language-specific premium voice names
-    if (langPremiumVoices.some(pv => nameLower.includes(pv))) {
-      score += 200;
+    // HIGH: Dialect/Language-specific premium voice names
+    preferredVoices.forEach((pv, idx) => {
+      if (nameLower.includes(pv.toLowerCase())) {
+        // Higher score for earlier preferences (more preferred)
+        score += 200 - (idx * 10);
+      }
+    });
+
+    // BONUS: Voice matches exact dialect voice code (e.g., es-MX for Mexican Spanish)
+    if (expectedVoiceCode && voice.lang.toLowerCase() === expectedVoiceCode.toLowerCase()) {
+      score += 150; // Strong preference for exact dialect match
     }
 
     // MEDIUM: General premium keywords (neural, natural)
     if (nameLower.includes('neural') || nameLower.includes('natural')) {
-      score += 150;
+      score += 100;
     }
 
     // General premium keywords
     if (PREMIUM_VOICE_KEYWORDS.some(kw => nameLower.includes(kw))) {
-      score += 100;
+      score += 75;
     }
 
     // Prefer non-compact voices (fuller, more natural sound)
@@ -141,12 +189,6 @@ export const getBestVoice = (langCode: SupportedLanguage): SpeechSynthesisVoice 
     // Prefer local Apple voices over network Google voices
     if (voice.localService && !nameLower.startsWith('google')) {
       score += 40;
-    }
-
-    // Prefer voices that match the exact locale
-    const langConfig = SUPPORTED_LANGUAGES.find(l => l.code === langCode);
-    if (langConfig && voice.lang === langConfig.voiceCode) {
-      score += 25;
     }
 
     // PENALIZE Google voices - they tend to sound more robotic
@@ -171,7 +213,7 @@ export const getBestVoice = (langCode: SupportedLanguage): SpeechSynthesisVoice 
   scoredVoices.sort((a, b) => b.score - a.score);
 
   // Log top 3 choices for debugging
-  console.log(`Voice options for ${langCode}:`,
+  console.log(`Voice options for ${langOrDialect}:`,
     scoredVoices.slice(0, 3).map(v => `${v.voice.name} (${v.score})`).join(', ')
   );
 
@@ -417,8 +459,8 @@ export const speak = (
   utterance.pitch = options?.pitch ?? voiceSettings.pitch;
   utterance.volume = options?.volume ?? 1;
 
-  // Try to set the best voice for the base language
-  const voice = getBestVoice(baseLangCode);
+  // Try to set the best voice - use full dialect code for regional voice selection
+  const voice = getBestVoice(langCode);
   if (voice) {
     utterance.voice = voice;
     console.log(`Using voice: ${voice.name} (${voice.lang}) for ${langCode}`);
