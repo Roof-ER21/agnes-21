@@ -457,9 +457,9 @@ Use natural pacing and intonation for the language.`
   }
 
   /**
-   * Speak text in any supported language
+   * Speak text in any supported language with retry support
    */
-  async speak(text: string, langCode: string): Promise<boolean> {
+  async speak(text: string, langCode: string, retryCount: number = 0): Promise<boolean> {
     if (!this.isInitialized) {
       const ok = await this.init();
       if (!ok) return false;
@@ -471,20 +471,28 @@ Use natural pacing and intonation for the language.`
       return false;
     }
 
+    // Clear any stale sessions for this language before getting a new one
+    if (retryCount > 0) {
+      this.sessions.delete(langCode);
+    }
+
     const session = await this.getSession(langCode);
     if (!session) {
       console.warn(`Gemini session not available for ${langCode}`);
       return false;
     }
 
-    console.log(`🔊 Gemini speaking in ${langCode}: "${text.substring(0, 50)}..."`);
+    console.log(`🔊 Gemini speaking in ${langCode}: "${text.substring(0, 50)}..."${retryCount > 0 ? ` (retry ${retryCount})` : ''}`);
 
-    return new Promise((resolve) => {
+    // Use longer timeout for non-English languages (30s vs 15s)
+    const timeoutMs = langCode === 'en' ? 15000 : 30000;
+
+    const success = await new Promise<boolean>((resolve) => {
       const timeout = setTimeout(() => {
         console.warn(`Gemini speech timeout for ${langCode}`);
         this.resolveCallback = null;
         resolve(false);
-      }, 15000);
+      }, timeoutMs);
 
       this.resolveCallback = () => {
         clearTimeout(timeout);
@@ -505,6 +513,14 @@ Use natural pacing and intonation for the language.`
         resolve(false);
       }
     });
+
+    // Retry once for non-English languages if failed
+    if (!success && retryCount < 1 && langCode !== 'en') {
+      console.log(`🔄 Retrying Gemini TTS for ${langCode}...`);
+      return this.speak(text, langCode, retryCount + 1);
+    }
+
+    return success;
   }
 
   stop(): void {

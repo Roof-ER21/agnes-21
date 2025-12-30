@@ -247,9 +247,17 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       // Use Gemini to detect language with dialect recognition
       const detection = await detectLanguageWithDialect(spokenText);
 
-      if (!detection || detection.language === 'en') {
-        // Couldn't detect or detected English - ask to select manually
+      if (!detection) {
+        // Truly couldn't detect - ask to select manually
         await agnesSpeak("I couldn't determine the language. Please select it manually.", 'en');
+        setIsAutoDetecting(false);
+        setShowLanguageSelect(true);
+        return;
+      }
+
+      if (detection.language === 'en') {
+        // Detected English - the homeowner speaks English, no translation needed
+        await agnesSpeak("The homeowner appears to speak English. If they speak another language, please select it now.", 'en');
         setIsAutoDetecting(false);
         setShowLanguageSelect(true);
         return;
@@ -277,8 +285,8 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       // Now introduce Agnes to homeowner in their language
       await naturalPause(500);
       setAgnesState('introducing');
-      const intro = getAgnesHomeownerIntro(detectedLang);
-      await agnesSpeak(intro, detectedLang);
+      const intro = getAgnesHomeownerIntro(detection.language);
+      await agnesSpeak(intro, detection.language);
 
       if (!sessionActiveRef.current) return;
 
@@ -805,6 +813,24 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
                 </span>
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Skip Auto-Detect Button - shown during detection phase */}
+        {isAutoDetecting && agnesState === 'detecting' && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => {
+                stopListening();
+                agnesVoiceStop();
+                setIsAutoDetecting(false);
+                setShowLanguageSelect(true);
+              }}
+              className="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2 mx-auto min-h-[44px]"
+            >
+              <Globe className="w-4 h-4 text-cyan-400" />
+              Skip - Choose Language Manually
+            </button>
           </div>
         )}
 
