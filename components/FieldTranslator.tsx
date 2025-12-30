@@ -461,16 +461,17 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
       if (!sessionActiveRef.current) return;
 
-      // Step 2: Show language selection
-      setShowLanguageSelect(true);
-      setAgnesState('detecting');
+      // Step 2: Auto-start language detection (no modal needed)
+      // Agnes will listen and automatically detect the homeowner's language
+      // Falls back to manual selection only if auto-detect fails
+      handleAutoDetect();
 
     } catch (error) {
       console.error('Session start error:', error);
       setAgnesState('idle');
       sessionActiveRef.current = false;
     }
-  }, [speechSupported, agnesSpeak]);
+  }, [speechSupported, agnesSpeak, handleAutoDetect]);
 
   // ============================================
   // End Session
@@ -744,12 +745,28 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
           <span className="text-sm">Back</span>
         </button>
 
-        <button
-          onClick={endSession}
-          className="px-4 py-1.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/40 rounded-full text-red-400 text-sm transition-colors"
-        >
-          End Session
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Manual Language Select Button */}
+          <button
+            onClick={() => setShowLanguageSelect(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-full text-neutral-300 text-sm transition-colors"
+            title="Select language manually"
+          >
+            <Globe className="w-4 h-4" />
+            {selectedLanguage ? (
+              <span>{getLanguageFlag(selectedLanguage)}</span>
+            ) : (
+              <span className="text-xs">Language</span>
+            )}
+          </button>
+
+          <button
+            onClick={endSession}
+            className="px-4 py-1.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/40 rounded-full text-red-400 text-sm transition-colors"
+          >
+            End Session
+          </button>
+        </div>
       </div>
 
       {/* Agnes Status Area */}

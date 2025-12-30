@@ -30,7 +30,7 @@ import { playSuccess, playPerfect, playLevelUp, toggleSounds, areSoundsEnabled }
 import { useAuth } from '../contexts/AuthContext';
 import { checkTTSHealth, generateSpeech, DEFAULT_FEEDBACK_VOICE, speakWithChatterbox } from '../utils/chatterboxTTS';
 import { createVAD, startVAD, stopVAD, pauseVAD, createFallbackVAD } from '../utils/vadUtils';
-import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle, Sparkles, AlertTriangle, Volume2, VolumeX, Wand2 } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle, Sparkles, AlertTriangle, Volume2, VolumeX, Wand2, Hand } from 'lucide-react';
 import XPBar from './XPBar';
 import LevelUpModal from './LevelUpModal';
 import { calculateSessionXP, awardXP, getUserProgress } from '../utils/gamification';
@@ -112,6 +112,19 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const SILENCE_TIMEOUT_MS = 5000; // 5 seconds of silence = end of speech (increased for longer pitches)
   const [isSpeakingCustom, setIsSpeakingCustom] = useState(false);
 
+  // NEW: Push-to-Talk (PTT) mode
+  type VoiceMode = 'continuous' | 'push-to-talk';
+  const [voiceMode, setVoiceMode] = useState<VoiceMode>('continuous');
+  const [isPTTActive, setIsPTTActive] = useState(false);
+  const isPTTActiveRef = useRef(false); // Ref for async callbacks
+  const voiceModeRef = useRef<VoiceMode>('continuous'); // Ref for async callbacks
+
+  // NEW: Reconnection logic
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const MAX_RECONNECT_ATTEMPTS = 3;
+  const RECONNECT_DELAY_MS = 2000;
+
   // NEW: Level-up modal state
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [levelUpData, setLevelUpData] = useState<{
@@ -153,17 +166,46 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       case DifficultyLevel.BEGINNER: return 'text-cyan-500';
       case DifficultyLevel.ROOKIE: return 'text-green-500';
       case DifficultyLevel.PRO: return 'text-yellow-500';
+      case DifficultyLevel.VETERAN: return 'text-orange-500';
       case DifficultyLevel.ELITE: return 'text-red-600';
-      case DifficultyLevel.NIGHTMARE: return 'text-orange-600';
       default: return 'text-white';
     }
   };
 
-  // NEW: Keyboard shortcuts
+  // Push-to-Talk handlers
+  const handlePTTStart = () => {
+    if (voiceMode !== 'push-to-talk') return;
+    setIsPTTActive(true);
+    setIsMuted(false);
+    // Clear any pending silence timeout
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+    console.log('🎤 PTT: Started recording');
+  };
+
+  const handlePTTEnd = () => {
+    if (voiceMode !== 'push-to-talk') return;
+    setIsPTTActive(false);
+    setIsMuted(true);
+    // Signal end of user speech so Agnes can respond
+    setIsSpeaking(false);
+    console.log('🎤 PTT: Stopped recording');
+  };
+
+  // NEW: Keyboard shortcuts (with PTT support)
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input field
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Spacebar for PTT (hold to talk)
+      if (e.key === ' ' && voiceMode === 'push-to-talk' && !e.repeat) {
+        e.preventDefault();
+        handlePTTStart();
         return;
       }
 
@@ -185,6 +227,18 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
             setUseCustomVoice(prev => !prev);
           }
           break;
+        case 'p':
+          // Toggle PTT mode
+          setVoiceMode(prev => {
+            const newMode = prev === 'continuous' ? 'push-to-talk' : 'continuous';
+            if (newMode === 'push-to-talk') {
+              setIsMuted(true); // Start muted in PTT mode
+            } else {
+              setIsMuted(false); // Unmute when switching to continuous
+            }
+            return newMode;
+          });
+          break;
         case 'escape':
           if (confirm('Are you sure you want to end this session?')) {
             handleEndSession();
@@ -198,12 +252,22 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       }
     };
 
-    window.addEventListener('keydown', handleKeyPress);
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // Release spacebar ends PTT
+      if (e.key === ' ' && voiceMode === 'push-to-talk') {
+        e.preventDefault();
+        handlePTTEnd();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyPress);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [voiceMode, ttsAvailable]);
 
   // NEW: Update Agnes state based on activity
   useEffect(() => {
@@ -244,6 +308,47 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   useEffect(() => {
     useCustomVoiceRef.current = useCustomVoice;
   }, [useCustomVoice]);
+
+  // Sync PTT refs with state (for async callbacks)
+  useEffect(() => {
+    isPTTActiveRef.current = isPTTActive;
+    voiceModeRef.current = voiceMode;
+  }, [isPTTActive, voiceMode]);
+
+  // Reconnection function
+  const attemptReconnect = async () => {
+    if (isReconnecting) return;
+
+    setIsReconnecting(true);
+    let attempts = connectionAttempts;
+
+    while (attempts < MAX_RECONNECT_ATTEMPTS) {
+      attempts++;
+      setConnectionAttempts(attempts);
+      setError(`🔄 Reconnecting... (${attempts}/${MAX_RECONNECT_ATTEMPTS})`);
+
+      try {
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, RECONNECT_DELAY_MS));
+
+        // Attempt to reinitialize the session
+        if (aiClientRef.current && streamRef.current) {
+          // Try to reconnect using existing resources
+          setError(null);
+          setIsReconnecting(false);
+          setConnectionAttempts(0);
+          console.log('✅ Reconnection successful');
+          return;
+        }
+      } catch (e) {
+        console.error(`Reconnection attempt ${attempts} failed:`, e);
+      }
+    }
+
+    // All attempts failed
+    setIsReconnecting(false);
+    setError('🌐 Connection failed after multiple attempts. Please refresh the page.');
+  };
 
   useEffect(() => {
     const initSession = async () => {
@@ -429,10 +534,32 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
             onclose: () => {
               console.log('Gemini Live Session Closed');
               setIsConnected(false);
+
+              // Attempt reconnection if session was active and not intentionally closed
+              if (sessionActiveRef.current && !isReconnecting) {
+                console.log('Unexpected disconnect, attempting reconnection...');
+                attemptReconnect();
+              }
             },
-            onerror: (err) => {
-              console.error('Gemini Live Error', err);
-              setError("Connection error. Please restart.");
+            onerror: (err: any) => {
+              const errorDetails = err?.message || String(err);
+              console.error('Gemini Live Error:', errorDetails);
+
+              // Specific error messages based on error type
+              if (errorDetails.includes('quota') || errorDetails.includes('rate limit')) {
+                setError('⚠️ API limit reached. Please wait a moment and try again.');
+              } else if (errorDetails.includes('network') || errorDetails.includes('WebSocket') || errorDetails.includes('connection')) {
+                // Network errors - try to reconnect
+                if (!isReconnecting && connectionAttempts < MAX_RECONNECT_ATTEMPTS) {
+                  attemptReconnect();
+                } else {
+                  setError('🌐 Connection lost. Please refresh the page.');
+                }
+              } else if (errorDetails.includes('auth') || errorDetails.includes('key')) {
+                setError('🔑 Authentication error. Please check your API key.');
+              } else {
+                setError(`❌ Connection error: ${errorDetails.slice(0, 100)}`);
+              }
             }
           },
           config: {
@@ -901,7 +1028,10 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     scriptProcessorRef.current = processor;
 
     processor.onaudioprocess = (e) => {
-      if (isMuted) return;
+      // In PTT mode, only send audio when button is held
+      if (voiceModeRef.current === 'push-to-talk' && !isPTTActiveRef.current) return;
+      // In continuous mode, respect mute state
+      if (voiceModeRef.current === 'continuous' && isMuted) return;
 
       const inputData = e.inputBuffer.getChannelData(0);
       const pcmBlob = createPcmBlob(inputData);
@@ -1377,15 +1507,62 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       </div>
 
       {/* Bottom Controls */}
-      <div className="h-24 bg-black border-t border-neutral-900 flex items-center justify-center space-x-8 z-20">
-          <button 
-            onClick={() => setIsMuted(!isMuted)}
-            className={`p-5 rounded-full transition-all duration-300 ${isMuted ? 'bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)]' : 'bg-neutral-900 text-neutral-400 border border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700 hover:text-white'}`}
-          >
-            {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-          </button>
-          
-          <button 
+      <div className="h-24 bg-black border-t border-neutral-900 flex items-center justify-center space-x-6 z-20">
+          {/* Voice Mode Toggle */}
+          <div className="flex items-center bg-neutral-900/80 rounded-lg p-1 border border-neutral-700">
+            <button
+              onClick={() => { setVoiceMode('continuous'); setIsMuted(false); }}
+              className={`px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center space-x-1 ${
+                voiceMode === 'continuous'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+              title="Continuous listening mode"
+            >
+              <Mic className="w-3 h-3" />
+              <span>Auto</span>
+            </button>
+            <button
+              onClick={() => { setVoiceMode('push-to-talk'); setIsMuted(true); }}
+              className={`px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center space-x-1 ${
+                voiceMode === 'push-to-talk'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+              title="Push-to-Talk mode (hold SPACE or button)"
+            >
+              <Hand className="w-3 h-3" />
+              <span>PTT</span>
+            </button>
+          </div>
+
+          {/* Mic Button (Continuous mode) or PTT Button (PTT mode) */}
+          {voiceMode === 'continuous' ? (
+            <button
+              onClick={() => setIsMuted(!isMuted)}
+              className={`p-5 rounded-full transition-all duration-300 ${isMuted ? 'bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)]' : 'bg-neutral-900 text-neutral-400 border border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700 hover:text-white'}`}
+            >
+              {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+            </button>
+          ) : (
+            <button
+              onMouseDown={handlePTTStart}
+              onMouseUp={handlePTTEnd}
+              onMouseLeave={handlePTTEnd}
+              onTouchStart={handlePTTStart}
+              onTouchEnd={handlePTTEnd}
+              className={`p-5 rounded-full transition-all duration-150 flex flex-col items-center ${
+                isPTTActive
+                  ? 'bg-emerald-500 text-white scale-110 shadow-[0_0_30px_rgba(16,185,129,0.5)]'
+                  : 'bg-neutral-800 text-neutral-400 border-2 border-dashed border-neutral-600 hover:border-emerald-500'
+              }`}
+              title="Hold to talk"
+            >
+              <Mic className={`w-6 h-6 ${isPTTActive ? 'animate-pulse' : ''}`} />
+            </button>
+          )}
+
+          <button
             onClick={() => setIsVideoEnabled(!isVideoEnabled)}
             className={`p-5 rounded-full transition-all duration-300 ${!isVideoEnabled ? 'bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)]' : 'bg-neutral-900 text-neutral-400 border border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700 hover:text-white'}`}
           >
@@ -1432,6 +1609,24 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 backdrop-blur text-white px-6 py-3 rounded-lg shadow-xl font-medium border border-red-500 flex items-center space-x-2 animate-bounce z-50">
           <X className="w-5 h-5" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* PTT Status Indicator */}
+      {voiceMode === 'push-to-talk' && (
+        <div className={`fixed bottom-28 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full text-sm font-medium transition-all z-30 ${
+          isPTTActive
+            ? 'bg-emerald-500/90 text-white shadow-lg shadow-emerald-500/30'
+            : 'bg-neutral-800/90 text-neutral-400 border border-neutral-700'
+        }`}>
+          {isPTTActive ? (
+            <span className="flex items-center space-x-2">
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+              <span>Recording...</span>
+            </span>
+          ) : (
+            <span>Hold SPACE or button to talk</span>
+          )}
         </div>
       )}
 
@@ -1507,6 +1702,16 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
               </span>
               <kbd className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-white font-mono text-xs">C</kbd>
             </div>
+            <div className="flex items-center justify-between py-2 border-b border-neutral-800">
+              <span className="text-neutral-400">Toggle PTT Mode</span>
+              <kbd className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-white font-mono text-xs">P</kbd>
+            </div>
+            {voiceMode === 'push-to-talk' && (
+              <div className="flex items-center justify-between py-2 border-b border-neutral-800 bg-blue-600/10 -mx-2 px-2 rounded">
+                <span className="text-blue-400">Hold to Talk (PTT)</span>
+                <kbd className="px-2 py-1 bg-blue-800 border border-blue-600 rounded text-white font-mono text-xs">SPACE</kbd>
+              </div>
+            )}
             <div className="flex items-center justify-between py-2 border-b border-neutral-800">
               <span className="text-neutral-400">End Session</span>
               <kbd className="px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-white font-mono text-xs">ESC</kbd>
