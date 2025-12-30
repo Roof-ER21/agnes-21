@@ -24,6 +24,7 @@ const LoginScreen: React.FC = () => {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [role, setRole] = useState<'trainee' | 'manager'>('trainee');
+  const [division, setDivision] = useState<'insurance' | 'retail'>('insurance');
   const [avatar, setAvatar] = useState(getRandomAvatar());
   const [showPin, setShowPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
@@ -102,8 +103,8 @@ const LoginScreen: React.FC = () => {
           return;
         }
 
-        createUser(name.trim(), pin, role, avatar);
-        setSuccess(`Account created! Welcome, ${name}!`);
+        createUser(name.trim(), pin, role, avatar, division);
+        setSuccess(`Account created! Welcome to ${division === 'retail' ? 'Retail' : 'Insurance'} division, ${name}!`);
 
         // Auto-login after registration
         setTimeout(async () => {
@@ -150,6 +151,7 @@ const LoginScreen: React.FC = () => {
     setConfirmPin('');
     setAccessCode('');
     setRole('trainee');
+    setDivision('insurance');
     setError('');
     setSuccess('');
   };
@@ -271,6 +273,45 @@ const LoginScreen: React.FC = () => {
                       {emoji}
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Division selection (register only) */}
+            {mode === 'register' && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-2">
+                  Division
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDivision('insurance')}
+                    disabled={loading}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      division === 'insurance'
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-neutral-700 bg-neutral-800 hover:border-neutral-600'
+                    } disabled:opacity-50`}
+                  >
+                    <div className="text-2xl mb-2">🏠</div>
+                    <div className="text-sm font-medium text-white">Insurance</div>
+                    <div className="text-xs text-neutral-400 mt-1">Storm & claims</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDivision('retail')}
+                    disabled={loading}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      division === 'retail'
+                        ? 'border-green-500 bg-green-500/10'
+                        : 'border-neutral-700 bg-neutral-800 hover:border-neutral-600'
+                    } disabled:opacity-50`}
+                  >
+                    <div className="text-2xl mb-2">🏪</div>
+                    <div className="text-sm font-medium text-white">Retail</div>
+                    <div className="text-xs text-neutral-400 mt-1">Direct sales</div>
+                  </button>
                 </div>
               </div>
             )}

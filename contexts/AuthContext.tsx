@@ -20,6 +20,10 @@ interface AuthContextType {
   login: (name: string, pin: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   refreshUser: () => void;
+  // Manager division viewing (separate from user's assigned division)
+  viewingDivision: 'insurance' | 'retail';
+  setViewingDivision: (division: 'insurance' | 'retail') => void;
+  isManager: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,6 +35,17 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewingDivision, setViewingDivision] = useState<'insurance' | 'retail'>('insurance');
+
+  // Check if user is a manager role
+  const isManager = user?.role === 'manager' || user?.role === 'insurance_manager' || user?.role === 'retail_manager';
+
+  // Set viewing division to user's division when user changes
+  useEffect(() => {
+    if (user?.division) {
+      setViewingDivision(user.division);
+    }
+  }, [user?.division]);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -116,7 +131,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     login,
     logout,
-    refreshUser
+    refreshUser,
+    viewingDivision,
+    setViewingDivision,
+    isManager
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

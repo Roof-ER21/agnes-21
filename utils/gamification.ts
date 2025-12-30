@@ -106,8 +106,8 @@ export const getUnlockedDifficulties = (level: number): DifficultyLevel[] => {
     DifficultyLevel.BEGINNER,
     DifficultyLevel.ROOKIE,
     DifficultyLevel.PRO,
-    DifficultyLevel.ELITE,
-    DifficultyLevel.NIGHTMARE
+    DifficultyLevel.VETERAN,
+    DifficultyLevel.ELITE
   ];
 };
 
@@ -183,13 +183,13 @@ const getDifficultyMultiplier = (difficulty: DifficultyLevel): number => {
     case DifficultyLevel.BEGINNER:
       return 1.0;
     case DifficultyLevel.ROOKIE:
-      return 1.2;
+      return 1.25;
     case DifficultyLevel.PRO:
       return 1.5;
+    case DifficultyLevel.VETERAN:
+      return 1.75;
     case DifficultyLevel.ELITE:
       return 2.0;
-    case DifficultyLevel.NIGHTMARE:
-      return 3.0;
     default:
       return 1.0;
   }

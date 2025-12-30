@@ -19,7 +19,7 @@ import RepHome from './components/RepHome';
 import ScriptEditor from './components/ScriptEditor';
 import RepHistory from './components/RepHistory';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
-import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, AlertTriangle, Lock, Globe, Video, ArrowLeft, Home, ShoppingCart } from 'lucide-react';
+import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, Lock, Globe, Video, ArrowLeft, Home, ShoppingCart, Medal } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
 import { PHONE_SCRIPTS, PhoneScript, getScriptsByDivision } from './utils/phoneScripts';
 import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty, isManagerMode, activateManagerMode, deactivateManagerMode } from './utils/gamification';
@@ -107,7 +107,7 @@ SIMPLICITY
 type AppView = 'home' | 'training' | 'history' | 'leaderboard' | 'dashboard' | 'users' | 'translate' | 'demos' | 'scripts';
 
 const AppContent: React.FC = () => {
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, logout, viewingDivision, setViewingDivision, isManager } = useAuth();
   const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null);
   const [currentView, setCurrentView] = useState<AppView>('home');
   const [showHistory, setShowHistory] = useState<boolean>(false);
@@ -131,8 +131,6 @@ const AppContent: React.FC = () => {
 
   // Handle navigation from home pages
   const handleNavigation = (view: string) => {
-    const isManager = user?.role === 'manager';
-
     switch (view) {
       case 'training':
         setCurrentView('training');
@@ -376,11 +374,36 @@ const AppContent: React.FC = () => {
 
   // Role-based home pages
   if (currentView === 'home') {
-    const isManager = user?.role === 'manager';
-
     // Common header for home pages
     const homeHeader = (
       <div className="fixed top-4 right-4 z-50 flex items-center space-x-2">
+        {/* Manager Division Toggle */}
+        {isManager && (
+          <div className="flex items-center bg-neutral-900/90 rounded-full border border-neutral-700 p-1">
+            <button
+              onClick={() => setViewingDivision('insurance')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+                viewingDivision === 'insurance'
+                  ? 'bg-red-600 text-white shadow-lg'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Home className="w-3 h-3" />
+              <span>Insurance</span>
+            </button>
+            <button
+              onClick={() => setViewingDivision('retail')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+                viewingDivision === 'retail'
+                  ? 'bg-emerald-600 text-white shadow-lg'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <ShoppingCart className="w-3 h-3" />
+              <span>Retail</span>
+            </button>
+          </div>
+        )}
         <div className="flex items-center space-x-2 px-3 py-2 bg-neutral-900/80 rounded-full border border-neutral-800">
           <span className="text-lg">{user?.avatar}</span>
           <span className="text-xs font-mono uppercase tracking-wider text-neutral-400">{user?.name}</span>
@@ -566,6 +589,21 @@ const AppContent: React.FC = () => {
                  {selectedDifficulty === DifficultyLevel.PRO && <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>}
               </button>
 
+              {/* Veteran */}
+              <button
+                onClick={() => setSelectedDifficulty(DifficultyLevel.VETERAN)}
+                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.VETERAN ? 'border-l-orange-500 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
+              >
+                 <div>
+                   <div className="flex items-center space-x-2">
+                      <Medal className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.VETERAN ? 'text-orange-500' : 'text-neutral-500'}`} />
+                      <h3 className="font-bold text-sm text-white">VETERAN</h3>
+                   </div>
+                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Challenging • Skeptical • Fair</p>
+                 </div>
+                 {selectedDifficulty === DifficultyLevel.VETERAN && <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>}
+              </button>
+
               {/* Elite */}
               <button
                 onClick={() => setSelectedDifficulty(DifficultyLevel.ELITE)}
@@ -576,24 +614,9 @@ const AppContent: React.FC = () => {
                       <Skull className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.ELITE ? 'text-red-600' : 'text-neutral-500'}`} />
                       <h3 className="font-bold text-sm text-white">ELITE</h3>
                    </div>
-                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Skeptical • Rude • Hostile</p>
+                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Hostile • Expert • One Chance</p>
                  </div>
                  {selectedDifficulty === DifficultyLevel.ELITE && <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></div>}
-              </button>
-
-              {/* Nightmare */}
-              <button
-                onClick={() => setSelectedDifficulty(DifficultyLevel.NIGHTMARE)}
-                className={`p-4 rounded-xl border-l-4 text-left transition-all duration-300 flex items-center justify-between ${selectedDifficulty === DifficultyLevel.NIGHTMARE ? 'border-l-orange-600 bg-neutral-900 border-y border-r border-neutral-800' : 'border-l-neutral-700 bg-black border-y border-r border-neutral-900 hover:bg-neutral-900'}`}
-              >
-                 <div>
-                   <div className="flex items-center space-x-2">
-                      <AlertTriangle className={`w-4 h-4 ${selectedDifficulty === DifficultyLevel.NIGHTMARE ? 'text-orange-600' : 'text-neutral-500'}`} />
-                      <h3 className="font-bold text-sm text-white">NIGHTMARE</h3>
-                   </div>
-                   <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Hostile • Threatening • Expert Challenge</p>
-                 </div>
-                 {selectedDifficulty === DifficultyLevel.NIGHTMARE && <div className="w-2 h-2 rounded-full bg-orange-600 animate-pulse"></div>}
               </button>
             </div>
           </div>

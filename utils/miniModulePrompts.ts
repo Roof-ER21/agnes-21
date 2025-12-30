@@ -351,11 +351,11 @@ export const getMiniModulePrompt = (moduleId: string, difficulty: DifficultyLeve
     case DifficultyLevel.PRO:
       difficultyModifier = '\n\nDIFFICULTY: PRO - Expect solid performance. Be realistic in reactions. Note areas for improvement.';
       break;
-    case DifficultyLevel.ELITE:
-      difficultyModifier = '\n\nDIFFICULTY: ELITE - High standards. Quick to notice flaws. Expect near-perfect execution.';
+    case DifficultyLevel.VETERAN:
+      difficultyModifier = '\n\nDIFFICULTY: VETERAN - Challenging but fair. Ask tough questions. Expect knowledge and professionalism.';
       break;
-    case DifficultyLevel.NIGHTMARE:
-      difficultyModifier = '\n\nDIFFICULTY: NIGHTMARE - Brutal honesty. Miss one thing? Call it out. This is expert-level training.';
+    case DifficultyLevel.ELITE:
+      difficultyModifier = '\n\nDIFFICULTY: ELITE - Expert level. High standards. Quick to notice flaws. One mistake tolerance.';
       break;
   }
 

@@ -109,7 +109,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
   // NEW: Silence timeout tracking
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const SILENCE_TIMEOUT_MS = 3000; // 3 seconds of silence = end of speech
+  const SILENCE_TIMEOUT_MS = 5000; // 5 seconds of silence = end of speech (increased for longer pitches)
   const [isSpeakingCustom, setIsSpeakingCustom] = useState(false);
 
   // NEW: Level-up modal state

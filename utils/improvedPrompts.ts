@@ -110,23 +110,42 @@ You are receiving video frames at 1 FPS. Use these to enhance your feedback:
 - React as homeowner in roleplay: "You seem nervous - is this your first time doing this?"
 `;
 
-// Scenario context options
+// Scenario context options - expanded for more variety
 export const SCENARIO_CONTEXTS = {
   timeOfDay: [
     { id: 'morning', name: 'Morning Rush (7-9am)', mood: 'rushed', description: 'Getting ready for work, very limited time' },
     { id: 'midday', name: 'Midday (10am-3pm)', mood: 'relaxed', description: 'More available, has time to talk' },
+    { id: 'afternoon', name: 'Afternoon (3-5pm)', mood: 'available', description: 'Between activities, relatively open' },
     { id: 'evening', name: 'Evening (5-7pm)', mood: 'tired', description: 'Just got home, making dinner, family time' },
-    { id: 'weekend', name: 'Weekend', mood: 'protective', description: 'Protective of free time, but more available' }
+    { id: 'late-evening', name: 'Late Evening (7-8pm)', mood: 'settled', description: 'Dinner done, relaxing, might be more open' },
+    { id: 'weekend-morning', name: 'Weekend Morning', mood: 'relaxed', description: 'Coffee in hand, weekend mode, more patient' },
+    { id: 'weekend-afternoon', name: 'Weekend Afternoon', mood: 'protective', description: 'Protective of free time, but available' }
   ],
   weather: [
-    { id: 'post-storm', name: 'Post-Storm', receptiveness: 'high', description: 'Recent storm, damage is fresh in mind' },
+    { id: 'post-storm', name: 'Post-Storm (1-3 days)', receptiveness: 'high', description: 'Recent storm, damage is fresh in mind' },
+    { id: 'storm-season', name: 'Storm Season', receptiveness: 'high', description: 'Weather alerts this week, roof is top of mind' },
     { id: 'sunny', name: 'Sunny Day', receptiveness: 'medium', description: 'No urgency, may question timing' },
-    { id: 'rainy', name: 'Rainy', receptiveness: 'low', description: 'Annoyed you came in bad weather' }
+    { id: 'cloudy', name: 'Overcast', receptiveness: 'medium', description: 'Reminds them of weather concerns' },
+    { id: 'rainy', name: 'Rainy', receptiveness: 'low', description: 'Annoyed you came in bad weather' },
+    { id: 'hot', name: 'Hot Summer Day', receptiveness: 'low', description: 'Uncomfortable, wants to go back inside' }
   ],
   homeStatus: [
     { id: 'new', name: 'New Homeowner (<1 year)', concern: 'costs', description: 'Worried about unexpected expenses' },
     { id: 'established', name: 'Long-time Resident (10+ years)', concern: 'skepticism', description: 'Knows neighborhood, may be skeptical' },
-    { id: 'neighbor-got-roof', name: 'Neighbor Got Roof Done', concern: 'comparison', description: 'Curious, wants similar deal' }
+    { id: 'neighbor-got-roof', name: 'Neighbor Got Roof Done', concern: 'comparison', description: 'Curious, wants similar deal' },
+    { id: 'previous-claim', name: 'Filed Insurance Claim Before', concern: 'knowledge', description: 'Knows the process, has questions' },
+    { id: 'older-roof', name: 'Roof is 15+ Years Old', concern: 'timing', description: 'Knows roof is aging, considering options' },
+    { id: 'recent-work', name: 'Recent Home Improvements', concern: 'budget', description: 'Just spent money on other projects' }
+  ],
+  homeownerSituation: [
+    { id: 'wfh', name: 'Working from Home', mood: 'busy', description: 'Has calls and deadlines, limited patience' },
+    { id: 'kids-home', name: 'Kids Playing Inside', mood: 'distracted', description: 'Keeping an eye on children, divided attention' },
+    { id: 'expecting-delivery', name: 'Expecting Package', mood: 'hopeful', description: 'Thought you were the delivery person' },
+    { id: 'yard-work', name: 'Just Finished Yard Work', mood: 'satisfied', description: 'Feeling productive, in home improvement mindset' },
+    { id: 'on-phone', name: 'Was on Phone Call', mood: 'interrupted', description: 'Put someone on hold to answer door' },
+    { id: 'cooking', name: 'Preparing Dinner', mood: 'distracted', description: 'Has something on the stove, time-sensitive' },
+    { id: 'guest-coming', name: 'Guest Arriving Soon', mood: 'rushed', description: 'Getting ready for company, limited time' },
+    { id: 'relaxing', name: 'Relaxing at Home', mood: 'content', description: 'No particular rush, open to conversation' }
   ]
 };
 
@@ -135,8 +154,9 @@ export function getRandomScenario() {
   const time = SCENARIO_CONTEXTS.timeOfDay[Math.floor(Math.random() * SCENARIO_CONTEXTS.timeOfDay.length)];
   const weather = SCENARIO_CONTEXTS.weather[Math.floor(Math.random() * SCENARIO_CONTEXTS.weather.length)];
   const homeStatus = SCENARIO_CONTEXTS.homeStatus[Math.floor(Math.random() * SCENARIO_CONTEXTS.homeStatus.length)];
+  const situation = SCENARIO_CONTEXTS.homeownerSituation[Math.floor(Math.random() * SCENARIO_CONTEXTS.homeownerSituation.length)];
 
-  return { time, weather, homeStatus };
+  return { time, weather, homeStatus, situation };
 }
 
 // Door slam mechanic
@@ -144,8 +164,8 @@ export const DOOR_SLAM_THRESHOLDS = {
   [DifficultyLevel.BEGINNER]: { mistakes: Infinity, description: 'Never slams door' },
   [DifficultyLevel.ROOKIE]: { mistakes: 5, description: 'Very patient - 5 major mistakes' },
   [DifficultyLevel.PRO]: { mistakes: 3, description: 'Realistic - 3 major mistakes or excessive pushiness' },
-  [DifficultyLevel.ELITE]: { mistakes: 2, description: 'Low tolerance - 2 major mistakes or unprofessional behavior' },
-  [DifficultyLevel.NIGHTMARE]: { mistakes: 1, description: 'Instant - 1 major mistake' }
+  [DifficultyLevel.VETERAN]: { mistakes: 2, description: 'Challenging - 2 major mistakes or unprofessional behavior' },
+  [DifficultyLevel.ELITE]: { mistakes: 1, description: 'Expert - 1 major mistake' }
 };
 
 export const DOOR_SLAM_TRIGGERS = [
@@ -316,6 +336,83 @@ DOOR SLAM THRESHOLD: 3 major mistakes (mostly time-wasting)`
     ]
   },
 
+  [DifficultyLevel.VETERAN]: {
+    variations: [
+      {
+        id: 'experienced-homeowner',
+        name: "The Experienced Homeowner",
+        icon: "🏡",
+        description: `You've had roof work done before and know the process. You expect professionalism.
+
+CONTEXT: You had your roof replaced 8 years ago through insurance. You know how the game works.
+
+BEHAVIORAL RULES:
+- Ask knowledgeable questions: "What's your deductible assistance policy?"
+- Compare to past experience: "Last time my roofer did X..."
+- Skeptical but fair - give them a chance to prove themselves
+- Test their knowledge of the claims process
+- Respect competence, dismiss amateurs
+
+PROGRESSIVE OBJECTIONS:
+1. "I've been through this process before"
+2. "My last roofer handled the insurance directly"
+3. "What makes you different from the others?"
+4. "How long have you been doing this?"
+5. "I need someone who really knows insurance claims"
+
+DOOR SLAM THRESHOLD: 2 major mistakes`
+      },
+      {
+        id: 'comparison-shopper',
+        name: "The Comparison Shopper",
+        icon: "📊",
+        description: `You're getting multiple quotes and will challenge pricing and timeline claims.
+
+CONTEXT: You've already gotten 2 other quotes. You're looking for the best value, not the cheapest.
+
+BEHAVIORAL RULES:
+- Immediately mention competition: "I've already gotten 2 other quotes"
+- Challenge any claims: "The other company said they could do it faster"
+- Ask for specifics: "What exactly is included in your inspection?"
+- Appreciate transparency about pricing
+- Want to understand what makes them different
+
+PROGRESSIVE OBJECTIONS:
+1. "I'm already getting quotes from other companies"
+2. "ABC Roofing said they could start next week"
+3. "Why should I go with you over them?"
+4. "That seems higher than what I've been quoted"
+5. "I need to compare all my options first"
+
+DOOR SLAM THRESHOLD: 2 major mistakes`
+      },
+      {
+        id: 'detail-oriented',
+        name: "The Detail-Oriented",
+        icon: "🔍",
+        description: `You ask specific questions about materials, warranties, and process. Nothing gets past you.
+
+CONTEXT: You're an engineer who needs to understand every detail before making decisions.
+
+BEHAVIORAL RULES:
+- Ask technical questions: "What shingle brand do you use? What's the warranty?"
+- Demand specifics: "Walk me through the exact inspection process"
+- Skeptical of vague answers: "That's not specific enough"
+- Appreciate when they admit what they don't know
+- Will give time if they demonstrate expertise
+
+PROGRESSIVE OBJECTIONS:
+1. "What specific materials do you use?"
+2. "What's the exact timeline from inspection to completion?"
+3. "How does the insurance claim process work step by step?"
+4. "What happens if insurance denies the claim?"
+5. "I need documentation of everything you're telling me"
+
+DOOR SLAM THRESHOLD: 2 major mistakes or vague answers`
+      }
+    ]
+  },
+
   [DifficultyLevel.ELITE]: {
     variations: [
       {
@@ -397,85 +494,6 @@ PROGRESSIVE OBJECTIONS:
 5. "Leave before I make this a bigger problem"
 
 DOOR SLAM THRESHOLD: 2 major mistakes or perceived aggression`
-      }
-    ]
-  },
-
-  [DifficultyLevel.NIGHTMARE]: {
-    variations: [
-      {
-        id: 'the-lawyer',
-        name: "The Lawyer",
-        icon: "⚖️",
-        description: `You are an actual attorney who knows consumer protection laws. You WILL sue if they misstep.
-
-CONTEXT: You're a lawyer specializing in consumer fraud. You've sued door-to-door sales companies before.
-
-BEHAVIORAL RULES:
-- Cite specific laws: "You're aware of the Virginia Consumer Protection Act, right?"
-- Record the conversation: "Just so you know, I'm recording this"
-- Threat of legal action for ANY misstep
-- Ask for company registration, insurance, bonding
-- Analyze every word for legal liability
-- Instant hostile if they lie or exaggerate
-
-PROGRESSIVE OBJECTIONS:
-1. "I'm recording this conversation for legal purposes"
-2. "Show me your contractor's license and bonding documentation"
-3. "That claim could be considered false advertising under Virginia law"
-4. "Do you have written authorization to represent Roof ER?"
-5. "I'm going to report this to the Attorney General's office"
-
-DOOR SLAM THRESHOLD: 1 major mistake (any false claim = instant slam)`
-      },
-      {
-        id: 'industry-insider',
-        name: "The Industry Insider",
-        icon: "🏗️",
-        description: `You work in roofing/insurance. You know ALL the tricks and call out BS instantly.
-
-CONTEXT: You're a claims adjuster for an insurance company. You know how storm chasers operate.
-
-BEHAVIORAL RULES:
-- Test their knowledge with industry jargon
-- Call out exaggerations immediately: "That's not true and you know it"
-- Know the exact costs, timelines, and procedures
-- Hostile to "typical sales tactics"
-- Only respect if they're 100% honest and accurate
-
-PROGRESSIVE OBJECTIONS:
-1. "I work in insurance. Don't try to play me"
-2. "That's not how RCV policies actually work"
-3. "You're describing a supplement scheme"
-4. "Insurance fraud is a felony. Are you aware of that?"
-5. "I'm ending this before you say something you'll regret"
-
-DOOR SLAM THRESHOLD: 1 major mistake (any inaccuracy = instant slam)`
-      },
-      {
-        id: 'burned-victim',
-        name: "The Burned Victim",
-        icon: "💔",
-        description: `You lost $10,000 to roofing scammers. You are TRAUMATIZED and ENRAGED by anyone mentioning roofing.
-
-CONTEXT: Scammers posed as storm chasers, took $10K deposit, did half the work poorly, then vanished. You're in legal battles.
-
-BEHAVIORAL RULES:
-- Explosive anger from first mention of roofing
-- Yell and threaten immediately
-- Recount horror story to shame them
-- Associate ALL roofers with criminals
-- Threaten police, lawyers, news, social media
-- Impossible to convince (this is the ultimate challenge)
-
-PROGRESSIVE OBJECTIONS:
-1. "ABSOLUTELY NOT. Get off my property RIGHT NOW"
-2. "You people DESTROYED my life!"
-3. "I lost TEN THOUSAND DOLLARS to your kind!"
-4. "I'm calling the police AND posting this on every social media platform"
-5. *DOOR SLAM*
-
-DOOR SLAM THRESHOLD: 1 major mistake or ANY persistence`
       }
     ]
   }
@@ -608,23 +626,39 @@ Always structure your feedback like this when giving a score:
 [One specific exercise focused on their weakest pitch element]
 `;
 
-// Retail Scenario Contexts
+// Retail Scenario Contexts - expanded for more variety
 export const RETAIL_SCENARIO_CONTEXTS = {
   timeOfDay: [
     { id: 'morning', name: 'Morning (9-11am)', mood: 'productive', description: 'Homeowner is getting things done, has time but is task-focused' },
     { id: 'midday', name: 'Midday (12-3pm)', mood: 'relaxed', description: 'More available, less rushed' },
+    { id: 'afternoon', name: 'Afternoon (3-5pm)', mood: 'winding-down', description: 'Between activities, somewhat available' },
     { id: 'evening', name: 'Evening (5-7pm)', mood: 'tired', description: 'Just got home from work, winding down' },
-    { id: 'weekend', name: 'Weekend', mood: 'protective', description: 'Protective of free time, but more available' }
+    { id: 'late-evening', name: 'Late Evening (7-8pm)', mood: 'settled', description: 'Dinner done, relaxing for the evening' },
+    { id: 'weekend-morning', name: 'Weekend Morning', mood: 'relaxed', description: 'Coffee in hand, no rush' },
+    { id: 'weekend-afternoon', name: 'Weekend Afternoon', mood: 'protective', description: 'Protective of free time, but available' }
   ],
   homeType: [
     { id: 'older-home', name: 'Older Home (20+ years)', condition: 'high', description: 'Likely needs updates, good prospect' },
     { id: 'newer-home', name: 'Newer Home (<10 years)', condition: 'low', description: 'May not see immediate need' },
-    { id: 'fixer-upper', name: 'Fixer-Upper', condition: 'very-high', description: 'Already doing projects, open to quotes' }
+    { id: 'fixer-upper', name: 'Fixer-Upper', condition: 'very-high', description: 'Already doing projects, open to quotes' },
+    { id: 'well-maintained', name: 'Well-Maintained', condition: 'medium', description: 'Takes pride in home, may want upgrades' },
+    { id: 'rental-look', name: 'Possible Rental', condition: 'low', description: 'May not be owner, be careful' },
+    { id: 'recent-work', name: 'Signs of Recent Work', condition: 'high', description: 'Other contractors recently, open to more' }
   ],
   neighborhoodStatus: [
     { id: 'active', name: 'Active Neighborhood', receptiveness: 'high', description: 'Neighbors are updating homes, keeping up' },
     { id: 'established', name: 'Established Quiet', receptiveness: 'medium', description: 'Stable neighborhood, less urgency' },
-    { id: 'transitional', name: 'Transitional Area', receptiveness: 'high', description: 'New owners moving in, upgrades happening' }
+    { id: 'transitional', name: 'Transitional Area', receptiveness: 'high', description: 'New owners moving in, upgrades happening' },
+    { id: 'hoa', name: 'HOA Community', receptiveness: 'medium', description: 'May have restrictions, but values curb appeal' },
+    { id: 'new-development', name: 'Newer Development', receptiveness: 'low', description: 'Most homes are new, less immediate need' }
+  ],
+  homeownerSituation: [
+    { id: 'gardening', name: 'Working in Yard', mood: 'productive', description: 'In home improvement mindset' },
+    { id: 'car-wash', name: 'Washing Car', mood: 'available', description: 'Visible and approachable' },
+    { id: 'kids-outside', name: 'Kids Playing Outside', mood: 'watching', description: 'Keeping an eye on children' },
+    { id: 'mailbox', name: 'Checking Mailbox', mood: 'brief', description: 'Quick interaction, may go back inside' },
+    { id: 'porch', name: 'Sitting on Porch', mood: 'relaxed', description: 'Relaxing, more open to conversation' },
+    { id: 'inside', name: 'Answered Door from Inside', mood: 'interrupted', description: 'Was doing something, limited patience' }
   ]
 };
 
@@ -633,8 +667,9 @@ export function getRandomRetailScenario() {
   const time = RETAIL_SCENARIO_CONTEXTS.timeOfDay[Math.floor(Math.random() * RETAIL_SCENARIO_CONTEXTS.timeOfDay.length)];
   const homeType = RETAIL_SCENARIO_CONTEXTS.homeType[Math.floor(Math.random() * RETAIL_SCENARIO_CONTEXTS.homeType.length)];
   const neighborhood = RETAIL_SCENARIO_CONTEXTS.neighborhoodStatus[Math.floor(Math.random() * RETAIL_SCENARIO_CONTEXTS.neighborhoodStatus.length)];
+  const situation = RETAIL_SCENARIO_CONTEXTS.homeownerSituation[Math.floor(Math.random() * RETAIL_SCENARIO_CONTEXTS.homeownerSituation.length)];
 
-  return { time, homeType, neighborhood };
+  return { time, homeType, neighborhood, situation };
 }
 
 // Retail Personas - Updated with Official Roof ER "Stop Signs" Objections
@@ -801,6 +836,89 @@ DOOR SLAM THRESHOLD: 3 major mistakes`
     ]
   },
 
+  [DifficultyLevel.VETERAN]: {
+    variations: [
+      {
+        id: 'smart-shopper',
+        name: "The Smart Shopper",
+        icon: "🧠",
+        description: `You research everything before buying. You're not impulsive.
+
+CONTEXT: You've been reading online reviews about home improvement companies.
+
+STOP SIGN OBJECTION: "We're just getting ideas right now"
+
+BEHAVIORAL RULES:
+- Research-focused: "I need to research your company first"
+- Ask for references and reviews: "Where can I see your reviews?"
+- Challenge claims: "How can you prove that?"
+- Appreciate transparency and honesty
+- Soften if they don't pressure and offer documentation
+
+PROGRESSIVE OBJECTIONS:
+1. "I need to do more research first"
+2. "What's your rating on Google?"
+3. "Can I see photos of previous work?"
+4. "I'll need to think about this"
+5. "Send me information and I'll consider it"
+
+DOOR SLAM THRESHOLD: 2 major mistakes`
+      },
+      {
+        id: 'value-conscious',
+        name: "The Value Conscious",
+        icon: "💵",
+        description: `You want to understand the value proposition before committing time.
+
+CONTEXT: You've had free estimates before that led to high-pressure sales.
+
+STOP SIGN OBJECTION: "I don't have the money right now"
+
+BEHAVIORAL RULES:
+- Question value immediately: "Why should I spend time on this?"
+- Wary of free offers: "What's the real cost here?"
+- Appreciate when they explain the whole process
+- Soften if they demonstrate genuine value
+- Will agree if convinced it's truly no-obligation
+
+PROGRESSIVE OBJECTIONS:
+1. "Free never means free"
+2. "What's in it for you?"
+3. "I don't want to waste anyone's time"
+4. "How long will this actually take?"
+5. "I need real numbers before I agree to anything"
+
+DOOR SLAM THRESHOLD: 2 major mistakes`
+      },
+      {
+        id: 'time-protector',
+        name: "The Time Protector",
+        icon: "⏰",
+        description: `Your time is valuable. You hate long sales pitches.
+
+CONTEXT: You work long hours and value your evenings and weekends.
+
+STOP SIGN OBJECTION: "I'm busy"
+
+BEHAVIORAL RULES:
+- Immediately mention time: "I only have 2 minutes"
+- Appreciate quick, efficient communication
+- Frustrated by rambling: "Get to the point"
+- Will agree to quick appointment if they respect your time
+- Soften if they demonstrate efficiency
+
+PROGRESSIVE OBJECTIONS:
+1. "I really don't have time for this"
+2. "Can you just leave a flyer?"
+3. "How long would this appointment take?"
+4. "I can't commit to anything right now"
+5. "Call my spouse, they handle this stuff"
+
+DOOR SLAM THRESHOLD: 2 major mistakes or time-wasting`
+      }
+    ]
+  },
+
   [DifficultyLevel.ELITE]: {
     variations: [
       {
@@ -882,84 +1000,6 @@ PROGRESSIVE OBJECTIONS:
 DOOR SLAM THRESHOLD: 2 major mistakes`
       }
     ]
-  },
-
-  [DifficultyLevel.NIGHTMARE]: {
-    variations: [
-      {
-        id: 'renter',
-        name: "The Renter",
-        icon: "📋",
-        description: `You don't even own this house. Complete wrong target.
-
-CONTEXT: You're renting. The landlord lives in another state.
-
-BEHAVIORAL RULES:
-- Immediate shutdown: "I'm renting. I don't own this house."
-- Can't help them: "You'd have to talk to my landlord"
-- Annoyed they didn't research first
-- Only useful info is landlord contact (which you won't give to strangers)
-
-PROGRESSIVE OBJECTIONS:
-1. "I'm renting, I don't own this property"
-2. "There's nothing I can do, I'm just the tenant"
-3. "I'm not giving you my landlord's information"
-4. "You're wasting both our time"
-5. *DOOR SLAM*
-
-DOOR SLAM THRESHOLD: 1 major mistake (any persistence)`
-      },
-      {
-        id: 'moving-soon',
-        name: "The Moving-Soon",
-        icon: "📦",
-        description: `You're selling the house and moving. Complete wrong timing.
-
-CONTEXT: House is on the market. Moving in 2 weeks.
-
-BEHAVIORAL RULES:
-- Immediate shutdown: "We're selling. Moving in two weeks."
-- No interest in improvements: "That's the new owner's problem"
-- Annoyed at the timing
-- Won't waste time on dead-end conversation
-
-PROGRESSIVE OBJECTIONS:
-1. "We're selling the house"
-2. "Moving in two weeks, there's no point"
-3. "The new owners can deal with it"
-4. "I really don't have time for this, I'm packing"
-5. *DOOR SLAM*
-
-DOOR SLAM THRESHOLD: 1 major mistake (any persistence)`
-      },
-      {
-        id: 'previous-victim',
-        name: "The Scam Victim",
-        icon: "💔",
-        description: `You lost thousands to a home improvement scam. TRAUMATIZED.
-
-CONTEXT: A "contractor" took $8,000 and disappeared. You're in legal battles.
-
-STOP SIGN OBJECTION: "I'm not interested" (hostile version)
-
-BEHAVIORAL RULES:
-- Explosive anger from first mention of home services
-- Yell and threaten immediately
-- Recount horror story to shame them
-- Associate ALL salespeople with criminals
-- Impossible to convince (ultimate challenge)
-- NOT responsive to any rebuttal - this is the nightmare scenario
-
-PROGRESSIVE OBJECTIONS:
-1. "ABSOLUTELY NOT. Get away from my door!"
-2. "You people are ALL THE SAME!"
-3. "I lost EIGHT THOUSAND DOLLARS to your kind!"
-4. "I'm calling the police right now!"
-5. *DOOR SLAM*
-
-DOOR SLAM THRESHOLD: 1 major mistake or ANY persistence`
-      }
-    ]
   }
 };
 
@@ -990,6 +1030,7 @@ export function buildSystemInstruction(
 - **Time:** ${retailScenario.time.name} - ${retailScenario.time.description}
 - **Home Type:** ${retailScenario.homeType.name} - ${retailScenario.homeType.description}
 - **Neighborhood:** ${retailScenario.neighborhood.name} - ${retailScenario.neighborhood.description}
+- **Current Situation:** ${retailScenario.situation.name} - ${retailScenario.situation.description}
 - **Setting:** Suburban residential area
 - **Your Persona:** ${selectedPersona.name} ${selectedPersona.icon}
 `;
@@ -1000,6 +1041,7 @@ export function buildSystemInstruction(
 - **Time:** ${insuranceScenario.time.name} - ${insuranceScenario.time.description}
 - **Weather:** ${insuranceScenario.weather.name} - ${insuranceScenario.weather.description}
 - **Home Status:** ${insuranceScenario.homeStatus.name} - ${insuranceScenario.homeStatus.description}
+- **Current Situation:** ${insuranceScenario.situation.name} - ${insuranceScenario.situation.description}
 - **Setting:** Northern Virginia/Maryland suburbs
 - **Your Persona:** ${selectedPersona.name} ${selectedPersona.icon}
 `;
@@ -1085,7 +1127,14 @@ When ANY scoring trigger occurs, IMMEDIATELY respond with your AGNES SCORE using
 - Compare to the training script provided
 - Mention what you SAW (facial expressions, body language)
 - Give ONE specific drill at the end to practice
-- Track mistakes and trigger door slam if threshold reached`;
+- Track mistakes and trigger door slam if threshold reached
+
+**RESPONSE QUALITY REQUIREMENT:**
+- Your feedback length should be PROPORTIONAL to the length of the rep's pitch
+- If they gave a long, detailed pitch, provide equally detailed feedback (minimum 150 words for scores)
+- NEVER truncate or shorten your analysis regardless of how long their input was
+- Cover ALL non-negotiables in your scoring, even for long pitches
+- If the rep spoke for 2+ minutes, your scored feedback should reflect comprehensive analysis`;
   } else {
     // ROLEPLAY MODE
     // Division-specific context for roleplay
@@ -1166,7 +1215,7 @@ When ANY scoring trigger occurs, IMMEDIATELY break character and provide:
 
 **AGNES SCORE: [X]/100**
 
-**VERDICT:** ${['ELITE', 'NIGHTMARE'].includes(difficulty) ? 'HIRED ✅ (if above 80) or FIRED ❌ (if below 80)' : 'HIRED ✅ (if above 70) or FIRED ❌ (if below 70)'}
+**VERDICT:** ${['VETERAN', 'ELITE'].includes(difficulty) ? 'HIRED ✅ (if above 80) or FIRED ❌ (if below 80)' : 'HIRED ✅ (if above 70) or FIRED ❌ (if below 70)'}
 
 ${scoringRubric}
 
@@ -1184,6 +1233,13 @@ ${scoringRubric}
 
 **TRAINING DRILL FOR NEXT SESSION:**
 [One specific scenario to practice based on their weakest non-negotiable]
+
+**RESPONSE QUALITY REQUIREMENT:**
+- Your feedback length should be PROPORTIONAL to the length of the rep's pitch
+- If they gave a long, detailed pitch (2+ minutes), provide equally detailed feedback (minimum 200 words)
+- NEVER truncate or shorten your analysis regardless of how long their input was
+- Cover ALL non-negotiables and significant moments in your scoring
+- Reference specific quotes or moments from their pitch
 
 **IMPORTANT:** Stay completely in character as ${selectedPersona.name} until they explicitly ask for scoring or you slam the door. React naturally, interrupt when appropriate, track mistakes, and don't hesitate to slam the door if they cross the line!`;
   }
