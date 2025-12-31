@@ -190,12 +190,12 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
       console.log(`Listening for ${speaker} in ${listenLang}`);
 
-      // Set timeout for silence
+      // Set timeout for silence (45 seconds for longer conversations)
       const timeout = setTimeout(() => {
         stopListening();
         setInterimText('');
         reject(new Error('Listening timeout'));
-      }, 20000); // 20 second timeout
+      }, 45000); // 45 second timeout for longer speech
 
       startListening(
         listenLang,
@@ -315,16 +315,16 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       currentSpeakerRef.current = nextSpeaker;
       setCurrentSpeaker(nextSpeaker);
 
-      // Continue with next turn after natural pause
-      if (sessionActiveRef.current) {
+      // Continue with next turn after natural pause (check pause state)
+      if (sessionActiveRef.current && !isPausedRef.current) {
         await naturalPause(400);
         handleSingleTurn();
       }
 
     } catch (error) {
       console.error('❌ Turn error:', error);
-      // On timeout or error, retry listening for same speaker
-      if (sessionActiveRef.current) {
+      // On timeout or error, retry listening for same speaker (check pause state)
+      if (sessionActiveRef.current && !isPausedRef.current) {
         console.log('🔄 Retrying...');
         await naturalPause(800);
         handleSingleTurn();
@@ -529,8 +529,8 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
     currentSpeakerRef.current = 'homeowner';
     setCurrentSpeaker('homeowner');
 
-    // Continue conversation
-    if (sessionActiveRef.current) {
+    // Continue conversation (check pause state)
+    if (sessionActiveRef.current && !isPausedRef.current) {
       await naturalPause(400);
       handleSingleTurn();
     }

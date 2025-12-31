@@ -107,9 +107,9 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const isPlayingScoreAudioRef = useRef(false); // Ref to track when score audio is playing (prevents session end)
   const scoreCleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Delayed cleanup for multi-chunk scores
 
-  // NEW: Silence timeout tracking
+  // NEW: Silence timeout tracking (10 seconds for roleplay/feedback to allow thinking pauses)
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const SILENCE_TIMEOUT_MS = 5000; // 5 seconds of silence = end of speech (increased for longer pitches)
+  const SILENCE_TIMEOUT_MS = 10000; // 10 seconds of silence = end of speech (for longer roleplay responses)
   const [isSpeakingCustom, setIsSpeakingCustom] = useState(false);
 
   // NEW: Push-to-Talk (PTT) mode
@@ -473,6 +473,9 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   setCurrentScore(score);
                   // DON'T clear flags here - clear them AFTER audio finishes
                   console.log('Score received:', score);
+                } else if (wasRequestingScore && score === null && textContent.length > 50) {
+                  // We requested a score but couldn't parse it - log warning
+                  console.warn('Score request returned feedback but no parseable score in:', textContent.substring(0, 100));
                 }
 
                 // Add to transcript (always add, mark with score if detected)
