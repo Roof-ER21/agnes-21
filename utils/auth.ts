@@ -58,14 +58,14 @@ export const verifyPIN = (pin: string, storedHash: string): boolean => {
 };
 
 /**
- * Validate PIN format (4-6 digits, no sequential/repeated)
+ * Validate PIN format (exactly 4 digits, no sequential/repeated)
  */
 export const validatePIN = (pin: string): { valid: boolean; error?: string } => {
-  if (pin.length < 4 || pin.length > 6) {
-    return { valid: false, error: 'PIN must be 4-6 digits' };
+  if (pin.length !== 4) {
+    return { valid: false, error: 'PIN must be exactly 4 digits' };
   }
 
-  if (!/^\d+$/.test(pin)) {
+  if (!/^\d{4}$/.test(pin)) {
     return { valid: false, error: 'PIN must contain only numbers' };
   }
 

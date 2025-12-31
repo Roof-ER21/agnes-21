@@ -721,7 +721,7 @@ const AppContent: React.FC = () => {
         <div className="mt-8 px-4">
           <TeamContests
             userId={user?.id || 'guest'}
-            userName={user?.displayName || 'Guest'}
+            userName={user?.name || 'Guest'}
             isManager={managerModeActive}
           />
         </div>

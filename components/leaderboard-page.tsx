@@ -1,15 +1,6 @@
-"use client"
+// Note: This component is not currently used in the app
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Trophy,
   Medal,
@@ -24,10 +15,27 @@ import {
   AlertCircle,
   TrendingUp,
 } from "lucide-react"
-import type { User as UserType } from "../types/user"
-import { GoogleSheetsService, getCurrentMonthName, formatMonthName } from "../lib/google-sheets"
-import { getProfileImage, getInitials } from "../utils/profile-images"
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
+
+// Placeholder types since this component is unused
+interface UserType {
+  id: string;
+  name: string;
+  avatar?: string;
+}
+
+// Placeholder functions
+const getCurrentMonthName = () => new Date().toLocaleString('default', { month: 'long' });
+const formatMonthName = (month: string) => month;
+const getProfileImage = (name: string) => '';
+const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('');
+
+// Placeholder GoogleSheetsService
+const GoogleSheetsService = {
+  getInstance: () => ({
+    getLeaderboardData: async () => [],
+    isConfigured: () => false,
+  })
+};
 
 interface LeaderboardPageProps {
   users: UserType[]

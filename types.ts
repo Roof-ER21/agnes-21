@@ -8,7 +8,8 @@ export enum DifficultyLevel {
   ROOKIE = 'ROOKIE',
   PRO = 'PRO',
   VETERAN = 'VETERAN',
-  ELITE = 'ELITE'
+  ELITE = 'ELITE',
+  NIGHTMARE = 'NIGHTMARE'
 }
 
 export interface SessionConfig {

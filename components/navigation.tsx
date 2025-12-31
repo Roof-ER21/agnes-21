@@ -1,12 +1,21 @@
-"use client"
+// Note: This component is not currently used in the app
 
-import Link from "next/link"
 import { Bell, Trophy, Users, Target, BarChart2, Settings, Video, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import type { User, Notification } from "@/types/user"
-import { cn } from "@/lib/utils"
+
+// Placeholder types since this component is unused
+interface User {
+  id: string;
+  name: string;
+  avatar?: string;
+}
+
+interface Notification {
+  id: string;
+  isRead: boolean | Record<string, boolean>;
+}
+
+// Simple utility function
+const cn = (...classes: (string | undefined)[]) => classes.filter(Boolean).join(' ');
 
 interface NavigationProps {
   currentUser: User | null

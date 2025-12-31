@@ -140,8 +140,8 @@ router.put('/:sessionId', authenticateToken, async (req: AuthRequest, res: Respo
 // GET /api/sessions - List user sessions
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const limit = parseInt(req.query.limit as string, 10) || 50;
+    const offset = parseInt(req.query.offset as string, 10) || 0;
 
     const sessions = await db
       .select()
