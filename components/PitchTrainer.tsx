@@ -403,7 +403,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         micAnalyserRef.current = micAnalyser;
 
         // 4. Build improved system instruction with division-awareness
-        const userDivision = (user?.division as 'insurance' | 'retail') || 'insurance';
+        const userDivision = (config.division as 'insurance' | 'retail') || (user?.division as 'insurance' | 'retail') || 'insurance';
         const systemInstruction = buildSystemInstruction(
           config.mode,
           config.difficulty,

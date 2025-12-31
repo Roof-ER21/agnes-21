@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginScreen from './components/LoginScreen';
 import PitchTrainer from './components/PitchTrainer';
@@ -21,7 +21,7 @@ import RepHistory from './components/RepHistory';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
 import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, Lock, Globe, Video, ArrowLeft, Home, ShoppingCart, Medal } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
-import { PHONE_SCRIPTS, PhoneScript, getScriptsByDivision } from './utils/phoneScripts';
+import { getScriptsByDivision } from './utils/phoneScripts';
 import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty, isManagerMode, activateManagerMode, deactivateManagerMode } from './utils/gamification';
 import { getMiniModulePrompt } from './utils/miniModulePrompts';
 
@@ -129,6 +129,9 @@ const AppContent: React.FC = () => {
     return stored ? JSON.parse(stored) : [];
   });
 
+  const isSuperManager = user?.role === 'manager';
+  const activeDivision = (isSuperManager ? viewingDivision : user?.division) || 'insurance';
+
   // Handle navigation from home pages
   const handleNavigation = (view: string) => {
     switch (view) {
@@ -181,13 +184,18 @@ const AppContent: React.FC = () => {
   // Handle mini-module selection
   const handleMiniModuleSelect = (module: MiniModule) => {
     // Start a mini-module session
-    const miniModulePrompt = getMiniModulePrompt(module.id, selectedDifficulty);
+    const miniModulePrompt = getMiniModulePrompt(
+      module.id,
+      selectedDifficulty,
+      activeDivision as 'insurance' | 'retail'
+    );
     setSessionConfig({
       mode: PitchMode.ROLEPLAY, // Mini-modules are roleplay style
       script: miniModulePrompt,
       difficulty: selectedDifficulty,
       isMiniModule: true,
-      miniModuleId: module.id
+      miniModuleId: module.id,
+      division: activeDivision as 'insurance' | 'retail'
     });
   };
 
@@ -219,14 +227,11 @@ const AppContent: React.FC = () => {
   const userProgress = getUserProgress(user?.id);
   const currentLevel = userProgress.currentLevel;
 
-  // Get scripts filtered by user's division
-  const userDivision = user?.division || 'insurance';
-  const isAdmin = user?.role === 'manager';
-
-  // Filter phone scripts by division (admins see all)
-  const filteredPhoneScripts = isAdmin
-    ? PHONE_SCRIPTS
-    : getScriptsByDivision(userDivision as 'insurance' | 'retail');
+  // Get scripts filtered by active division (admins switch via toggle)
+  const filteredPhoneScripts = useMemo(
+    () => getScriptsByDivision(activeDivision as 'insurance' | 'retail'),
+    [activeDivision]
+  );
 
   // Built-in scripts (Insurance division only)
   const insuranceBuiltInScripts = [
@@ -247,9 +252,9 @@ const AppContent: React.FC = () => {
   ];
 
   // All available scripts with summaries - filter by division
-  const allScripts = [
-    // Only include built-in scripts for insurance users or admins
-    ...(userDivision === 'insurance' || isAdmin ? insuranceBuiltInScripts : []),
+  const allScripts = useMemo(() => [
+    // Only include built-in scripts for insurance division
+    ...(activeDivision === 'insurance' ? insuranceBuiltInScripts : []),
     // Phone scripts filtered by division
     ...filteredPhoneScripts.map(script => ({
       id: script.id,
@@ -265,20 +270,21 @@ const AppContent: React.FC = () => {
       summary: 'Write or paste your own custom script for specialized training scenarios.',
       content: customScript
     }
-  ];
+  ], [activeDivision, filteredPhoneScripts, customScript]);
 
   const selectedScript = allScripts.find(s => s.id === selectedScriptId) || allScripts[0];
 
-  // Set default script based on user's division (only once when first loading or division changes)
+  // Keep script selection aligned to active division
   useEffect(() => {
-    if (!selectedScriptId && allScripts.length > 0) {
-      // Set default to first available script for user's division
-      const defaultScript = allScripts[0];
-      if (defaultScript) {
-        setSelectedScriptId(defaultScript.id);
-      }
+    if (!allScripts.length) {
+      setSelectedScriptId('');
+      return;
     }
-  }, [selectedScriptId, allScripts]);
+    const existsInDivision = allScripts.some(s => s.id === selectedScriptId);
+    if (!existsInDivision) {
+      setSelectedScriptId(allScripts[0].id);
+    }
+  }, [allScripts, selectedScriptId]);
 
   // Show loading while checking auth
   if (isLoading) {
@@ -308,7 +314,8 @@ const AppContent: React.FC = () => {
     setSessionConfig({
       mode: selectedMode,
       script: getActiveScript().trim() || undefined,
-      difficulty: selectedDifficulty
+      difficulty: selectedDifficulty,
+      division: activeDivision as 'insurance' | 'retail'
     });
   };
 
@@ -378,7 +385,7 @@ const AppContent: React.FC = () => {
     const homeHeader = (
       <div className="fixed top-4 right-4 z-50 flex items-center space-x-2">
         {/* Manager Division Toggle */}
-        {isManager && (
+        {isSuperManager && (
           <div className="flex items-center bg-neutral-900/90 rounded-full border border-neutral-700 p-1">
             <button
               onClick={() => setViewingDivision('insurance')}
@@ -467,18 +474,18 @@ const AppContent: React.FC = () => {
         {/* Header */}
         <div className="text-center space-y-6">
           {/* Centered Badge with Division */}
-          <div className="flex justify-center items-center gap-3">
-            <div className="inline-flex items-center justify-center px-4 py-1.5 bg-neutral-900 rounded-full border border-red-900/50 shadow-[0_0_20px_rgba(220,38,38,0.15)]">
-               <Sparkles className="w-4 h-4 text-red-500 mr-2" />
-               <span className="text-red-200 font-mono text-xs tracking-widest uppercase">Agnes 21 // AI Trainer</span>
-            </div>
-            {/* Division Badge */}
-            <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full font-bold text-sm uppercase tracking-wider shadow-lg ${
-              user?.division === 'retail'
+            <div className="flex justify-center items-center gap-3">
+              <div className="inline-flex items-center justify-center px-4 py-1.5 bg-neutral-900 rounded-full border border-red-900/50 shadow-[0_0_20px_rgba(220,38,38,0.15)]">
+                 <Sparkles className="w-4 h-4 text-red-500 mr-2" />
+                 <span className="text-red-200 font-mono text-xs tracking-widest uppercase">Agnes 21 // AI Trainer</span>
+              </div>
+              {/* Division Badge */}
+              <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full font-bold text-sm uppercase tracking-wider shadow-lg ${
+              activeDivision === 'retail'
                 ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-emerald-500/25'
                 : 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-red-500/25'
             }`}>
-              {user?.division === 'retail' ? (
+              {activeDivision === 'retail' ? (
                 <>
                   <ShoppingCart className="w-4 h-4" />
                   <span>Retail</span>
@@ -633,7 +640,7 @@ const AppContent: React.FC = () => {
                     className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-500"
                   >
                     {/* Door-to-Door scripts (Insurance only) */}
-                    {(userDivision === 'insurance' || isAdmin) && (
+                    {activeDivision === 'insurance' && (
                       <optgroup label="Door-to-Door">
                         <option value="initial">Initial Pitch</option>
                         <option value="post">Post-Inspection Pitch</option>
@@ -696,7 +703,7 @@ const AppContent: React.FC = () => {
           <MiniModules
             onSelectModule={handleMiniModuleSelect}
             completedToday={completedMiniModulesToday}
-            division={user?.division as 'insurance' | 'retail' || 'insurance'}
+            division={activeDivision as 'insurance' | 'retail'}
           />
         </div>
 

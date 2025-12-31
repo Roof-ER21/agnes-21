@@ -17,6 +17,7 @@ export interface SessionConfig {
   difficulty: DifficultyLevel;
   isMiniModule?: boolean;
   miniModuleId?: string;
+  division: 'insurance' | 'retail';
 }
 
 export type AudioVolumeCallback = (volume: number) => void;

@@ -146,7 +146,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // Agnes Speech Function
   // ============================================
 
-  const agnesSpeak = useCallback(async (text: string, lang: SupportedLanguage = 'en'): Promise<void> => {
+  const agnesSpeak = useCallback(async (text: string, lang: SupportedLanguage | SupportedDialect = 'en'): Promise<void> => {
     if (!text || text.trim().length === 0) {
       console.warn('agnesSpeak called with empty text');
       return;
@@ -286,7 +286,8 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       await naturalPause(500);
       setAgnesState('introducing');
       const intro = getAgnesHomeownerIntro(detection.language);
-      await agnesSpeak(intro, detection.language);
+      const speakLang = (detection.dialect as SupportedLanguage | SupportedDialect | undefined) || detection.language;
+      await agnesSpeak(intro, speakLang);
 
       if (!sessionActiveRef.current) return;
 
@@ -299,6 +300,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
     } catch (error) {
       console.error('Auto-detect error:', error);
+      await agnesSpeak('Auto-detect hit a snag. Please pick the homeowner language to keep going.', 'en');
       setIsAutoDetecting(false);
       setShowLanguageSelect(true);
     }
