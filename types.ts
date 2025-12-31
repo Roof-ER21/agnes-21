@@ -31,8 +31,7 @@ export type AudioVolumeCallback = (volume: number) => void;
 export type SupportedLanguage =
   | 'en' | 'es' | 'zh' | 'vi' | 'ko' | 'pt' | 'ar'  // Original 7
   | 'fr' | 'ru' | 'tl' | 'hi' | 'ja' | 'de' | 'it'  // Common additions
-  | 'pl' | 'ht' | 'pa' | 'uk' | 'fa' | 'th' | 'bn'  // More coverage
-  | 'auto';  // Auto-detect option
+  | 'pl' | 'ht' | 'pa' | 'uk' | 'fa' | 'th' | 'bn';  // More coverage
 
 // Dialect codes for languages with regional variants
 export type SupportedDialect =
@@ -120,8 +119,6 @@ export const SUPPORTED_LANGUAGES: LanguageConfig[] = [
   { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', voiceCode: 'bn-IN', flag: '🇧🇩' },
   { code: 'ht', name: 'Haitian Creole', nativeName: 'Kreyòl Ayisyen', voiceCode: 'ht-HT', flag: '🇭🇹' },
   { code: 'pa', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', voiceCode: 'pa-IN', flag: '🇮🇳' },
-  // Auto-detect pseudo-language
-  { code: 'auto', name: 'Auto-Detect', nativeName: "I don't know", voiceCode: 'en-US', flag: '🔍' },
 ];
 
 export type PhraseCategory = 'greeting' | 'pitch' | 'insurance' | 'objection' | 'scheduling' | 'closing';

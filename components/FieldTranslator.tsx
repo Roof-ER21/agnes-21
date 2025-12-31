@@ -3,9 +3,8 @@
  * Complete redesign with one-button activation and conversation facilitation
  *
  * Features:
- * - Auto-detect language option (using Gemini)
- * - 21 supported languages
- * - Natural conversation flow
+ * - 20+ supported languages with dialect selection for Spanish/Arabic
+ * - Natural conversation flow with pause/resume controls
  * - Consistent Agnes persona
  */
 
@@ -18,14 +17,13 @@ import {
   AgnesState,
   DetectionResult,
   getDialectConfig,
+  getDialectsForLanguage,
 } from '../types';
 import {
   translateWithCache,
-  detectLanguageWithDialect,
   getLanguageName,
   getLanguageFlag,
   getDetectionDisplayName,
-  getVoiceCodeForDetection,
 } from '../utils/translationUtils';
 import {
   startListening,
@@ -41,9 +39,7 @@ import {
 } from '../utils/geminiTTS';
 import {
   getAgnesRepIntro,
-  getAgnesAutoDetectIntro,
   getAgnesHomeownerIntro,
-  getLanguageDetectedMessage,
 } from '../utils/agnesPersona';
 import {
   saveTranslationSession,
@@ -62,8 +58,11 @@ import {
   X,
   BookOpen,
   Globe,
-  Search,
   Mic,
+  Pause,
+  Play,
+  SkipForward,
+  Square,
 } from 'lucide-react';
 
 interface FieldTranslatorProps {
@@ -99,8 +98,14 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   const [showQuickPhrases, setShowQuickPhrases] = useState<boolean>(false);
   const [showHistory, setShowHistory] = useState<boolean>(false);
   const [showLanguageSelect, setShowLanguageSelect] = useState<boolean>(false);
-  const [isAutoDetecting, setIsAutoDetecting] = useState<boolean>(false);
+  const [showDialectPicker, setShowDialectPicker] = useState<boolean>(false);
+  const [pendingLanguage, setPendingLanguage] = useState<'es' | 'ar' | null>(null);
+  const [selectedDialect, setSelectedDialect] = useState<SupportedDialect | null>(null);
   const [pastSessions, setPastSessions] = useState<any[]>([]);
+
+  // Conversation control state
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const isPausedRef = useRef<boolean>(false);
 
   // Track whose turn it is
   const [currentSpeaker, setCurrentSpeaker] = useState<'rep' | 'homeowner'>('homeowner');
@@ -219,92 +224,6 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
     });
   }, []);
 
-  // ============================================
-  // Auto-detect Language Flow
-  // ============================================
-
-  const handleAutoDetect = useCallback(async () => {
-    setShowLanguageSelect(false);
-    setIsAutoDetecting(true);
-
-    try {
-      // Agnes tells rep she's listening
-      setAgnesState('detecting');
-      await agnesSpeak(getAgnesAutoDetectIntro(), 'en');
-
-      if (!sessionActiveRef.current) return;
-
-      // Listen for homeowner (use English recognition but capture raw audio)
-      // Then use Gemini to detect the actual language
-      const spokenText = await listenForSpeaker('homeowner', 'en');
-
-      if (!sessionActiveRef.current || !spokenText) {
-        setIsAutoDetecting(false);
-        setShowLanguageSelect(true);
-        return;
-      }
-
-      // Use Gemini to detect language with dialect recognition
-      const detection = await detectLanguageWithDialect(spokenText);
-
-      if (!detection) {
-        // Truly couldn't detect - ask to select manually
-        await agnesSpeak("I couldn't determine the language. Please select it manually.", 'en');
-        setIsAutoDetecting(false);
-        setShowLanguageSelect(true);
-        return;
-      }
-
-      if (detection.language === 'en') {
-        // Detected English - the homeowner speaks English, no translation needed
-        await agnesSpeak("The homeowner appears to speak English. If they speak another language, please select it now.", 'en');
-        setIsAutoDetecting(false);
-        setShowLanguageSelect(true);
-        return;
-      }
-
-      // Successfully detected! Show dialect-specific name if available
-      const displayName = getDetectionDisplayName(detection);
-      const confidenceNote = detection.confidence >= 90
-        ? ''
-        : detection.confidence >= 70
-          ? ' I think.'
-          : ' Let me know if that\'s not right.';
-      await agnesSpeak(`I detected ${displayName.replace(/[^\w\s]/g, '')}.${confidenceNote}`, 'en');
-
-      // Set the detected language and dialect info
-      setSelectedLanguage(detection.language);
-      selectedLangRef.current = detection.language;
-      setDetectionResult(detection);
-      setIsAutoDetecting(false);
-
-      // Add the homeowner's first message to transcript
-      const translation = await translateWithCache(spokenText, 'en', detection.language);
-      addToTranscript('homeowner', spokenText, detection.language, translation, 'en');
-
-      // Now introduce Agnes to homeowner in their language
-      await naturalPause(500);
-      setAgnesState('introducing');
-      const intro = getAgnesHomeownerIntro(detection.language);
-      const speakLang = (detection.dialect as SupportedLanguage | SupportedDialect | undefined) || detection.language;
-      await agnesSpeak(intro, speakLang);
-
-      if (!sessionActiveRef.current) return;
-
-      // Start conversation - homeowner responds next
-      currentSpeakerRef.current = 'homeowner';
-      setCurrentSpeaker('homeowner');
-
-      // Start conversation loop
-      handleSingleTurn();
-
-    } catch (error) {
-      console.error('Auto-detect error:', error);
-      await agnesSpeak('Auto-detect hit a snag. Please pick the homeowner language to keep going.', 'en');
-      setIsAutoDetecting(false);
-      setShowLanguageSelect(true);
-    }
-  }, [agnesSpeak, listenForSpeaker]);
 
   // ============================================
   // Add to Transcript
@@ -336,6 +255,12 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   const handleSingleTurn = useCallback(async () => {
     if (!sessionActiveRef.current || !selectedLangRef.current) {
       console.log('handleSingleTurn: session not active or no language selected');
+      return;
+    }
+
+    // Check if paused
+    if (isPausedRef.current) {
+      console.log('handleSingleTurn: paused, not continuing');
       return;
     }
 
@@ -412,22 +337,50 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // ============================================
 
   const handleLanguageSelected = useCallback(async (lang: SupportedLanguage) => {
-    if (lang === 'auto') {
-      handleAutoDetect();
+    // If Spanish or Arabic, show dialect picker
+    if (lang === 'es' || lang === 'ar') {
+      setPendingLanguage(lang);
+      setShowDialectPicker(true);
       return;
     }
 
+    // For other languages, proceed directly
+    await startConversationWithLanguage(lang);
+  }, []);
+
+  // Handle dialect selection for Spanish/Arabic
+  const handleDialectSelected = useCallback(async (dialect: SupportedDialect) => {
+    const lang = pendingLanguage;
+    if (!lang) return;
+
+    setSelectedDialect(dialect);
+    setShowDialectPicker(false);
+    setPendingLanguage(null);
+
+    await startConversationWithLanguage(lang, dialect);
+  }, [pendingLanguage]);
+
+  // Start conversation with selected language/dialect
+  const startConversationWithLanguage = useCallback(async (lang: SupportedLanguage, dialect?: SupportedDialect) => {
     setSelectedLanguage(lang);
     selectedLangRef.current = lang;
     setShowLanguageSelect(false);
 
-    console.log(`Language selected: ${lang}`);
+    console.log(`Language selected: ${lang}${dialect ? ` (${dialect})` : ''}`);
 
     try {
+      // Agnes greets rep first
+      await agnesSpeak(getAgnesRepIntro(), 'en');
+
+      if (!sessionActiveRef.current) return;
+
+      await naturalPause(300);
+
       // Agnes introduces herself to homeowner in their language
       setAgnesState('introducing');
       const intro = getAgnesHomeownerIntro(lang);
-      await agnesSpeak(intro, lang);
+      const speakLang = dialect || lang;
+      await agnesSpeak(intro, speakLang);
 
       if (!sessionActiveRef.current) return;
 
@@ -443,7 +396,39 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       console.error('Error after language selection:', error);
       endSession();
     }
-  }, [agnesSpeak, handleSingleTurn, handleAutoDetect]);
+  }, [agnesSpeak, handleSingleTurn]);
+
+  // ============================================
+  // Conversation Control Handlers
+  // ============================================
+
+  const handlePauseConversation = useCallback(() => {
+    stopListening();
+    agnesVoiceStop();
+    setIsPaused(true);
+    isPausedRef.current = true;
+    setAgnesState('idle');
+  }, []);
+
+  const handleResumeConversation = useCallback(async () => {
+    setIsPaused(false);
+    isPausedRef.current = false;
+    await naturalPause(300);
+    handleSingleTurn();
+  }, [handleSingleTurn]);
+
+  const handleSkipTurn = useCallback(async () => {
+    stopListening();
+    agnesVoiceStop();
+    // Switch speaker
+    const nextSpeaker = currentSpeakerRef.current === 'rep' ? 'homeowner' : 'rep';
+    currentSpeakerRef.current = nextSpeaker;
+    setCurrentSpeaker(nextSpeaker);
+    await naturalPause(300);
+    if (sessionActiveRef.current && !isPausedRef.current) {
+      handleSingleTurn();
+    }
+  }, [handleSingleTurn]);
 
   // ============================================
   // Start Agnes Session
@@ -462,26 +447,16 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
     setTranscript([]);
     setSelectedLanguage(null);
     selectedLangRef.current = null;
+    setSelectedDialect(null);
     setDetectionResult(null);
+    setIsPaused(false);
+    isPausedRef.current = false;
 
-    try {
-      // Step 1: Agnes introduces herself to rep (English)
-      setAgnesState('activating');
-      await agnesSpeak(getAgnesRepIntro(), 'en');
+    // Show language selection modal immediately
+    setAgnesState('activating');
+    setShowLanguageSelect(true);
 
-      if (!sessionActiveRef.current) return;
-
-      // Step 2: Auto-start language detection (no modal needed)
-      // Agnes will listen and automatically detect the homeowner's language
-      // Falls back to manual selection only if auto-detect fails
-      handleAutoDetect();
-
-    } catch (error) {
-      console.error('Session start error:', error);
-      setAgnesState('idle');
-      sessionActiveRef.current = false;
-    }
-  }, [speechSupported, agnesSpeak, handleAutoDetect]);
+  }, [speechSupported]);
 
   // ============================================
   // End Session
@@ -494,7 +469,10 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
     setAgnesState('ended');
     setInterimText('');
     setShowLanguageSelect(false);
-    setIsAutoDetecting(false);
+    setShowDialectPicker(false);
+    setPendingLanguage(null);
+    setIsPaused(false);
+    isPausedRef.current = false;
 
     // Save session if we have transcript
     if (transcript.length > 0 && user?.id) {
@@ -597,8 +575,8 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // ============================================
 
   const renderLanguageSelection = () => {
-    // Get languages excluding 'en' and 'auto', then add auto at top
-    const selectableLanguages = SUPPORTED_LANGUAGES.filter(l => l.code !== 'en');
+    // Get languages excluding 'en' and 'auto'
+    const selectableLanguages = SUPPORTED_LANGUAGES.filter(l => l.code !== 'en' && l.code !== 'auto');
 
     return (
       <div className="fixed inset-0 bg-black/95 z-50 flex flex-col">
@@ -614,29 +592,9 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
               </p>
             </div>
 
-            {/* Auto-Detect Option - Prominent at top */}
-            <button
-              onClick={() => handleLanguageSelected('auto')}
-              disabled={isAutoDetecting}
-              className="w-full flex items-center gap-4 p-4 mb-4 bg-gradient-to-r from-cyan-900/50 to-blue-900/50 hover:from-cyan-800/50 hover:to-blue-800/50 border-2 border-cyan-500/50 rounded-xl transition-all disabled:opacity-50"
-            >
-              <div className="w-12 h-12 bg-cyan-500/20 rounded-full flex items-center justify-center">
-                <Search className="w-6 h-6 text-cyan-400" />
-              </div>
-              <div className="text-left flex-1">
-                <div className="text-white font-bold">Auto-Detect</div>
-                <div className="text-cyan-400/80 text-xs">Let Agnes listen and identify the language</div>
-              </div>
-              {isAutoDetecting && (
-                <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-              )}
-            </button>
-
-            <div className="text-center text-neutral-500 text-xs mb-4">— or select manually —</div>
-
             {/* Language Grid */}
             <div className="grid grid-cols-2 gap-2">
-              {selectableLanguages.filter(l => l.code !== 'auto').map(lang => (
+              {selectableLanguages.map(lang => (
                 <button
                   key={lang.code}
                   onClick={() => handleLanguageSelected(lang.code)}
@@ -656,6 +614,64 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
               className="w-full mt-6 py-3 text-neutral-400 hover:text-white text-sm transition-colors"
             >
               Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================
+  // Render - Dialect Picker Modal
+  // ============================================
+
+  const renderDialectPicker = () => {
+    if (!pendingLanguage) return null;
+
+    const dialects = getDialectsForLanguage(pendingLanguage);
+    const langName = pendingLanguage === 'es' ? 'Spanish' : 'Arabic';
+
+    return (
+      <div className="fixed inset-0 bg-black/95 z-50 flex flex-col">
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="max-w-[calc(100vw-2rem)] sm:max-w-md mx-auto">
+            <div className="text-center mb-6 pt-4">
+              <Globe className="w-10 h-10 text-cyan-400 mx-auto mb-3" />
+              <h2 className="text-lg font-bold text-white mb-1">
+                Select {langName} Dialect
+              </h2>
+              <p className="text-neutral-400 text-sm">
+                Which regional variant?
+              </p>
+            </div>
+
+            {/* Dialect Options */}
+            <div className="space-y-2">
+              {dialects.map(dialect => (
+                <button
+                  key={dialect.code}
+                  onClick={() => handleDialectSelected(dialect.code)}
+                  className="w-full flex items-center gap-4 p-4 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 hover:border-cyan-500/50 rounded-xl transition-all"
+                >
+                  <span className="text-3xl">{dialect.flag}</span>
+                  <div className="text-left flex-1">
+                    <div className="text-white font-medium">{dialect.name}</div>
+                    <div className="text-neutral-400 text-sm">{dialect.nativeName}</div>
+                    <div className="text-neutral-500 text-xs">{dialect.region}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                setShowDialectPicker(false);
+                setPendingLanguage(null);
+                setShowLanguageSelect(true);
+              }}
+              className="w-full mt-6 py-3 text-neutral-400 hover:text-white text-sm transition-colors"
+            >
+              ← Back to Languages
             </button>
           </div>
         </div>
@@ -745,6 +761,9 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       {/* Language Selection Modal */}
       {showLanguageSelect && renderLanguageSelection()}
 
+      {/* Dialect Picker Modal */}
+      {showDialectPicker && renderDialectPicker()}
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800">
         <button
@@ -818,21 +837,13 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
           </div>
         )}
 
-        {/* Skip Auto-Detect Button - shown during detection phase */}
-        {isAutoDetecting && agnesState === 'detecting' && (
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => {
-                stopListening();
-                agnesVoiceStop();
-                setIsAutoDetecting(false);
-                setShowLanguageSelect(true);
-              }}
-              className="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2 mx-auto min-h-[44px]"
-            >
-              <Globe className="w-4 h-4 text-cyan-400" />
-              Skip - Choose Language Manually
-            </button>
+        {/* Paused Indicator */}
+        {isPaused && (
+          <div className="mt-3 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500/20 border border-orange-500/40 rounded-full">
+              <Pause className="w-4 h-4 text-orange-400" />
+              <span className="text-sm text-orange-400 font-medium">Conversation Paused</span>
+            </div>
           </div>
         )}
 
@@ -868,7 +879,53 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       </div>
 
       {/* Bottom Controls */}
-      <div className="px-4 py-4 border-t border-neutral-800 bg-neutral-900/50">
+      <div className="px-4 py-4 border-t border-neutral-800 bg-neutral-900/50 space-y-3">
+        {/* Conversation Controls - shown when language is selected */}
+        {selectedLanguage && (
+          <div className="flex items-center justify-center gap-3">
+            {/* Pause/Resume Button */}
+            <button
+              onClick={isPaused ? handleResumeConversation : handlePauseConversation}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
+                isPaused
+                  ? 'bg-green-600 hover:bg-green-500 text-white'
+                  : 'bg-orange-600 hover:bg-orange-500 text-white'
+              }`}
+            >
+              {isPaused ? (
+                <>
+                  <Play className="w-4 h-4" />
+                  <span className="text-sm">Resume</span>
+                </>
+              ) : (
+                <>
+                  <Pause className="w-4 h-4" />
+                  <span className="text-sm">Pause</span>
+                </>
+              )}
+            </button>
+
+            {/* Skip Turn Button */}
+            <button
+              onClick={handleSkipTurn}
+              disabled={isPaused}
+              className="flex items-center gap-2 px-4 py-2.5 bg-neutral-700 hover:bg-neutral-600 rounded-xl text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <SkipForward className="w-4 h-4" />
+              <span className="text-sm">Skip Turn</span>
+            </button>
+
+            {/* End Session Button */}
+            <button
+              onClick={endSession}
+              className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-500 rounded-xl text-white font-medium transition-colors"
+            >
+              <Square className="w-4 h-4" />
+              <span className="text-sm">End</span>
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           {/* Auto-speak toggle */}
           <button
