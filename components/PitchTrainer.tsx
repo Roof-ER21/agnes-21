@@ -280,24 +280,31 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     }
   }, [aiSpeaking, isSpeaking, isConnected, isSpeakingCustom]);
 
-  // NEW: Check Chatterbox TTS availability
+  // NEW: Check Chatterbox TTS availability (only in development)
   useEffect(() => {
     const checkTTS = async () => {
+      // Skip TTS check in production - Chatterbox requires local backend
+      const isDev = import.meta.env.DEV;
+      const hasTTSUrl = import.meta.env.VITE_TTS_API_URL;
+
+      if (!isDev && !hasTTSUrl) {
+        // Silently disable in production without logging
+        setTtsAvailable(false);
+        return;
+      }
+
       try {
-        console.log('Checking Chatterbox TTS availability...');
+        if (isDev) console.log('Checking Chatterbox TTS availability...');
         const available = await checkTTSHealth();
         setTtsAvailable(available);
-        if (available) {
-          console.log('✅ Chatterbox TTS is available - custom voice enabled');
-          console.log('   Voice: Reeses Piecies');
-          console.log('   Press "C" or click the wand icon to toggle custom voice');
-        } else {
-          console.log('⚠️ Chatterbox TTS backend not responding');
-          console.log('   Custom voice will be disabled');
-          console.log('   To enable: Start TTS backend at http://localhost:8000');
+        if (isDev) {
+          if (available) {
+            console.log('✅ Chatterbox TTS is available - custom voice enabled');
+          } else {
+            console.log('⚠️ Chatterbox TTS backend not responding (dev only)');
+          }
         }
-      } catch (error) {
-        console.error('❌ Error checking TTS availability:', error);
+      } catch {
         setTtsAvailable(false);
       }
     };
@@ -574,13 +581,17 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         sessionPromiseRef.current = sessionPromise;
 
       } catch (err: any) {
-        console.error("Initialization Error", err);
+        // Only log in development
+        if (import.meta.env.DEV) {
+          console.error("Initialization Error", err);
+        }
 
         // Improved error handling with specific messages
         if (err.name === 'NotAllowedError') {
           setError("🎤 Microphone/Camera access denied. Click the lock icon in your browser and enable permissions.");
         } else if (err.name === 'NotFoundError') {
-          setError("🎤 No microphone or camera detected. Please connect a device and refresh the page.");
+          // Don't show error for missing camera - it's optional for audio-only mode
+          setError("🎤 No microphone detected. Please connect a microphone to start training.");
         } else if (err.name === 'NotReadableError') {
           setError("🎥 Camera/mic is being used by another app. Close other apps and try again.");
         } else if (err.message && err.message.includes('API')) {
