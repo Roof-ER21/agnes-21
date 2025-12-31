@@ -19,7 +19,7 @@ import RepHome from './components/RepHome';
 import ScriptEditor from './components/ScriptEditor';
 import RepHistory from './components/RepHistory';
 import { SessionConfig, PitchMode, DifficultyLevel } from './types';
-import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, Lock, Globe, Video, ArrowLeft, Home, ShoppingCart, Medal } from 'lucide-react';
+import { Mic, Users, Play, Sparkles, FileText, Edit3, Zap, Shield, Skull, History, Trophy, BarChart3, LogOut, User as UserIcon, Phone, Lock, Globe, Video, ArrowLeft, Home, ShoppingCart, Medal, Headphones } from 'lucide-react';
 import { registerServiceWorker } from './utils/pwa';
 import { getScriptsByDivision } from './utils/phoneScripts';
 import { getUserProgress, isDifficultyUnlocked, getLevelRequiredForDifficulty, isManagerMode, activateManagerMode, deactivateManagerMode } from './utils/gamification';
@@ -530,7 +530,7 @@ const AppContent: React.FC = () => {
                 </div>
               </button>
 
-              <button 
+              <button
                 onClick={() => setSelectedMode(PitchMode.ROLEPLAY)}
                 className={`relative group p-5 rounded-xl border-2 text-left transition-all duration-300 ${selectedMode === PitchMode.ROLEPLAY ? 'border-red-600 bg-neutral-900 shadow-[0_0_30px_rgba(220,38,38,0.1)]' : 'border-neutral-800 bg-black hover:border-neutral-600'}`}
               >
@@ -541,6 +541,21 @@ const AppContent: React.FC = () => {
                   <div>
                     <h3 className="text-lg font-bold text-white">Roleplay</h3>
                     <p className="text-neutral-400 text-xs mt-1">Interactive simulation.</p>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setSelectedMode(PitchMode.JUST_LISTEN)}
+                className={`relative group p-5 rounded-xl border-2 text-left transition-all duration-300 ${selectedMode === PitchMode.JUST_LISTEN ? 'border-red-600 bg-neutral-900 shadow-[0_0_30px_rgba(220,38,38,0.1)]' : 'border-neutral-800 bg-black hover:border-neutral-600'}`}
+              >
+                <div className="flex items-center space-x-4">
+                  <div className={`p-2 rounded-lg transition-colors ${selectedMode === PitchMode.JUST_LISTEN ? 'bg-red-600 text-white' : 'bg-neutral-900 text-neutral-500'}`}>
+                    <Headphones className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Just Listen</h3>
+                    <p className="text-neutral-400 text-xs mt-1">Full run-through, scored at end.</p>
                   </div>
                 </div>
               </button>

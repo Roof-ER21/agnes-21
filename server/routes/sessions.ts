@@ -4,7 +4,7 @@ import { eq, desc, sql } from 'drizzle-orm';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 // Valid session modes and difficulties
-const VALID_MODES = ['COACH', 'ROLEPLAY', 'PRACTICE', 'QUIZ', 'SCORE_ME'];
+const VALID_MODES = ['COACH', 'ROLEPLAY', 'PRACTICE', 'QUIZ', 'SCORE_ME', 'JUST_LISTEN'];
 const VALID_DIFFICULTIES = ['BEGINNER', 'ROOKIE', 'PRO', 'ELITE', 'NIGHTMARE'];
 
 const router = Router();

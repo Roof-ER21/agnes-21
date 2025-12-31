@@ -30,7 +30,7 @@ import { playSuccess, playPerfect, playLevelUp, toggleSounds, areSoundsEnabled }
 import { useAuth } from '../contexts/AuthContext';
 import { checkTTSHealth, generateSpeech, DEFAULT_FEEDBACK_VOICE, speakWithChatterbox } from '../utils/chatterboxTTS';
 import { createVAD, startVAD, stopVAD, pauseVAD, createFallbackVAD } from '../utils/vadUtils';
-import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle, Sparkles, AlertTriangle, Volume2, VolumeX, Wand2, Hand } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle, Sparkles, AlertTriangle, Volume2, VolumeX, Wand2, Hand, Users, Headphones } from 'lucide-react';
 import XPBar from './XPBar';
 import LevelUpModal from './LevelUpModal';
 import { calculateSessionXP, awardXP, getUserProgress } from '../utils/gamification';
@@ -1295,6 +1295,19 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         </div>
         
         <div className="flex items-center space-x-4">
+           {/* Mode Badge */}
+           <div className="hidden md:flex items-center space-x-2 px-3 py-1 rounded bg-neutral-900/80 border border-neutral-800 backdrop-blur">
+              {config.mode === PitchMode.COACH && <Mic className="w-4 h-4 text-blue-500" />}
+              {config.mode === PitchMode.ROLEPLAY && <Users className="w-4 h-4 text-purple-500" />}
+              {config.mode === PitchMode.JUST_LISTEN && <Headphones className="w-4 h-4 text-cyan-400" />}
+              <span className={`font-mono text-xs font-bold ${
+                config.mode === PitchMode.COACH ? 'text-blue-500' :
+                config.mode === PitchMode.ROLEPLAY ? 'text-purple-500' : 'text-cyan-400'
+              }`}>
+                {config.mode === PitchMode.JUST_LISTEN ? 'JUST LISTEN' : config.mode}
+              </span>
+           </div>
+
            {/* Gamification Badge */}
            <div className="hidden md:flex items-center space-x-2 px-3 py-1 rounded bg-neutral-900/80 border border-neutral-800 backdrop-blur">
               {config.difficulty === DifficultyLevel.BEGINNER && <Sparkles className="w-4 h-4 text-cyan-500" />}

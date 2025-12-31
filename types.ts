@@ -1,6 +1,7 @@
 export enum PitchMode {
   COACH = 'COACH',
-  ROLEPLAY = 'ROLEPLAY'
+  ROLEPLAY = 'ROLEPLAY',
+  JUST_LISTEN = 'JUST_LISTEN'
 }
 
 export enum DifficultyLevel {
