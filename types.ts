@@ -16,6 +16,7 @@ export enum DifficultyLevel {
 export interface SessionConfig {
   mode: PitchMode;
   script?: string;
+  scriptId?: string;  // Script ID for per-script roleplay behavior
   difficulty: DifficultyLevel;
   isMiniModule?: boolean;
   miniModuleId?: string;

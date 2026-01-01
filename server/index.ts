@@ -33,6 +33,16 @@ app.use('/api/analytics', analyticsRoutes);
 
 // Serve static files from dist folder in production
 const distPath = path.join(__dirname, '..', 'dist');
+
+// Explicitly serve demo audio files with proper MIME type
+app.use('/demos', express.static(path.join(distPath, 'demos'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.wav')) {
+      res.set('Content-Type', 'audio/wav');
+    }
+  }
+}));
+
 app.use(express.static(distPath));
 
 // SPA fallback - serve index.html for all non-API routes

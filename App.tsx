@@ -8,9 +8,6 @@ import ManagerDashboard from './components/ManagerDashboard';
 import AllUsersView from './components/AllUsersView';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import MiniModules, { MiniModule } from './components/MiniModules';
-import TrainingGoals from './components/TrainingGoals';
-import TeamContests from './components/TeamContests';
-import SkillTree from './components/SkillTree';
 import PerfectWeekChallenge from './components/PerfectWeekChallenge';
 import FieldTranslator from './components/FieldTranslator';
 import RoleplayDemo from './components/RoleplayDemo';
@@ -314,6 +311,7 @@ const AppContent: React.FC = () => {
     setSessionConfig({
       mode: selectedMode,
       script: getActiveScript().trim() || undefined,
+      scriptId: selectedScriptId !== 'custom' ? selectedScriptId : undefined,  // Pass scriptId for per-script roleplay behavior
       difficulty: selectedDifficulty,
       division: activeDivision as 'insurance' | 'retail'
     });
@@ -725,25 +723,6 @@ const AppContent: React.FC = () => {
         {/* Perfect Week Challenge */}
         <div className="mt-8 px-4">
           <PerfectWeekChallenge userId={user?.id || 'guest'} />
-        </div>
-
-        {/* Training Goals */}
-        <div className="mt-8 px-4">
-          <TrainingGoals userId={user?.id || 'guest'} />
-        </div>
-
-        {/* Team Contests */}
-        <div className="mt-8 px-4">
-          <TeamContests
-            userId={user?.id || 'guest'}
-            userName={user?.name || 'Guest'}
-            isManager={managerModeActive}
-          />
-        </div>
-
-        {/* Skill Tree */}
-        <div className="mt-8 px-4">
-          <SkillTree userId={user?.id || 'guest'} />
         </div>
 
         {/* Divider */}

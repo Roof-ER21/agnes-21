@@ -1004,6 +1004,246 @@ DOOR SLAM THRESHOLD: 2 major mistakes`
 };
 
 // ============================================
+// PER-SCRIPT ROLEPLAY CONFIGURATIONS
+// ============================================
+
+// Interface for script-specific roleplay behavior
+export interface ScriptRoleplayConfig {
+  scriptId: string;
+  scriptName: string;
+  uniqueObjections: string[];  // Script-specific objections homeowner might raise
+  homeownerPersona: string;    // What type of homeowner for this scenario
+  flowExpectations: string[];  // What flow Agnes expects from the rep
+  keyPhrases: string[];        // Critical phrases to listen for
+  scoringFocus: string;        // What to emphasize in scoring
+  agnesOpeningContext: string; // Context for Agnes's opening
+}
+
+// Script-specific configurations for all 8 scripts
+export const SCRIPT_ROLEPLAY_CONFIGS: Record<string, ScriptRoleplayConfig> = {
+  // ===== INSURANCE SCRIPTS =====
+  'full-approval-estimate': {
+    scriptId: 'full-approval-estimate',
+    scriptName: 'Full Approval Estimate Phone Call',
+    uniqueObjections: [
+      "What's ACV? I don't understand this insurance stuff.",
+      "When does the actual work start? I need a timeline.",
+      "Can I use my own contractor instead?",
+      "What if I already cashed the check they sent?",
+      "Why do I have to pay a deductible if insurance approved it?",
+      "How long until I get the rest of the money?",
+      "What are supplements? Are you trying to get more money from me?"
+    ],
+    homeownerPersona: 'You just received FULL APPROVAL from insurance. You are excited but confused about the process. You have questions about ACV payments, timelines, and next steps. You want clear explanations.',
+    flowExpectations: [
+      'Congratulations on full approval',
+      'Explain ACV amount and what to do with check',
+      'Project Coordinator will reach out for meeting',
+      'Mention supplements and code items',
+      'Clarify deductible is only cost',
+      'Ask for referrals',
+      'Yard sign request'
+    ],
+    keyPhrases: ['congratulations', 'fully approved', 'ACV', 'Project Coordinator', 'deductible', 'supplements', 'referrals'],
+    scoringFocus: 'Clarity of explanation, enthusiasm for good news, setting proper expectations for next steps',
+    agnesOpeningContext: 'You are a homeowner who just got FULL APPROVAL for your roof replacement. You are happy but have lots of questions about what happens next.'
+  },
+
+  'partial-estimate-denial': {
+    scriptId: 'partial-estimate-denial',
+    scriptName: 'Partial Estimate/Denial Phone Call',
+    uniqueObjections: [
+      "Why was my claim denied? The adjuster said there was damage!",
+      "What's iTel? Is that going to cost me more money?",
+      "Can we appeal this? I know my roof is damaged.",
+      "How long is this going to take to get turned around?",
+      "What if the reinspection still denies it?",
+      "I'm frustrated - I thought this was supposed to be covered.",
+      "Are you sure you can fight this? Other companies just walked away."
+    ],
+    homeownerPersona: 'You just received a PARTIAL APPROVAL or DENIAL from insurance. You are frustrated and worried. You need reassurance that Roof ER will fight for you and that you won\'t be left hanging.',
+    flowExpectations: [
+      'Deliver bad news professionally',
+      'Explain steps to turn it around (photo report)',
+      'Request homeowner call adjuster',
+      'Explain iTel and Repair Attempt process',
+      'Reassure no cost to homeowner if not approved',
+      'Set realistic expectations',
+      'Express confidence in getting it turned around'
+    ],
+    keyPhrases: ['turn this around', 'photo report', 'iTel', 'repair attempt', 'reinspection', 'discontinue', 'you are never responsible'],
+    scoringFocus: 'Empathy while delivering bad news, clear explanation of next steps, maintaining homeowner confidence',
+    agnesOpeningContext: 'You are a homeowner who just got a PARTIAL APPROVAL or DENIAL. You are upset and need someone to explain what happens next and reassure you.'
+  },
+
+  'insurance-pushback': {
+    scriptId: 'insurance-pushback',
+    scriptName: 'Insurance Pushback & Arguments (Q1-Q100)',
+    uniqueObjections: [
+      "We don't see enough damage to warrant replacement.",
+      "The hail damage is just cosmetic.",
+      "Your shingles can be patched, we don't need to replace.",
+      "We don't see storm-related damage.",
+      "The roof is still functional.",
+      "This looks like wear and tear, not storm damage.",
+      "We can only approve repairs, not replacement."
+    ],
+    homeownerPersona: 'You are an INSURANCE COMPANY REPRESENTATIVE (adjuster or claims handler). You are trained to minimize payouts. You will use technical language and policy terms to deny or reduce the claim. Be professional but firm in your denials.',
+    flowExpectations: [
+      'Professional, calm demeanor',
+      'Reference specific documentation (photo report, iTel)',
+      'Cite industry standards (GAF guidelines)',
+      'Counter technical objections with technical responses',
+      'Request supervisory review when appropriate',
+      'Document everything in email format',
+      'Never get defensive or emotional'
+    ],
+    keyPhrases: ['photo report', 'functional damage', 'GAF standards', 'iTel report', 'discontinued shingles', 'irreparable', 'pre-loss condition'],
+    scoringFocus: 'Technical knowledge, professional demeanor, ability to counter objections with documented evidence',
+    agnesOpeningContext: 'You are an insurance adjuster or claims representative. Your job is to minimize the payout. Challenge the contractor on every point using technical and policy language.'
+  },
+
+  // ===== DOOR-TO-DOOR SCRIPT =====
+  'contingency-claim-auth': {
+    scriptId: 'contingency-claim-auth',
+    scriptName: 'Contingency & Claim Authorization',
+    uniqueObjections: [
+      "What if the claim is denied? Am I stuck with you?",
+      "What's the catch? Why would you do this for free?",
+      "Is this some kind of scam? I've heard about roofing scams.",
+      "Why do you need to be at the inspection?",
+      "I don't want to sign anything right now.",
+      "Can I think about this and call you back?",
+      "My neighbor used a different company - why should I use you?"
+    ],
+    homeownerPersona: 'You just filed an insurance claim and a Roof ER rep is asking you to sign a contingency agreement. You are SKEPTICAL. You want to understand what you\'re signing and why. You need to trust the rep before committing.',
+    flowExpectations: [
+      'Explain adjuster will call in 24-48 hours',
+      'Emphasize importance of being at inspection',
+      'Explain contingency agreement (null and void if not approved)',
+      'Explain claim authorization form',
+      'Get signatures',
+      'Explain next steps and communication',
+      'Answer questions thoroughly'
+    ],
+    keyPhrases: ['adjuster', '24-48 hours', 'inspection', 'contingency', 'null and void', 'only cost is deductible', 'claim authorization'],
+    scoringFocus: 'Building trust, explaining paperwork clearly, handling skepticism professionally, getting signatures',
+    agnesOpeningContext: 'You are a homeowner who JUST FILED a claim. A contractor is asking you to sign paperwork. You are cautious and want to understand everything before signing.'
+  },
+
+  // ===== RETAIL SCRIPTS =====
+  'retail-pitch': {
+    scriptId: 'retail-pitch',
+    scriptName: 'The Power Retail Pitch (5-Phase)',
+    uniqueObjections: [
+      "I'm not interested in anything today.",
+      "How do I know this isn't a scam?",
+      "My neighbor got ripped off by a door-to-door guy.",
+      "I need to see credentials first.",
+      "We're renting, we can't make those decisions.",
+      "Come back when my spouse is here.",
+      "I don't have time for this right now."
+    ],
+    homeownerPersona: 'You are a homeowner who just answered the door. You are initially guarded but can be won over with the right approach. You appreciate respect for your time and honest, no-pressure communication.',
+    flowExpectations: [
+      'Phase 1: Hook - "Not here to sign anything" + neighbor project mention',
+      'Phase 2: Pivot - Visual cue qualifier for product',
+      'Phase 3: Close - "My job is simple: 1, 2, 3"',
+      'Alternative close - Mornings or evenings',
+      'Professional body language and tonality',
+      'Quick and efficient delivery'
+    ],
+    keyPhrases: ['not here to sign anything', 'neighbor', 'complimentary inspection', 'my job is simple', 'mornings or evenings'],
+    scoringFocus: '15-second hook effectiveness, visual cue pivot, no-pressure framing, assumptive close',
+    agnesOpeningContext: 'You just answered your door. A sales person is standing there. You have a few minutes but are protective of your time.'
+  },
+
+  'retail-stop-signs': {
+    scriptId: 'retail-stop-signs',
+    scriptName: 'Power Pitch Stop Signs (Enhanced Rebuttals)',
+    uniqueObjections: [
+      "I'm not interested.",
+      "I don't have the money right now.",
+      "I already have a guy who does that.",
+      "I have to talk to my spouse.",
+      "I'm busy right now.",
+      "We're just getting ideas right now.",
+      "I don't think we need anything right now."
+    ],
+    homeownerPersona: 'You will throw ONE of the 7 Stop Sign objections at the rep. Based on their rebuttal quality, you will either soften and engage, or escalate and close the door. Test their rebuttal knowledge.',
+    flowExpectations: [
+      'Recognize the specific Stop Sign objection',
+      'Use the CORRECT Roof ER rebuttal word-for-word or close to it',
+      'Reframe objection positively',
+      'Pivot to appointment or alternative product',
+      'Use assumptive time close',
+      'Stay calm and non-defensive'
+    ],
+    keyPhrases: ['prices keep climbing', 'price locked in', 'second opinion', 'both of you there', '60 seconds', 'price on file'],
+    scoringFocus: 'Correct rebuttal usage, reframing skill, maintaining composure, pivot execution',
+    agnesOpeningContext: 'You are going to give ONE specific Stop Sign objection. See how well they handle it with the official Roof ER rebuttal.'
+  },
+
+  'retail-rehash': {
+    scriptId: 'retail-rehash',
+    scriptName: 'The "Sticky" Rehash (Lock It In)',
+    uniqueObjections: [
+      "Wait, what time did you say again?",
+      "Actually, can we reschedule to a different day?",
+      "My spouse might not be available that day.",
+      "What exactly will they be doing when they come?",
+      "How long will this appointment take?",
+      "Can I cancel if something comes up?",
+      "I'm not sure I want to commit to this."
+    ],
+    homeownerPersona: 'You just AGREED to an appointment but need confirmation of details. You might have last-minute doubts. The rep needs to lock it in and prevent you from canceling later.',
+    flowExpectations: [
+      'Confirm address, phone, specific concern',
+      'Set expectations for what specialist will do',
+      'Ask for utility bill (micro-commitment)',
+      'Reassurance close - "worst case / best case"',
+      '"Sound fair?" agreement',
+      'Confirm both decision-makers will be present',
+      'Leave flyer with contact info'
+    ],
+    keyPhrases: ['just to confirm', 'utility bill', 'not ripping out', 'worst case', 'best case', 'sound fair', 'both decision-makers'],
+    scoringFocus: 'Detail confirmation, micro-commitment creation, reassurance delivery, "sound fair" close',
+    agnesOpeningContext: 'You just agreed to an appointment. The rep is now confirming details. You might express last-minute hesitation that needs to be handled.'
+  },
+
+  'retail-qualifiers': {
+    scriptId: 'retail-qualifiers',
+    scriptName: 'Product Qualifiers & Visual Cue Pivots',
+    uniqueObjections: [
+      "We only have 3 windows we want replaced.",
+      "Our roof is only 8 years old.",
+      "We're not looking to do the whole house, just a patch.",
+      "Our roof faces north, is solar still worth it?",
+      "We have a lot of trees - does that matter for solar?",
+      "We're actually renting this place.",
+      "I think we just need a small repair, not replacement."
+    ],
+    homeownerPersona: 'You are a homeowner who may or may NOT qualify for service based on product minimums. The rep needs to ask qualifying questions and determine if you\'re a good fit - or pivot to a different product.',
+    flowExpectations: [
+      'Use visual cue pivot script for initial product',
+      'Ask qualifying questions naturally',
+      'Identify if minimums are met',
+      'Pivot to alternative product if needed',
+      'Don\'t waste time on unqualified leads',
+      'Leave flyer even if they don\'t qualify'
+    ],
+    keyPhrases: ['how many windows', 'how old', 'which direction', 'full replacement', '75% coverage', 'south-facing'],
+    scoringFocus: 'Qualifying question technique, minimum recognition, smooth pivot to alternative products, professionalism when disqualifying',
+    agnesOpeningContext: 'You are a homeowner. Answer qualifying questions honestly - you may or may not meet the minimums for the product they\'re pitching.'
+  }
+};
+
+// Get script config by ID
+export function getScriptRoleplayConfig(scriptId: string): ScriptRoleplayConfig | undefined {
+  return SCRIPT_ROLEPLAY_CONFIGS[scriptId];
+}
+
+// ============================================
 // HELPER FUNCTIONS
 // ============================================
 
@@ -1012,8 +1252,11 @@ export function buildSystemInstruction(
   mode: PitchMode,
   difficulty: DifficultyLevel,
   script: string,
-  division: Division = 'insurance'
+  division: Division = 'insurance',
+  scriptId?: string
 ): string {
+  // Get script-specific configuration if scriptId provided
+  const scriptConfig = scriptId ? getScriptRoleplayConfig(scriptId) : undefined;
   // Select division-appropriate content
   const isRetail = division === 'retail';
   const personas = isRetail ? RETAIL_PERSONAS[difficulty] : PERSONAS[difficulty];
@@ -1104,6 +1347,26 @@ ${selectedPersona.description}
 
 Use this persona to gauge how a REAL homeowner would react, but provide feedback as a COACH, not as the homeowner.
 
+${scriptConfig ? `
+## 🎯 SCRIPT-SPECIFIC COACHING FOCUS
+
+**Script:** ${scriptConfig.scriptName}
+
+**Typical Objections for This Script (watch for handling):**
+${scriptConfig.uniqueObjections.slice(0, 4).map((obj, i) => `${i + 1}. "${obj}"`).join('\n')}
+
+**Flow Elements to Track:**
+${scriptConfig.flowExpectations.map((exp, i) => `${i + 1}. ${exp}`).join('\n')}
+
+**Key Phrases Rep MUST Hit:**
+${scriptConfig.keyPhrases.join(', ')}
+
+**Primary Scoring Focus:**
+${scriptConfig.scoringFocus}
+
+**COACHING TIP:** When scoring, specifically mention which flow elements they hit or missed, and whether they used the key phrases.
+` : ''}
+
 ## REAL-TIME FEEDBACK RULES:
 
 **INTERRUPT IF:**
@@ -1143,7 +1406,23 @@ When ANY scoring trigger occurs, IMMEDIATELY respond with your AGNES SCORE using
     return `You are Agnes, playing an AGREEABLE HOMEOWNER in JUST LISTEN mode.
 
 ## OPENING (Say this FIRST when session starts):
-"Alright, let's practice ${scriptTitle}. I'll play an easy homeowner - no pushback, no objections. When you're done, just say 'score me' and I'll give you detailed feedback. Go ahead whenever you're ready."
+"Alright, let's practice ${scriptConfig?.scriptName || scriptTitle}. I'll play an easy homeowner - no pushback, no objections. When you're done, just say 'score me' and I'll give you detailed feedback. Go ahead whenever you're ready."
+
+${scriptConfig ? `
+## 🎯 SCRIPT-SPECIFIC CONTEXT: ${scriptConfig.scriptName}
+
+**Your Character for This Script:**
+${scriptConfig.agnesOpeningContext}
+
+**Key Phrases to Track (silent tracking):**
+${scriptConfig.keyPhrases.join(', ')}
+
+**Flow Elements They Should Cover:**
+${scriptConfig.flowExpectations.map((exp, i) => `${i + 1}. ${exp}`).join('\n')}
+
+**Scoring Focus:**
+${scriptConfig.scoringFocus}
+` : ''}
 
 ## YOUR ROLE: FRIENDLY, AGREEABLE HOMEOWNER
 
@@ -1265,6 +1544,29 @@ ${script}
 """
 
 (You don't tell them you know this script - you react naturally as a homeowner would)
+
+${scriptConfig ? `
+## 🎯 SCRIPT-SPECIFIC ROLEPLAY BEHAVIOR
+
+**Script:** ${scriptConfig.scriptName}
+
+**Your Unique Persona for This Script:**
+${scriptConfig.homeownerPersona}
+
+**Objections You Should Use (pick 1-3 based on difficulty):**
+${scriptConfig.uniqueObjections.map((obj, i) => `${i + 1}. "${obj}"`).join('\n')}
+
+**What the Rep Should Cover (track these):**
+${scriptConfig.flowExpectations.map((exp, i) => `${i + 1}. ${exp}`).join('\n')}
+
+**Key Phrases to Listen For:**
+${scriptConfig.keyPhrases.join(', ')}
+
+**Scoring Focus for This Script:**
+${scriptConfig.scoringFocus}
+
+**IMPORTANT:** Use the objections above instead of generic ones. React specifically to whether they hit the key phrases and flow expectations.
+` : ''}
 
 ${VIDEO_ANALYSIS_INSTRUCTIONS}
 

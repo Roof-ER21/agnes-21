@@ -6,7 +6,7 @@
 export interface PhoneScript {
   id: string;
   title: string;
-  category: 'estimate' | 'objection' | 'authorization' | 'pushback' | 'retail';
+  category: 'estimate' | 'objection' | 'authorization' | 'pushback' | 'retail' | 'door-to-door';
   division: 'insurance' | 'retail' | 'both';
   content: string;
   description: string;
@@ -93,9 +93,9 @@ Answer any questions or concerns the HO has.
   {
     id: 'contingency-claim-auth',
     title: 'Contingency & Claim Authorization',
-    category: 'authorization',
+    category: 'door-to-door',
     division: 'insurance',
-    description: 'Script for getting claim authorization after filing',
+    description: 'Script for door-to-door claim authorization after filing',
     content: `Contingency & Claim Authorization
 
 After the claim: "Okay, perfect! Like they said, an adjuster will be reaching out to you in the next 24 to 48 hours to schedule the inspection. The absolute most important part of this process is that I am at this inspection. Insurance companies don't want to pay out. They are trying to mitigate their losses after storms. I am there as your representation to make sure you get a fair shake.
@@ -160,152 +160,208 @@ For full playbook with all 100 questions, refer to the complete Pushback PDF doc
   },
   {
     id: 'retail-pitch',
-    title: 'Door-to-Door Appointment Setting',
+    title: 'The Power Retail Pitch (5-Phase)',
     category: 'retail',
     division: 'retail',
-    description: 'Neighbor notification approach for setting inspection appointments',
+    description: 'Complete 5-phase door-to-door pitch: Hook, Pivot, Close, Stop Signs, Rehash',
     voice: 'agnes_21',
-    content: `Door-to-Door Appointment Setting
+    content: `THE POWER RETAIL PITCH - Full Field Guide
+═══════════════════════════════════════════════════════════
 
-Hello, how are you?
+PHASE 1: THE HOOK (15 seconds or less)
+═══════════════════════════════════════════════════════════
+Goal: Establish authority and create curiosity quickly.
 
-"Eh, you know, working lol"
+"Hi there, how are you? I'll keep this quick—I'm not here to sign anything today. My name is [Name] with Roof ER.
 
-"You look ________, I'll be quick"
+I'm stopping by because we're managing a project for one of your neighbors down the street, and while our crew is active in the area, we're doing complimentary inspections for homes with similar builds."
 
-My name is ___________.
+WHY THIS WORKS:
+• "Not here to sign anything" = Lowers guard immediately
+• "Neighbor project" = Social proof (FOMO)
+• "Similar builds" = Creates relevance
 
-I'm just giving the neighbors a heads up
+═══════════════════════════════════════════════════════════
+PHASE 2: THE PIVOT (Qualification)
+═══════════════════════════════════════════════════════════
+Goal: Identify the problem BEFORE offering the solution.
 
-Our company is about to do the (product) for one of your neighbors. (POINT)
+"Specifically, I noticed you have..."
 
-So, before we get going, we are going to come by, and we are going to do free quotes.
+CHOOSE YOUR PATH BASED ON VISUAL CUES:
 
-So far, we're coming by for everybody in the afternoons, or are the evenings better for you?
+🪟 WINDOWS (Qualifiers: 4+ windows, 10+ years old)
+"...the original window frames. Usually when we see these, neighbors mention drafts in winter or the AC running constantly in summer. Have you noticed that, or are they holding up okay?"
 
-Great! My job is simple.
+🏠 SIDING (Qualifiers: 75% coverage, 10+ years old)
+"...some fading or wear on the siding. We're working with homes that have that split-level coverage to update. How long has this siding been up?"
+Follow-up: "Once siding hits that 10-15 year mark, moisture can start getting behind it without you even seeing it."
+
+🏗️ ROOFING (Qualifiers: Full replacement only, 15+ years old)
+"...some wear on the shingles from the recent weather. When was the last time someone actually got up there to check the integrity?"
+Follow-up: "Most homeowners don't think about the roof until there's a leak—by then it's usually caused interior damage."
+
+☀️ SOLAR (Qualifiers: South-facing, minimal tree coverage, 4KW capable)
+"...perfect southern exposure with almost no tree coverage. Have you seen your electric bill creeping up like everyone else's?"
+Follow-up: "We're finding homes in this area can offset 70-90% of their bill with the right setup."
+
+═══════════════════════════════════════════════════════════
+PHASE 3: THE "NO-PRESSURE" CLOSE
+═══════════════════════════════════════════════════════════
+Goal: Frame it as information delivery, not a sales call.
+
+"Got it. Look, my job is super simple:
 1. I get your name
-2. I'll find a time that works best for you
-3. Leave you with a flyer
+2. Find a time that fits your schedule
+3. Leave you with information
 
----
+We have a specialist in the area tomorrow giving price estimates so you have them for your records. Do mornings or evenings typically work better for you?"
 
-Key Points:
-- Keep it quick and friendly (door-to-door requires brevity)
-- Use the neighbor angle to create social proof and relatability
-- Get commitment on timing preference (afternoon vs evening)
-- GOAL: Set the appointment for a free inspection/quote
-- Not trying to close the sale - just book the appointment
-- Leave with contact info collected and scheduled time
+KEY PHRASE: "For your records" = No commitment implied
 
-Voice Selection: This script works best with Agnes 21 or 21 voice for TTS playback.`
+═══════════════════════════════════════════════════════════
+BODY LANGUAGE & TONALITY TIPS
+═══════════════════════════════════════════════════════════
+✓ Stand at an angle, not directly facing them (less confrontational)
+✓ Hold materials in your hand (looks official)
+✓ Point when you say "neighbor down the street"
+✓ Smile and be conversational, not robotic
+
+TONALITY KEYS:
+• "I'm not here to sign anything" = Casual, reassuring
+• "Does mornings or evenings work better?" = Confident, assumptive
+• "Sound fair?" = Friendly, agreement-seeking
+
+RED FLAGS (Walk Away):
+✗ Aggressive "Get off my property" hostility
+✗ No qualifying factors (wrong product fit)
+✗ Renter (unless doing solar in targeted areas)`
   },
   {
     id: 'retail-stop-signs',
-    title: 'Retail "Stop Signs" & Official Rebuttals',
+    title: 'Power Pitch Stop Signs (Enhanced Rebuttals)',
     category: 'retail',
     division: 'retail',
-    description: 'Official Roof ER rebuttals for the 7 common retail objections',
-    content: `Roof ER "Stop Signs" & Rebuttals for Field Marketers
+    description: 'Enhanced rebuttals for 7 common retail objections with price-lock & inflation framing',
+    content: `POWER PITCH "STOP SIGNS" - Enhanced Rebuttals
 (Goal: Overcome, reframe, and redirect to schedule a free estimate)
 
 ═══════════════════════════════════════════════════════════
-STOP SIGN #1: "I'm not interested."
+🛑 STOP SIGN #1: "I'm not interested."
 ═══════════════════════════════════════════════════════════
-Customer Type: Good S.E.E. Factors (Signs, Equity, Energy bill)
 
-REBUTTAL:
-"Totally fair. We do a lot more than just roofs – windows, siding, doors, solar, gutters. If there's a part of the home you've thought about updating, what do you think will be next for you guys?"
+PRIMARY REBUTTAL:
+"I totally get that. Most people aren't 'interested' in home projects until something breaks. We're just trying to help you get a price locked in now while our team is here, so you aren't scrambling later when prices go up. Since I'm already here, it doesn't hurt to get the info, right?"
+
+BACKUP OPTION (Pivot to other products):
+"Fair enough. We do more than just [product]—windows, siding, roofing, solar. Is there anything else on the home you've thought about updating eventually?"
 
 WHY IT WORKS:
-✓ Accepts rejection gracefully
-✓ Pivots to full product range
-✓ Opens new conversation opportunity
-✓ No pressure, just curiosity
+✓ "Until something breaks" plants a seed
+✓ "Price locked in" creates urgency without pressure
+✓ "Doesn't hurt" is low-commitment ask
+✓ Pivot opens new conversation paths
 
 ═══════════════════════════════════════════════════════════
-STOP SIGN #2: "I'm busy."
+🛑 STOP SIGN #2: "I'm busy." / "Not right now."
 ═══════════════════════════════════════════════════════════
 
-REBUTTAL (Standard):
-"Totally get it - most people are - these days. My job is really simple, I just get your name, I'll find a time that ACTUALLY works around your busy schedule, and I'll leave a flyer"
+PRIMARY REBUTTAL:
+"Totally get it—most people are. This will take 60 seconds right now just to qualify your home, then we'll schedule a time that actually works around your schedule. I just need your name, best phone number, and whether mornings or evenings are better."
 
-REBUTTAL (If busy right this second):
-"We won't take more than 60 seconds now, just to qualify your home."
+ALTERNATIVE (If they seem very rushed):
+"My job is really simple—I just get your name, find a time that ACTUALLY works around your busy schedule, and leave a flyer."
 
 WHY IT WORKS:
-✓ Acknowledges their time immediately
-✓ Three steps make it feel quick and simple
-✓ Offers flexibility for their schedule
-✓ Low commitment ask
+✓ "60 seconds" gives specific time commitment
+✓ Three-step simplicity removes friction
+✓ "Actually works" shows flexibility
+✓ You're scheduling for THEIR convenience
 
 ═══════════════════════════════════════════════════════════
-STOP SIGN #3: "I don't have the money right now."
+🛑 STOP SIGN #3: "I don't have the money right now."
 ═══════════════════════════════════════════════════════════
 
-REBUTTAL:
-"Makes sense, the [Product] is going to have to wait for a little while, huh? To be totally honest with you, that's exactly why we're coming by. We're not looking to rip out anyone's windows today (lol) just while the team is in the area, we are going to leave everyone with that free information on like styles and prices, so that way when you are ready, you'll have a price on file, and you can use that to shop around and see who gives you the best deal"
+PRIMARY REBUTTAL:
+"That's exactly why we're doing this. Material costs keep climbing with inflation. Even if you're not ready today, getting an estimate now gives you a baseline so you know exactly what to budget for. It's about being prepared, not spending money today. Does 4:00 PM or 6:00 PM work better to just get the numbers?"
+
+ALTERNATIVE:
+"Makes sense, the [Product] is going to have to wait for a little while, huh? We're not looking to rip out anyone's windows today (lol)—just while the team is in the area, we're leaving everyone with free information on styles and prices, so when you ARE ready, you'll have a price on file to shop around."
 
 WHY IT WORKS:
-✓ Validates their financial concern with empathy
-✓ "Wait for a little while" shows understanding
-✓ "Not ripping anything out today" removes pressure
-✓ "Price on file" gives future value
-✓ "Shop around" empowers their decision
+✓ Reframes "no money" as "more reason to get info NOW"
+✓ "Inflation" creates logical urgency
+✓ "Baseline to budget" gives practical value
+✓ "Not spending money today" removes immediate pressure
+✓ Assumptive time close at the end
 
 ═══════════════════════════════════════════════════════════
-STOP SIGN #4: "I already have a guy who does that."
+🛑 STOP SIGN #4: "I already have a guy."
 ═══════════════════════════════════════════════════════════
 
-REBUTTAL:
-"That's great — always smart to have someone. We'd still love to give you a second opinion and a competitive quote. Worst case, you get a price check and some new ideas. No harm in seeing options, right?"
+PRIMARY REBUTTAL:
+"That's awesome—it's rare to find a contractor you trust. But does your 'guy' specialize in [product] specifically? We find that generalists often catch different things than specialists. Let us be your 'second opinion'—if his quote is solid, we'll tell you. Worst case, you have a benchmark."
+
+ALTERNATIVE:
+"Great! Then you know the value of a second opinion. Most homeowners like having two quotes to compare anyway—it's just smart."
 
 WHY IT WORKS:
 ✓ Validates their existing relationship
-✓ Positions as helpful, not competitive
-✓ "Second opinion" is non-threatening
-✓ "No harm" removes risk
+✓ "Generalist vs specialist" plants doubt gently
+✓ "If his quote is solid, we'll tell you" = trustworthy
+✓ "Just smart" appeals to their intelligence
 
 ═══════════════════════════════════════════════════════════
-STOP SIGN #5: "I have to talk to my spouse."
+🛑 STOP SIGN #5: "I have to talk to my spouse."
 ═══════════════════════════════════════════════════════════
 
-REBUTTAL (Primary):
-"Of course — we always recommend both decision-makers are involved. We'll lay out all the options, and you two can decide together from there. What's the best time for both of you?"
+PRIMARY REBUTTAL:
+"That makes total sense. Actually, we prefer both of you to be there. We cover a lot of options and technical details, and it's easier if you both hear it directly rather than playing 'telephone' later. When's a time you're both typically home?"
 
-REBUTTAL (Alternative):
-"Makes sense..that's usually something you guys talk about together, right? The [product]? (lol) My job is simple, I just get your name, a time that will work for both of you, and leave you with a flyer"
+ALTERNATIVE:
+"Makes sense...that's usually something you guys talk about together, right? The [product]? (lol) My job is simple—I just get your name, a time that works for both of you, and leave you with a flyer."
 
 WHY IT WORKS:
-✓ Respects the decision-making process
-✓ Includes spouse in the appointment
-✓ Three steps for simplicity
-✓ Gets commitment for when both are home
+✓ Makes spouse involvement sound like YOUR requirement
+✓ "Playing telephone" is relatable problem
+✓ Gets commitment for when BOTH are home
+✓ Increases show rate when both parties know about it
 
 ═══════════════════════════════════════════════════════════
-STOP SIGN #6: "We're just getting ideas right now."
+🛑 STOP SIGN #6: "We're just getting ideas right now."
 ═══════════════════════════════════════════════════════════
 
-REBUTTAL (Primary):
-"Perfect! Our goal is to give you real pricing and recommendations so you're ready when the time comes."
-
-REBUTTAL (Alternative):
-"That's exactly what this is for - useful info and professional insight on your home."
+PRIMARY REBUTTAL:
+"Perfect! That's exactly what this is for. Our goal is to give you real pricing and professional recommendations so when you're ready, you're not starting from scratch. No pressure to move forward—just solid information."
 
 WHY IT WORKS:
-✓ Validates their timeline
-✓ Frames appointment as useful info gathering
-✓ "When the time comes" respects their pace
-✓ Easy yes for information
+✓ Validates their timeline completely
+✓ "Not starting from scratch" shows value
+✓ "No pressure" removes sales anxiety
+✓ Easy yes for "just information"
 
 ═══════════════════════════════════════════════════════════
-STOP SIGN #7: "I don't think we need anything right now."
+🛑 STOP SIGN #7: "I don't think we need anything right now."
 ═══════════════════════════════════════════════════════════
 
-REBUTTAL:
-Use the "No Money" rebuttal - same approach applies.
+REBUTTAL (Same as No Money):
+"Makes sense, the [Product] is going to have to wait for a little while, huh? That's exactly why we're coming by—free info so you have a price on file when you're ready. Prices keep going up, so getting a baseline now just makes sense."
 
-"Makes sense, the [Product] is going to have to wait for a little while, huh? That's exactly why we're coming by - free info so you have a price on file when you're ready."
+═══════════════════════════════════════════════════════════
+🎯 POCKET REBUTTALS (Quick Reference)
+═══════════════════════════════════════════════════════════
+
+"Not interested." → "Most aren't until something breaks. Get a price now while we're here—it's free info for later. Doesn't hurt, right?"
+
+"No money." → "That's WHY we're doing this—prices keep rising. Get a baseline now to budget smart. 4 PM or 6 PM for numbers?"
+
+"Have a guy." → "Great! Does he specialize in [product]? Let us be your second opinion—smart homeowners always compare."
+
+"Talk to spouse." → "Perfect—we need both of you there anyway. Easier than playing telephone. When are you both home?"
+
+"Busy right now." → "60 seconds to qualify, then we'll schedule for when it works. Just need name, number, mornings or evenings?"
+
+"Just getting ideas." → "Perfect! Real pricing and recommendations so you're ready when the time comes. No pressure."
 
 ═══════════════════════════════════════════════════════════
 PRO TIPS FOR ALL STOP SIGNS
@@ -316,92 +372,131 @@ PRO TIPS FOR ALL STOP SIGNS
 3. Keep your tone friendly and conversational
 4. Remember: you're helping, not selling
 5. If they say no twice, leave gracefully with a flyer
-6. The goal is to book an appointment, not close a sale`
+6. The goal is to book an appointment, not close a sale
+7. Use assumptive time closes ("4 PM or 6 PM?")
+8. Keep pivoting until you find what resonates`
   },
   {
     id: 'retail-rehash',
-    title: 'REHASH - Appointment Confirmation Script',
+    title: 'The "Sticky" Rehash (Lock It In)',
     category: 'retail',
     division: 'retail',
-    description: 'Script for confirming retail appointment details with homeowner',
-    content: `REHASH - Appointment Confirmation Script
-(Use this to confirm all details before leaving)
+    description: 'Lock in appointments and prevent cancellations with utility bill commitment',
+    content: `THE "STICKY" REHASH - Lock In & Prevent Cancellations
+Goal: Confirm all details, create micro-commitment, increase show rate.
 
 ═══════════════════════════════════════════════════════════
 THE REHASH SCRIPT
 ═══════════════════════════════════════════════════════════
 
-"Alright, [Homeowner Name], you're all set for your free estimate on the [product — e.g., roof, windows, siding].
+"Alright, [Homeowner Name], you're all set for [Time/Date].
 
-Just to make sure everything's spot-on, I've got:
-– [Confirm Full Address]
-– [Confirm Phone]
-– [Confirm Email]
-
-And you mentioned [confirm the issue/need briefly — e.g., 'your windows are getting drafty,' or 'your roof's about 20 years old'], right?
+Just to confirm:
+• I have [Full Address] correct?
+• Best number for updates is [Phone]?
+• And you mentioned [repeat their specific concern—e.g., 'the drafty windows' or 'wanting to see solar options'], right?
 
 ═══════════════════════════════════════════════════════════
-WHAT TO EXPECT (READ TO HOMEOWNER)
+WHAT TO EXPECT (Set Proper Expectations)
 ═══════════════════════════════════════════════════════════
 
-"Our specialist is going to walk you through everything you need to know—they'll:
+"Our specialist will walk through everything—they'll:
 • Inspect the [product]
 • Take some quick measurements
-• Show you the different styles and options we have available
+• Show you styles and options available
 • Give you clear pricing options
 • Help build a plan that fits your budget
 
 Super straightforward.
 
-Again, we're not looking to rip out any windows on the spot or anything (lol), but if it makes sense and you love what you see, a lot of our homeowners choose to move forward.
-
-It's important that both decision-makers can be there, it helps speed things up and avoid back-and-forth."
-
 ═══════════════════════════════════════════════════════════
-OPTIONAL CLOSE-OUT (If they're hesitant)
+THE UTILITY BILL ASK (Micro-Commitment)
 ═══════════════════════════════════════════════════════════
 
-"Worst case, you get expert advice and numbers to plan for later. Best case, we help you knock it out and get it done the right way. Either way, it's a win."
+"One quick favor: If you can have a recent utility bill handy, it helps our specialist be precise and not waste a second of your time."
+
+WHY THE UTILITY BILL MATTERS:
+✓ It's a small commitment that INCREASES show-rate
+✓ Makes them feel invested in the appointment
+✓ Prepares them for a productive conversation
+✓ Especially critical for Solar appointments
 
 ═══════════════════════════════════════════════════════════
-REHASH CHECKLIST
+THE REASSURANCE CLOSE
 ═══════════════════════════════════════════════════════════
 
-Before you leave, confirm:
-☐ Full address correct
-☐ Best phone number
-☐ Email for follow-up
-☐ The issue/need they mentioned
-☐ Both decision-makers will be present
-☐ Appointment date and time
-☐ Left flyer with your info`
+"Again, we're not ripping out windows on the spot. Worst case, you get expert advice and numbers for the future. Best case, we help you fix the issue for good. Sound fair?"
+
+KEY PHRASES:
+• "Not ripping out windows" = Removes immediate sales pressure
+• "Worst case / Best case" = Both outcomes are positive
+• "Sound fair?" = Gets verbal agreement (micro-yes)
+
+═══════════════════════════════════════════════════════════
+SPOUSE REMINDER (If applicable)
+═══════════════════════════════════════════════════════════
+
+"It's important that both decision-makers are there—it helps speed things up and avoids back-and-forth. We need [Spouse Name] there too, right?"
+
+═══════════════════════════════════════════════════════════
+🔒 STICKY REHASH CHECKLIST
+═══════════════════════════════════════════════════════════
+
+Before you leave, CONFIRM:
+☑️ Full address correct
+☑️ Best phone number for updates
+☑️ Their specific concern/need (repeat it back)
+☑️ Appointment date and time
+☑️ Both decision-makers will be present
+☑️ Asked them to have utility bill ready
+☑️ "Sound fair?" agreement received
+☑️ Left flyer with your contact info
+
+═══════════════════════════════════════════════════════════
+IF THEY SEEM HESITANT AT THE END
+═══════════════════════════════════════════════════════════
+
+"Look, I get it—no one loves appointments. But worst case, you walk away with free expert advice and numbers to plan for later. Best case, we knock it out and you don't have to think about it again. Either way, it's a win for you."
+
+═══════════════════════════════════════════════════════════
+EXAMPLE SMOOTH REHASH
+═══════════════════════════════════════════════════════════
+
+Marketer: "Perfect, Mike. So I have 123 Main Street, 555-0123, and you mentioned the upstairs getting hot. Our specialist will show you energy-efficient options and give you clear pricing. Oh, and if you can have a recent utility bill handy, it helps them be super precise. We're not ripping out windows tomorrow—just getting you solid info. Worst case, you know what to budget for. Best case, we fix it for good. Sound fair?"
+
+Homeowner: "Yeah, sounds good."
+
+Marketer: "Awesome! You'll see our specialist at 6 PM tomorrow. Thanks, Mike!"`
   },
   {
     id: 'retail-qualifiers',
-    title: 'Product Minimum Qualifiers',
+    title: 'Product Qualifiers & Visual Cue Pivots',
     category: 'retail',
     division: 'retail',
-    description: 'Minimum requirements for each retail product type',
-    content: `Product Minimum Qualifiers
-(Know these before setting an appointment)
+    description: 'Minimum requirements and visual cue pivot scripts for each product',
+    content: `PRODUCT QUALIFIERS & VISUAL CUE PIVOTS
+(Know these BEFORE setting an appointment)
 
 ═══════════════════════════════════════════════════════════
 🪟 WINDOWS
 ═══════════════════════════════════════════════════════════
 
-Minimum Requirements:
-• 4 windows (common residential sizes)
-  OR
-• 1 Bay or Bow window
+MINIMUMS:
+• 4+ windows (common residential sizes) OR 1 Bay/Bow window
 • 10 years old or older
 
-Quick Questions to Ask:
+VISUAL CUE PIVOT SCRIPT:
+"...the original window frames. Usually when we see these, neighbors mention drafts in winter or the AC running constantly in summer. Have you noticed that, or are they holding up okay?"
+
+What You're Doing: Planting a seed. Even if they say "they're fine," you've made them think about it.
+
+QUALIFYING QUESTIONS:
 - "About how many windows are you thinking about?"
 - "How old are your current windows?"
 - "Are they single or double pane?"
 
-Don't Set Appointment If:
-✗ Less than 4 windows
+DON'T SET APPOINTMENT IF:
+✗ Less than 4 windows (and no bay/bow)
 ✗ Windows less than 10 years old
 ✗ Already has brand new windows
 
@@ -409,18 +504,21 @@ Don't Set Appointment If:
 🏠 SIDING
 ═══════════════════════════════════════════════════════════
 
-Minimum Requirements:
-• 75% coverage of home
-  OR
-• Entire level of home (e.g., split level)
+MINIMUMS:
+• 75% coverage of home OR entire level (e.g., split level)
 • 10 years old or older
 
-Quick Questions to Ask:
+VISUAL CUE PIVOT SCRIPT:
+"...some fading or wear on the siding. We're working with homes that have that split-level coverage to update. How long has this siding been up?"
+
+Follow-up: "Once siding hits that 10-15 year mark, moisture can start getting behind it without you even seeing it."
+
+QUALIFYING QUESTIONS:
 - "Are you thinking about the whole house or just part of it?"
 - "Is it the original siding or has it been replaced?"
 - "How old is the current siding?"
 
-Don't Set Appointment If:
+DON'T SET APPOINTMENT IF:
 ✗ Just a small patch or repair
 ✗ Less than 75% coverage
 ✗ Siding less than 10 years old
@@ -429,16 +527,21 @@ Don't Set Appointment If:
 🏗️ ROOFING
 ═══════════════════════════════════════════════════════════
 
-Minimum Requirements:
-• Full replacement estimate only
+MINIMUMS:
+• Full replacement estimate only (no repairs)
 • 15 years old or older
 
-Quick Questions to Ask:
+VISUAL CUE PIVOT SCRIPT:
+"...some wear on the shingles from the recent weather. When was the last time someone actually got up there to check the integrity?"
+
+Follow-up: "Most homeowners don't think about the roof until there's a leak—by then it's usually caused interior damage."
+
+QUALIFYING QUESTIONS:
 - "How old is your current roof?"
 - "Have you had any leaks or issues?"
 - "Is it the original roof or has it been replaced?"
 
-Don't Set Appointment If:
+DON'T SET APPOINTMENT IF:
 ✗ Just needs a repair (refer to service dept)
 ✗ Roof less than 15 years old
 ✗ Recently replaced
@@ -447,35 +550,52 @@ Don't Set Appointment If:
 ☀️ SOLAR
 ═══════════════════════════════════════════════════════════
 
-Minimum Requirements:
-• Rear of home predominantly south facing
-• No tree coverage / interference
-• Targeted zip code preferred
+MINIMUMS:
+• South-facing roof (predominantly)
+• Minimal tree coverage/interference
 • 4KW system capability
 • Utility bill gathering preferred
+• Targeted zip code preferred
 
-Quick Questions to Ask:
+VISUAL CUE PIVOT SCRIPT:
+"...perfect southern exposure with almost no tree coverage. Have you seen your electric bill creeping up like everyone else's?"
+
+Follow-up: "We're finding homes in this area can offset 70-90% of their bill with the right setup."
+
+QUALIFYING QUESTIONS:
 - "Which direction does your roof face?"
 - "Are there any trees that shade your roof?"
 - "Do you own the home?"
 - "What's your average monthly electric bill?"
 
-Don't Set Appointment If:
+DON'T SET APPOINTMENT IF:
 ✗ North-facing roof only
 ✗ Heavy tree coverage
 ✗ Renter (not owner)
 ✗ Very low electric bill (under $100/month)
 
 ═══════════════════════════════════════════════════════════
-QUALIFYING TIPS
+📊 QUICK REFERENCE TABLE
+═══════════════════════════════════════════════════════════
+
+| Product  | Minimums                                    |
+|----------|---------------------------------------------|
+| Windows  | 4+ windows OR 1 bay/bow, 10+ years old      |
+| Siding   | 75% coverage OR full level, 10+ years old   |
+| Roofing  | Full replacement only, 15+ years old        |
+| Solar    | South-facing, no trees, 4KW capable         |
+
+═══════════════════════════════════════════════════════════
+🎯 QUALIFYING TIPS
 ═══════════════════════════════════════════════════════════
 
 1. Ask qualifying questions naturally in conversation
 2. Don't interrogate - keep it friendly
-3. If they don't qualify, pivot to another product:
+3. PIVOT when they don't qualify:
    "Windows might not make sense right now, but what about the roof? How old is that?"
 4. Always leave a flyer even if they don't qualify
-5. A good lead today is worth more than a wasted appointment`
+5. A good lead today is worth more than a wasted appointment
+6. Use visual cues before you even ask questions—notice what you see`
   }
 ];
 
@@ -497,7 +617,7 @@ export const getScriptsByCategory = (category: PhoneScript['category']): PhoneSc
  * Get all script categories
  */
 export const getScriptCategories = (): PhoneScript['category'][] => {
-  return ['estimate', 'objection', 'authorization', 'pushback', 'retail'];
+  return ['estimate', 'objection', 'authorization', 'pushback', 'retail', 'door-to-door'];
 };
 
 /**

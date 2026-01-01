@@ -1,7 +1,7 @@
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import { copyFileSync } from 'fs';
+import { copyFileSync, cpSync, existsSync } from 'fs';
 
 // Plugin to copy PWA files to dist after build
 const copyPWAFiles = () => ({
@@ -15,6 +15,12 @@ const copyPWAFiles = () => ({
       // Copy manifest
       copyFileSync('public/manifest.json', 'dist/manifest.json');
       console.log('✓ Copied manifest.json to dist/');
+
+      // Copy demos folder with audio files
+      if (existsSync('public/demos')) {
+        cpSync('public/demos', 'dist/demos', { recursive: true });
+        console.log('✓ Copied demos folder to dist/');
+      }
     } catch (error) {
       console.warn('Warning: Could not copy PWA files:', error.message);
     }

@@ -409,13 +409,14 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         micAnalyser.smoothingTimeConstant = 0.8;
         micAnalyserRef.current = micAnalyser;
 
-        // 4. Build improved system instruction with division-awareness
+        // 4. Build improved system instruction with division-awareness and per-script behavior
         const userDivision = (config.division as 'insurance' | 'retail') || (user?.division as 'insurance' | 'retail') || 'insurance';
         const systemInstruction = buildSystemInstruction(
           config.mode,
           config.difficulty,
           config.script || "No specific script provided",
-          userDivision
+          userDivision,
+          config.scriptId  // Pass scriptId for per-script roleplay behavior
         );
 
         // 5. Connect to Gemini Live

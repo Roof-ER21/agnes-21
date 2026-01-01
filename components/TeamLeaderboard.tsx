@@ -3,23 +3,17 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   Trophy,
   Medal,
-  Award,
   TrendingUp,
   TrendingDown,
   Flame,
   Target,
-  Star,
   ChevronRight,
-  ChevronLeft,
   X,
-  Zap,
-  Crown,
-  BarChart3
+  Crown
 } from 'lucide-react';
 import {
   getSessions,
   getStreak,
-  getAchievementProgress,
   SessionData
 } from '../utils/sessionStorage';
 import { leaderboardApi } from '../utils/apiClient';
@@ -32,16 +26,12 @@ interface LeaderboardUser {
   id: string;
   name: string;
   avatar: string;
-  totalSessions: number;
-  avgScore: number;
   currentStreak: number;
-  achievementCount: number;
+  daysUsed: number;
   recentSessions: SessionData[];
-  scoreImprovement: number;
   rank?: number;
   previousRank?: number;
   rankChange?: number;
-  weekScore?: number;
 }
 
 interface WeeklyWinner {
@@ -51,7 +41,7 @@ interface WeeklyWinner {
   weekStart: string;
 }
 
-type LeaderboardCategory = 'overall' | 'streaks' | 'volume' | 'achievements' | 'rising';
+type LeaderboardCategory = 'streaks' | 'days';
 
 // ============================================
 // XP CALCULATION INFO (For Reference)
@@ -173,16 +163,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ user, onClose }) => {
 
         {/* Stats Grid */}
         <div className="p-6 grid grid-cols-2 gap-4">
-          <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-lg p-4">
-            <div className="text-blue-400 text-sm mb-1">Total Sessions</div>
-            <div className="text-2xl font-bold text-white">{user.totalSessions}</div>
-          </div>
-
-          <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 rounded-lg p-4">
-            <div className="text-green-400 text-sm mb-1">Avg Score</div>
-            <div className="text-2xl font-bold text-white">{user.avgScore}</div>
-          </div>
-
           <div className="bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-orange-500/30 rounded-lg p-4">
             <div className="text-orange-400 text-sm mb-1 flex items-center gap-1">
               <Flame className="w-3 h-3" />
@@ -191,30 +171,12 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ user, onClose }) => {
             <div className="text-2xl font-bold text-white">{user.currentStreak} days</div>
           </div>
 
-          <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-lg p-4">
-            <div className="text-purple-400 text-sm mb-1 flex items-center gap-1">
-              <Trophy className="w-3 h-3" />
-              Achievements
+          <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-lg p-4">
+            <div className="text-blue-400 text-sm mb-1 flex items-center gap-1">
+              <Target className="w-3 h-3" />
+              Days Used
             </div>
-            <div className="text-2xl font-bold text-white">{user.achievementCount}</div>
-          </div>
-        </div>
-
-        {/* Score Trend */}
-        <div className="px-6 pb-4">
-          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-            <div className="text-gray-400 text-sm mb-2 flex items-center justify-between">
-              <span>Score Trend (Last 5 Sessions)</span>
-              <span className={user.scoreImprovement >= 0 ? 'text-green-400' : 'text-red-400'}>
-                {user.scoreImprovement >= 0 ? '+' : ''}{user.scoreImprovement}
-              </span>
-            </div>
-            <Sparkline
-              data={recentScores}
-              width={320}
-              height={40}
-              color={user.scoreImprovement >= 0 ? '#10b981' : '#ef4444'}
-            />
+            <div className="text-2xl font-bold text-white">{user.daysUsed} days</div>
           </div>
         </div>
 
@@ -285,7 +247,7 @@ const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
       }}
       tabIndex={0}
       role="button"
-      aria-label={`View profile for ${user.name}, ranked ${rank}, average score ${user.avgScore}, current streak ${user.currentStreak} days${isCurrentUser ? ' (You)' : ''}`}
+      aria-label={`View profile for ${user.name}, ranked ${rank}, current streak ${user.currentStreak} days, ${user.daysUsed} days used${isCurrentUser ? ' (You)' : ''}`}
       className={`
         relative group cursor-pointer rounded-xl p-4 transition-all duration-300
         ${isTopThree ? 'bg-gradient-to-r from-yellow-500/10 to-red-500/10 border-2 border-yellow-500/30' : 'bg-gray-800/50 border border-gray-700'}
@@ -346,30 +308,16 @@ const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
           {/* Stats Row */}
           <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-1 text-gray-400">
-              <Target className="w-3 h-3" />
-              <span className="text-white font-semibold">{user.avgScore}</span>
-              <span>avg</span>
-            </div>
-            <div className="flex items-center gap-1 text-gray-400">
               <Flame className="w-3 h-3 text-orange-500" />
               <span className="text-white font-semibold">{user.currentStreak}</span>
-              <span>streak</span>
+              <span>day streak</span>
             </div>
             <div className="flex items-center gap-1 text-gray-400">
-              <Trophy className="w-3 h-3 text-purple-500" />
-              <span className="text-white font-semibold">{user.achievementCount}</span>
+              <Target className="w-3 h-3 text-blue-500" />
+              <span className="text-white font-semibold">{user.daysUsed}</span>
+              <span>days used</span>
             </div>
           </div>
-        </div>
-
-        {/* Sparkline */}
-        <div className="hidden md:block">
-          <Sparkline
-            data={user.recentSessions.map(s => s.finalScore || 0)}
-            width={80}
-            height={30}
-            color="#ef4444"
-          />
         </div>
 
         {/* Arrow Indicator */}
@@ -411,7 +359,7 @@ const Podium: React.FC<PodiumProps> = ({ topThree, onUserClick, isUserInTopThree
           }}
           tabIndex={0}
           role="button"
-          aria-label={`Second place: ${second.name}, score ${second.avgScore}. Press Enter to view profile.`}
+          aria-label={`Second place: ${second.name}, ${second.currentStreak} day streak. Press Enter to view profile.`}
           className="flex flex-col items-center cursor-pointer group transform transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:ring-offset-gray-900 rounded-lg"
         >
           <div className="text-6xl mb-2 transform group-hover:scale-110 transition-transform">
@@ -419,7 +367,7 @@ const Podium: React.FC<PodiumProps> = ({ topThree, onUserClick, isUserInTopThree
           </div>
           <div className="text-5xl mb-2">🥈</div>
           <div className="text-white font-bold text-lg mb-1">{second.name}</div>
-          <div className="text-gray-400 text-sm mb-3">Score: {second.avgScore}</div>
+          <div className="text-gray-400 text-sm mb-3 flex items-center gap-1"><Flame className="w-3 h-3 text-orange-500" /> {second.currentStreak} days</div>
           <div className="w-32 h-24 bg-gradient-to-t from-gray-400 to-gray-500 rounded-t-lg shadow-lg flex items-center justify-center">
             <span className="text-white text-3xl font-bold">2</span>
           </div>
@@ -436,7 +384,7 @@ const Podium: React.FC<PodiumProps> = ({ topThree, onUserClick, isUserInTopThree
           }}
           tabIndex={0}
           role="button"
-          aria-label={`First place: ${first.name}, score ${first.avgScore}. Press Enter to view profile.`}
+          aria-label={`First place: ${first.name}, ${first.currentStreak} day streak. Press Enter to view profile.`}
           className="flex flex-col items-center cursor-pointer group transform transition-transform hover:scale-105 -mt-8 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:ring-offset-gray-900 rounded-lg"
         >
           {/* Crown and glow */}
@@ -449,7 +397,7 @@ const Podium: React.FC<PodiumProps> = ({ topThree, onUserClick, isUserInTopThree
           </div>
           <div className="text-6xl mb-2">🥇</div>
           <div className="text-white font-bold text-xl mb-1">{first.name}</div>
-          <div className="text-yellow-400 text-sm font-semibold mb-3">Score: {first.avgScore}</div>
+          <div className="text-yellow-400 text-sm font-semibold mb-3 flex items-center gap-1"><Flame className="w-4 h-4" /> {first.currentStreak} days</div>
           <div className="w-36 h-32 bg-gradient-to-t from-yellow-400 via-yellow-500 to-red-500 rounded-t-lg shadow-2xl shadow-yellow-500/50 flex items-center justify-center relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
             <span className="relative text-white text-4xl font-bold">1</span>
@@ -467,7 +415,7 @@ const Podium: React.FC<PodiumProps> = ({ topThree, onUserClick, isUserInTopThree
           }}
           tabIndex={0}
           role="button"
-          aria-label={`Third place: ${third.name}, score ${third.avgScore}. Press Enter to view profile.`}
+          aria-label={`Third place: ${third.name}, ${third.currentStreak} day streak. Press Enter to view profile.`}
           className="flex flex-col items-center cursor-pointer group transform transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-gray-900 rounded-lg"
         >
           <div className="text-6xl mb-2 transform group-hover:scale-110 transition-transform">
@@ -475,7 +423,7 @@ const Podium: React.FC<PodiumProps> = ({ topThree, onUserClick, isUserInTopThree
           </div>
           <div className="text-5xl mb-2">🥉</div>
           <div className="text-white font-bold text-lg mb-1">{third.name}</div>
-          <div className="text-gray-400 text-sm mb-3">Score: {third.avgScore}</div>
+          <div className="text-gray-400 text-sm mb-3 flex items-center gap-1"><Flame className="w-3 h-3 text-orange-500" /> {third.currentStreak} days</div>
           <div className="w-32 h-20 bg-gradient-to-t from-amber-500 to-amber-600 rounded-t-lg shadow-lg flex items-center justify-center">
             <span className="text-white text-3xl font-bold">3</span>
           </div>
@@ -495,7 +443,7 @@ interface TeamLeaderboardProps {
 
 const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user_0' }) => {
   const { user } = useAuth();
-  const [category, setCategory] = useState<LeaderboardCategory>('overall');
+  const [category, setCategory] = useState<LeaderboardCategory>('streaks');
   const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(null);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [apiUsers, setApiUsers] = useState<LeaderboardUser[] | null>(null);
@@ -506,19 +454,15 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
     const fetchLeaderboard = async () => {
       try {
         const data = await leaderboardApi.get();
-        // Transform API data to LeaderboardUser format (now includes real session stats)
+        // Transform API data to LeaderboardUser format (streaks + days only)
         const transformedUsers: LeaderboardUser[] = data.map((u: any, index: number) => ({
           id: u.id,
           name: u.name,
           avatar: u.avatar,
-          totalSessions: u.totalSessions || 0,
-          avgScore: u.avgScore || 0,
           currentStreak: u.currentStreak || 0,
-          achievementCount: 0, // Can be enhanced later
-          recentSessions: [], // Not included in API response
-          scoreImprovement: 0, // Calculated from recent sessions
-          rank: u.rank || index + 1,
-          weekScore: u.totalXp
+          daysUsed: u.daysUsed || u.totalSessions || 0, // Use daysUsed or fall back to totalSessions
+          recentSessions: [],
+          rank: u.rank || index + 1
         }));
         setApiUsers(transformedUsers);
       } catch (error) {
@@ -553,20 +497,14 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
 
       if (currentUserInList && sessions.length > 0) {
         const streak = getStreak(user.id);
-        const achievementProgress = getAchievementProgress(user.id);
 
         // Update with local session data
         currentUserInList.recentSessions = sessions.slice(-5);
-        currentUserInList.achievementCount = achievementProgress.unlockedAchievements.length;
+        currentUserInList.currentStreak = streak;
 
-        // Calculate score improvement from local sessions
-        const firstFive = sessions.slice(0, 5).filter(s => s.finalScore);
-        const lastFive = sessions.slice(-5).filter(s => s.finalScore);
-        if (firstFive.length > 0 && lastFive.length > 0) {
-          const firstAvg = firstFive.reduce((sum, s) => sum + (s.finalScore || 0), 0) / firstFive.length;
-          const lastAvg = lastFive.reduce((sum, s) => sum + (s.finalScore || 0), 0) / lastFive.length;
-          currentUserInList.scoreImprovement = Math.round(lastAvg - firstAvg);
-        }
+        // Calculate unique days used from sessions
+        const uniqueDays = new Set(sessions.map(s => s.startTime.split('T')[0]));
+        currentUserInList.daysUsed = uniqueDays.size;
       }
     }
 
@@ -578,20 +516,11 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
     const sorted = [...users];
 
     switch (category) {
-      case 'overall':
-        sorted.sort((a, b) => b.avgScore - a.avgScore);
-        break;
       case 'streaks':
         sorted.sort((a, b) => b.currentStreak - a.currentStreak);
         break;
-      case 'volume':
-        sorted.sort((a, b) => b.totalSessions - a.totalSessions);
-        break;
-      case 'achievements':
-        sorted.sort((a, b) => b.achievementCount - a.achievementCount);
-        break;
-      case 'rising':
-        sorted.sort((a, b) => b.scoreImprovement - a.scoreImprovement);
+      case 'days':
+        sorted.sort((a, b) => b.daysUsed - a.daysUsed);
         break;
     }
 
@@ -617,21 +546,15 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
 
   const getCategoryIcon = (cat: LeaderboardCategory) => {
     switch (cat) {
-      case 'overall': return <Trophy className="w-4 h-4" />;
       case 'streaks': return <Flame className="w-4 h-4" />;
-      case 'volume': return <Target className="w-4 h-4" />;
-      case 'achievements': return <Star className="w-4 h-4" />;
-      case 'rising': return <TrendingUp className="w-4 h-4" />;
+      case 'days': return <Target className="w-4 h-4" />;
     }
   };
 
   const getCategoryLabel = (cat: LeaderboardCategory) => {
     switch (cat) {
-      case 'overall': return 'Overall Score';
       case 'streaks': return 'Streak Kings';
-      case 'volume': return 'Volume Leaders';
-      case 'achievements': return 'Achievement Hunters';
-      case 'rising': return 'Rising Stars';
+      case 'days': return 'Days Used';
     }
   };
 
@@ -670,7 +593,7 @@ const TeamLeaderboard: React.FC<TeamLeaderboardProps> = ({ currentUserId = 'user
 
         {/* Category Pills */}
         <div className="flex flex-wrap gap-3">
-          {(['overall', 'streaks', 'volume', 'achievements', 'rising'] as LeaderboardCategory[]).map(cat => (
+          {(['streaks', 'days'] as LeaderboardCategory[]).map(cat => (
             <button
               key={cat}
               onClick={() => setCategory(cat)}
