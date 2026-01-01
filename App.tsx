@@ -657,13 +657,40 @@ const AppContent: React.FC = () => {
                       <optgroup label="Door-to-Door">
                         <option value="initial">Initial Pitch</option>
                         <option value="post">Post-Inspection Pitch</option>
+                        {filteredPhoneScripts
+                          .filter(s => s.category === 'door-to-door')
+                          .map(script => (
+                            <option key={script.id} value={script.id}>{script.title}</option>
+                          ))}
                       </optgroup>
                     )}
-                    <optgroup label="Phone Scripts">
-                      {filteredPhoneScripts.map(script => (
-                        <option key={script.id} value={script.id}>{script.title}</option>
-                      ))}
-                    </optgroup>
+                    {/* Phone Call Scripts - grouped by category */}
+                    {activeDivision === 'insurance' && (
+                      <>
+                        <optgroup label="Estimate Calls">
+                          {filteredPhoneScripts
+                            .filter(s => s.category === 'estimate')
+                            .map(script => (
+                              <option key={script.id} value={script.id}>{script.title}</option>
+                            ))}
+                        </optgroup>
+                        <optgroup label="Insurance Pushback">
+                          {filteredPhoneScripts
+                            .filter(s => s.category === 'pushback')
+                            .map(script => (
+                              <option key={script.id} value={script.id}>{script.title}</option>
+                            ))}
+                        </optgroup>
+                      </>
+                    )}
+                    {/* Retail Scripts */}
+                    {activeDivision === 'retail' && (
+                      <optgroup label="Retail Scripts">
+                        {filteredPhoneScripts.map(script => (
+                          <option key={script.id} value={script.id}>{script.title}</option>
+                        ))}
+                      </optgroup>
+                    )}
                     <optgroup label="Custom">
                       <option value="custom">Custom Script</option>
                     </optgroup>
