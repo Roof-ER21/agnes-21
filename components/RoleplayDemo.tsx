@@ -4,7 +4,7 @@
  * Uses Gemini TTS for dynamic audio generation
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Play,
   Pause,
@@ -24,7 +24,15 @@ import {
   Search,
   Filter
 } from 'lucide-react';
-import { agnesVoiceSpeak, agnesVoiceStop } from '../utils/geminiTTS';
+import { speakWithDemoVoice, stopDemoVoice, type GeminiVoice } from '../utils/geminiTTS';
+
+// Voice assignments for demo roleplay
+// Charon = deeper, authoritative (salesperson)
+// Aoede = warm, natural (homeowner)
+const DEMO_VOICES: Record<'salesperson' | 'homeowner', GeminiVoice> = {
+  salesperson: 'Charon',
+  homeowner: 'Aoede'
+};
 
 // Demo division type
 type DemoDivision = 'insurance' | 'retail';
@@ -209,7 +217,7 @@ const OBJECTION_LEVELS = [
 const DEMO_SCRIPTS: Record<string, Array<{ speaker: 'salesperson' | 'homeowner'; text: string; emotion?: string; note?: string }>> = {
   excellent: [
     // Opening - Hits all 5 non-negotiables perfectly (50 pts)
-    { speaker: 'salesperson', text: "Good morning! My name is Marcus with Roof-ER. How are you doing today?", note: "Non-negotiable #1 & #2: Name + Company intro" },
+    { speaker: 'salesperson', text: "Good morning! My name is Marcus with Roof E-R. How are you doing today?", note: "Non-negotiable #1 & #2: Name + Company intro" },
     { speaker: 'homeowner', text: "I'm alright, just busy with the kids right now." },
     { speaker: 'salesperson', text: "Oh I totally get it - I've got two little ones myself! I'll keep this super quick, I promise.", note: "Builds rapport, acknowledges their time" },
     { speaker: 'homeowner', text: "Okay, what's this about?" },
@@ -233,7 +241,7 @@ const DEMO_SCRIPTS: Record<string, Array<{ speaker: 'salesperson' | 'homeowner';
 
   good: [
     // Opening - Hits most non-negotiables but less warmth
-    { speaker: 'salesperson', text: "Hi there! I'm Marcus from Roof-ER. We're out doing roof inspections in the neighborhood after last week's storm.", note: "Good intro but could be warmer" },
+    { speaker: 'salesperson', text: "Hi there! I'm Marcus from Roof E-R. We're out doing roof inspections in the neighborhood after last week's storm.", note: "Good intro but could be warmer" },
     { speaker: 'homeowner', text: "Okay... what for?" },
     { speaker: 'salesperson', text: "Well, there was a storm last week and we're checking for damage. Your neighbor mentioned they might have some issues so we're going around to help everyone out.", note: "Good reason, vague neighbor reference" },
     { speaker: 'homeowner', text: "I see. We haven't noticed anything wrong with our roof." },
@@ -247,7 +255,7 @@ const DEMO_SCRIPTS: Record<string, Array<{ speaker: 'salesperson' | 'homeowner';
     { speaker: 'homeowner', text: "What exactly are you looking for?" },
     { speaker: 'salesperson', text: "Mainly hail damage - dents in the shingles, cracked tiles, things like that. The storm last week was significant enough that a lot of homes in this zip code are getting new roofs through insurance.", note: "Good specifics" },
     { speaker: 'homeowner', text: "And this is all free?" },
-    { speaker: 'salesperson', text: "Completely free. We only make money if you decide to use us for repairs, and that's your choice.", note: "Honest and direct" },
+    { speaker: 'salesperson', text: "Completely free. We document the damage and submit it to your insurance. If approved, insurance covers everything - you just pay your deductible.", note: "Insurance-focused messaging" },
     { speaker: 'homeowner', text: "Okay, go ahead and take a look then.", emotion: 'neutral' }
   ],
 
@@ -255,12 +263,12 @@ const DEMO_SCRIPTS: Record<string, Array<{ speaker: 'salesperson' | 'homeowner';
     // Weak opening - misses non-negotiables
     { speaker: 'salesperson', text: "Hey there. So we're doing roof inspections today. You interested?", note: "No introduction, too casual - loses 20 pts" },
     { speaker: 'homeowner', text: "Uh, who are you with?" },
-    { speaker: 'salesperson', text: "Oh yeah, Roof-ER. Anyway, there was a storm and your roof probably has damage. Can I check it out?", note: "Skipped rapport, assumed damage" },
+    { speaker: 'salesperson', text: "Oh yeah, Roof E-R. Anyway, there was a storm and your roof probably has damage. Can I check it out?", note: "Skipped rapport, assumed damage" },
     { speaker: 'homeowner', text: "I don't know, we're pretty busy right now..." },
     // Poor objection handling
     { speaker: 'salesperson', text: "It'll only take a few minutes. You really should get it looked at before it gets worse.", note: "Pushy, doesn't acknowledge their concern - loses 10 pts" },
     { speaker: 'homeowner', text: "What company did you say you were with?", emotion: 'suspicious' },
-    { speaker: 'salesperson', text: "Roof-ER. We do a lot of work in this area. So can I get up there or...?", note: "Impatient, skipping trust building" },
+    { speaker: 'salesperson', text: "Roof E-R. We do a lot of work in this area. So can I get up there or...?", note: "Impatient, skipping trust building" },
     { speaker: 'homeowner', text: "I'm not comfortable with that. We don't even know if there's damage." },
     // Getting defensive
     { speaker: 'salesperson', text: "There's definitely damage. Every house on this street got hit by the storm.", note: "Making claims without evidence - loses trust" },
@@ -294,7 +302,7 @@ const DEMO_SCRIPTS: Record<string, Array<{ speaker: 'salesperson' | 'homeowner';
 // Objection-specific demo scenarios for focused training
 const OBJECTION_DEMOS: Record<string, Array<{ speaker: 'salesperson' | 'homeowner'; text: string; emotion?: string; note?: string }>> = {
   'too-busy': [
-    { speaker: 'salesperson', text: "Hi! I'm Marcus with Roof-ER. Is now a good time?" },
+    { speaker: 'salesperson', text: "Hi! I'm Marcus with Roof E-R. Is now a good time?" },
     { speaker: 'homeowner', text: "Actually, I'm really busy right now. We're about to leave.", emotion: 'rushed' },
     { speaker: 'salesperson', text: "No problem at all! I just need 30 seconds to explain why I'm here, and if you're interested, we can schedule a time that works better.", note: "Respects time, offers alternative" },
     { speaker: 'homeowner', text: "Okay, what is it?", emotion: 'hesitant' },
@@ -307,7 +315,7 @@ const OBJECTION_DEMOS: Record<string, Array<{ speaker: 'salesperson' | 'homeowne
   ],
 
   'not-interested': [
-    { speaker: 'salesperson', text: "Good morning! I'm Marcus with Roof-ER..." },
+    { speaker: 'salesperson', text: "Good morning! I'm Marcus with Roof E-R..." },
     { speaker: 'homeowner', text: "Not interested, thanks.", emotion: 'dismissive' },
     { speaker: 'salesperson', text: "Totally understand - you must get a lot of people at your door! Quick question though: did you know the storm last Tuesday actually qualified this area for free roof inspections?", note: "Acknowledges, pivots with question" },
     { speaker: 'homeowner', text: "Free? What do you mean free?", emotion: 'curious' },
@@ -320,7 +328,7 @@ const OBJECTION_DEMOS: Record<string, Array<{ speaker: 'salesperson' | 'homeowne
   ],
 
   'have-a-guy': [
-    { speaker: 'salesperson', text: "Hey there! I'm Marcus with Roof-ER, doing free storm inspections..." },
+    { speaker: 'salesperson', text: "Hey there! I'm Marcus with Roof E-R, doing free storm inspections..." },
     { speaker: 'homeowner', text: "Oh, we already have a roofer we use. Thanks though.", emotion: 'polite' },
     { speaker: 'salesperson', text: "That's great! Having a trusted contractor is important. Has your guy had a chance to check for storm damage from last week's hail?", note: "Validates their choice, asks question" },
     { speaker: 'homeowner', text: "No, we haven't called him yet." },
@@ -333,7 +341,7 @@ const OBJECTION_DEMOS: Record<string, Array<{ speaker: 'salesperson' | 'homeowne
   ],
 
   'no-money': [
-    { speaker: 'salesperson', text: "Hi! I'm Marcus with Roof-ER..." },
+    { speaker: 'salesperson', text: "Hi! I'm Marcus with Roof E-R..." },
     { speaker: 'homeowner', text: "Look, whatever you're selling, we can't afford it right now.", emotion: 'stressed' },
     { speaker: 'salesperson', text: "I hear you - times are tough. But here's the thing: I'm not asking you to spend a dime.", note: "Acknowledges concern immediately" },
     { speaker: 'homeowner', text: "Nothing's ever really free.", emotion: 'skeptical' },
@@ -346,7 +354,7 @@ const OBJECTION_DEMOS: Record<string, Array<{ speaker: 'salesperson' | 'homeowne
   ],
 
   'spouse-not-home': [
-    { speaker: 'salesperson', text: "Good afternoon! I'm Marcus with Roof-ER..." },
+    { speaker: 'salesperson', text: "Good afternoon! I'm Marcus with Roof E-R..." },
     { speaker: 'homeowner', text: "My husband handles all that stuff and he's at work.", emotion: 'unsure' },
     { speaker: 'salesperson', text: "No problem! I don't need anyone to make a decision today. I'm just here to do a free inspection and take photos after last week's storm.", note: "Removes pressure for decision" },
     { speaker: 'homeowner', text: "Well, what would I do with the photos?", emotion: 'curious' },
@@ -567,7 +575,7 @@ const RETAIL_DEMO_SCRIPTS: Record<string, Array<{ speaker: 'salesperson' | 'home
     { speaker: 'homeowner', text: "Okay, what's this about?" },
 
     // Neighbor hook with context (5-6)
-    { speaker: 'salesperson', text: "I'm just giving the neighbors a heads up - our company Roof ER is about to do the windows for the Miller's right there. (POINTS) So before we get going, we're coming by to do free quotes.", note: "Neighbor hook with POINT + free quotes" },
+    { speaker: 'salesperson', text: "I'm just giving the neighbors a heads up - our company Roof E-R is about to do the windows for the Miller's right there. (POINTS) So before we get going, we're coming by to do free quotes.", note: "Neighbor hook with POINT + free quotes" },
     { speaker: 'homeowner', text: "Free quotes for windows?" },
 
     // Value and alternative close (7-8)
@@ -587,7 +595,7 @@ const RETAIL_DEMO_SCRIPTS: Record<string, Array<{ speaker: 'salesperson' | 'home
 
   'retail-good': [
     // Opening - adequate but less warm (1-3)
-    { speaker: 'salesperson', text: "Hi there! I'm Marcus from Roof ER.", note: "Good intro but no 'How are you?'" },
+    { speaker: 'salesperson', text: "Hi there! I'm Marcus from Roof E-R.", note: "Good intro but no 'How are you?'" },
     { speaker: 'homeowner', text: "Okay... what are you selling?" },
     { speaker: 'salesperson', text: "We're doing the windows for your neighbor down the street, so I wanted to let you know we're offering free quotes.", note: "Has neighbor hook but no POINT" },
 
@@ -611,7 +619,7 @@ const RETAIL_DEMO_SCRIPTS: Record<string, Array<{ speaker: 'salesperson' | 'home
     // Weak opening (1-3)
     { speaker: 'salesperson', text: "Hey, we're out doing window quotes in the neighborhood. Interested?", note: "No greeting, no name, no ice breaker" },
     { speaker: 'homeowner', text: "Who are you with?" },
-    { speaker: 'salesperson', text: "Roof ER. Anyway, your windows look pretty old. You should probably get them replaced.", note: "Assumed problem, no rapport" },
+    { speaker: 'salesperson', text: "Roof E-R. Anyway, your windows look pretty old. You should probably get them replaced.", note: "Assumed problem, no rapport" },
 
     // Poor handling (4-6)
     { speaker: 'homeowner', text: "I'm not interested, thanks.", emotion: 'annoyed' },
@@ -645,7 +653,7 @@ const RETAIL_DEMO_SCRIPTS: Record<string, Array<{ speaker: 'salesperson' | 'home
 // Retail Objection Demo Scripts - Using Official "Stop Signs" Rebuttals
 const RETAIL_OBJECTION_DEMOS: Record<string, Array<{ speaker: 'salesperson' | 'homeowner'; text: string; emotion?: string; note?: string }>> = {
   'retail-busy': [
-    { speaker: 'salesperson', text: "Hello! How are you? My name is Marcus with Roof ER.", note: "Warm greeting with name" },
+    { speaker: 'salesperson', text: "Hello! How are you? My name is Marcus with Roof E-R.", note: "Warm greeting with name" },
     { speaker: 'homeowner', text: "I'm really busy right now.", emotion: 'rushed' },
     { speaker: 'salesperson', text: "Totally get it - most people are these days. My job is really simple: I just get your name, find a time that ACTUALLY works around your busy schedule, and leave you with a flyer.", note: "Official 'busy' rebuttal" },
     { speaker: 'homeowner', text: "That's it?", emotion: 'curious' },
@@ -680,7 +688,7 @@ const RETAIL_OBJECTION_DEMOS: Record<string, Array<{ speaker: 'salesperson' | 'h
   ],
 
   'retail-have-guy': [
-    { speaker: 'salesperson', text: "Hello! How are you? I'm Marcus with Roof ER, giving neighbors a heads up...", note: "Standard opening" },
+    { speaker: 'salesperson', text: "Hello! How are you? I'm Marcus with Roof E-R, giving neighbors a heads up...", note: "Standard opening" },
     { speaker: 'homeowner', text: "Oh, we already have a guy who does that.", emotion: 'polite' },
     { speaker: 'salesperson', text: "That's great – always smart to have someone you trust. We'd still love to give you a second opinion and a competitive quote.", note: "Official 'have a guy' rebuttal" },
     { speaker: 'homeowner', text: "I don't want to be disloyal to him though." },
@@ -691,7 +699,7 @@ const RETAIL_OBJECTION_DEMOS: Record<string, Array<{ speaker: 'salesperson' | 'h
   ],
 
   'retail-spouse': [
-    { speaker: 'salesperson', text: "Hello! How are you? I'm Marcus with Roof ER...", note: "Standard opening" },
+    { speaker: 'salesperson', text: "Hello! How are you? I'm Marcus with Roof E-R...", note: "Standard opening" },
     { speaker: 'homeowner', text: "I have to talk to my spouse about anything like this.", emotion: 'unsure' },
     { speaker: 'salesperson', text: "Of course – we always recommend both decision-makers are involved. Makes sense, that's usually something you guys talk about together, right?", note: "Official 'spouse' rebuttal" },
     { speaker: 'homeowner', text: "Yeah, we make all big decisions together." },
@@ -733,6 +741,9 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [audioError, setAudioError] = useState<string | null>(null);
+
+  // Ref to track pause state - prevents callbacks from continuing after pause
+  const isPausedRef = useRef(false);
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -798,6 +809,7 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
     // Skip door slam sound effect
     if (line.text === '[Door slams]') {
       setTimeout(() => {
+        if (isPausedRef.current) return; // Don't continue if paused
         const nextLine = lineIndex + 1;
         if (nextLine < script.length) {
           playCurrentLine(nextLine);
@@ -809,18 +821,26 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
       return;
     }
 
-    // For demos with voice audio, use Gemini TTS
+    // For demos with voice audio, use Gemini TTS with different voices
     if (hasVoiceAudio(selectedLevel) && !isMuted) {
-      console.log(`🎤 Speaking line ${lineIndex + 1}: "${line.text.substring(0, 50)}..."`);
+      // Select voice based on speaker
+      const voice = DEMO_VOICES[line.speaker];
+      console.log(`🎤 Speaking line ${lineIndex + 1} (${line.speaker}/${voice}): "${line.text.substring(0, 50)}..."`);
 
       try {
-        await agnesVoiceSpeak(line.text, 'en', {
+        await speakWithDemoVoice(line.text, voice, {
           onEnd: () => {
+            // Check if paused before continuing
+            if (isPausedRef.current) {
+              console.log('⏸️ Paused, not continuing to next line');
+              return;
+            }
             // Move to next line after speech completes
             const nextLine = lineIndex + 1;
             if (nextLine < script.length) {
               // Small pause between lines
               setTimeout(() => {
+                if (isPausedRef.current) return; // Double-check pause state
                 playCurrentLine(nextLine);
               }, 500);
             } else {
@@ -831,10 +851,15 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
           onError: (error) => {
             console.error('TTS error:', error);
             setAudioError(`Speech failed: ${error}`);
+            // Check pause state before continuing
+            if (isPausedRef.current) return;
             // Continue anyway
             const nextLine = lineIndex + 1;
             if (nextLine < script.length) {
-              setTimeout(() => playCurrentLine(nextLine), 500);
+              setTimeout(() => {
+                if (isPausedRef.current) return;
+                playCurrentLine(nextLine);
+              }, 500);
             } else {
               setIsPlaying(false);
             }
@@ -845,6 +870,7 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
         // Fallback to timed advance if TTS fails
         const readingTime = Math.max(2000, line.text.length * 50);
         setTimeout(() => {
+          if (isPausedRef.current) return;
           const nextLine = lineIndex + 1;
           if (nextLine < script.length) {
             playCurrentLine(nextLine);
@@ -858,6 +884,7 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
       // For muted or non-voice demos, just auto-advance
       const readingTime = Math.max(2000, line.text.length * 50); // ~50ms per character, min 2s
       setTimeout(() => {
+        if (isPausedRef.current) return;
         const nextLine = lineIndex + 1;
         if (nextLine < script.length) {
           playCurrentLine(nextLine);
@@ -872,19 +899,21 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
   // Handle mute changes - stop TTS if muted mid-playback
   useEffect(() => {
     if (isMuted) {
-      agnesVoiceStop();
+      stopDemoVoice();
     }
   }, [isMuted]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      agnesVoiceStop();
+      stopDemoVoice();
+      isPausedRef.current = true; // Prevent any lingering callbacks
     };
   }, []);
 
   const handlePlay = () => {
     setAudioError(null);
+    isPausedRef.current = false; // Clear pause state
     setIsPlaying(true);
     setCurrentLine(0);
     setProgress(0);
@@ -892,18 +921,22 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
   };
 
   const handlePause = () => {
+    isPausedRef.current = true; // Set pause state FIRST
     setIsPlaying(false);
-    agnesVoiceStop();
+    stopDemoVoice();
+    console.log('⏸️ Paused - isPausedRef set to true');
   };
 
   const handleResume = () => {
-    // Resume from current line
+    isPausedRef.current = false; // Clear pause state FIRST
     setIsPlaying(true);
+    console.log('▶️ Resumed - isPausedRef set to false');
     playCurrentLine(currentLine);
   };
 
   const handleRestart = () => {
-    agnesVoiceStop();
+    isPausedRef.current = false; // Clear pause state
+    stopDemoVoice();
     setAudioError(null);
     setCurrentLine(0);
     setProgress(0);
@@ -912,11 +945,12 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
   };
 
   const handleSkip = () => {
-    agnesVoiceStop();
+    stopDemoVoice();
     const nextLine = Math.min(currentLine + 1, script.length - 1);
     setCurrentLine(nextLine);
     setProgress((nextLine / script.length) * 100);
     if (isPlaying) {
+      isPausedRef.current = false; // Make sure we're not paused
       playCurrentLine(nextLine);
     }
   };

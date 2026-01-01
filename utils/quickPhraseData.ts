@@ -22,7 +22,7 @@ export const SYSTEM_PHRASES: QuickPhrase[] = [
   {
     id: 'sys-greeting-2',
     category: 'greeting',
-    englishText: "Hi, my name is with Roof-ER. We're a local roofing company.",
+    englishText: "Hi, my name is [NAME] with Roof E-R. We're a local roofing company.",
     createdBy: 'system',
     scope: 'global',
     translations: {},

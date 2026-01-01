@@ -28,7 +28,7 @@ HOMEOWNER_VOICE = VOICES_DIR / "agnes_21.wav"  # Agnes 21 for homeowner
 DEMO_SCRIPTS = {
     "excellent": {
         "salesperson": [
-            "Good morning! My name is Marcus with Roof-ER. How are you today?",
+            "Good morning! My name is Marcus with Roof E-R. How are you today?",
             "I totally understand - I'll be quick! I'm just out here because we're doing free storm damage inspections in the neighborhood after last week's hail. Your neighbor across the street, the Johnsons, actually just had their roof inspected and we found some damage their insurance is covering completely.",
             "Yeah, it's pretty common after storms like we had. The damage isn't always visible from the ground. Would you mind if I took a quick 10-minute look at your roof? Totally free, no obligation. I just want to make sure you're protected."
         ],
@@ -40,7 +40,7 @@ DEMO_SCRIPTS = {
     },
     "good": {
         "salesperson": [
-            "Hi there! I'm Marcus from Roof-ER. We're out doing roof inspections in the neighborhood.",
+            "Hi there! I'm Marcus from Roof E-R. We're out doing roof inspections in the neighborhood.",
             "Well, there was a storm last week and we're checking for damage. Your neighbor mentioned they might have some issues so we're going around to help everyone out.",
             "That's good! Most storm damage isn't visible from the ground though. Would it be okay if I just took a quick look? It's free and only takes about 10 minutes."
         ],
@@ -53,7 +53,7 @@ DEMO_SCRIPTS = {
     "bad": {
         "salesperson": [
             "Hey there. So we're doing roof inspections today. You interested?",
-            "Oh yeah, Roof-ER. Anyway, there was a storm and your roof probably has damage. Can I check it out?",
+            "Oh yeah, Roof E-R. Anyway, there was a storm and your roof probably has damage. Can I check it out?",
             "It'll only take a few minutes. You really should get it looked at before it gets worse."
         ],
         "homeowner": [

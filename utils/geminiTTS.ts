@@ -870,6 +870,266 @@ export const cleanupGeminiTTS = async (): Promise<void> => {
   ]);
 };
 
+// ============================================
+// Demo Roleplay Voice Support
+// ============================================
+
+/**
+ * Available Gemini voice names for roleplay demos
+ * - Charon: Deep, authoritative male voice (good for salesperson)
+ * - Puck: Neutral, professional voice
+ * - Kore: Warm female voice (good for homeowner)
+ * - Aoede: Natural, warm female voice
+ * - Fenrir: German-style voice
+ */
+export type GeminiVoice = 'Charon' | 'Puck' | 'Kore' | 'Aoede' | 'Fenrir';
+
+// Demo roleplay voice state (with proper session tracking)
+let demoAudioContext: AudioContext | null = null;
+let demoAudioQueue: AudioBufferSourceNode[] = [];
+let demoNextStartTime: number = 0;
+let demoResolveCallback: (() => void) | null = null;
+let demoAiClient: GoogleGenAI | null = null;
+
+// Session tracking to prevent race conditions
+let activeSession: any = null;
+let activeSessionId: string | null = null;
+
+/**
+ * Speak text with a specific voice for demo roleplay
+ * Properly cancels previous session before creating new one
+ */
+export const speakWithDemoVoice = async (
+  text: string,
+  voice: GeminiVoice,
+  options?: {
+    onEnd?: () => void;
+    onError?: (error: string) => void;
+  }
+): Promise<boolean> => {
+  const { onEnd, onError } = options || {};
+
+  if (!text || text.trim().length === 0) {
+    onEnd?.();
+    return true;
+  }
+
+  // Generate unique session ID for this call
+  const sessionId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+  try {
+    // CRITICAL: Cancel any active session first to prevent overlapping audio
+    if (activeSession) {
+      console.log('🛑 Canceling previous demo session');
+      try { activeSession.close(); } catch {}
+      activeSession = null;
+    }
+    activeSessionId = sessionId;
+
+    // Clear all pending audio and reset timing
+    demoAudioQueue.forEach(s => { try { s.stop(); } catch {} });
+    demoAudioQueue = [];
+    demoResolveCallback = null;
+
+    // Initialize client if needed
+    if (!demoAiClient) {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.warn('Gemini API key not found for demo voice');
+        onError?.('API key not found');
+        return false;
+      }
+      demoAiClient = new GoogleGenAI({ apiKey });
+    }
+
+    // Initialize audio context if needed
+    if (!demoAudioContext) {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      demoAudioContext = new AudioContextClass({ sampleRate: 24000 });
+    }
+
+    if (demoAudioContext.state === 'suspended') {
+      await demoAudioContext.resume();
+    }
+
+    // Reset timing to current time (prevents audio scheduling in the past or far future)
+    demoNextStartTime = demoAudioContext.currentTime;
+
+    console.log(`🎭 Demo voice (${voice}): "${text.substring(0, 50)}..." [session: ${sessionId.slice(-6)}]`);
+
+    // Create fresh session with specified voice
+    const session = await demoAiClient.live.connect({
+      model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+      callbacks: {
+        onopen: () => {
+          console.log(`✅ Demo voice session opened (${voice}) [${sessionId.slice(-6)}]`);
+        },
+        onmessage: async (message: LiveServerMessage) => {
+          // CRITICAL: Ignore messages from stale sessions
+          if (sessionId !== activeSessionId) {
+            console.log(`🚫 Ignoring message from stale session [${sessionId.slice(-6)}]`);
+            return;
+          }
+
+          const serverContent = message.serverContent;
+
+          // Handle audio
+          const base64Audio = serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+          if (base64Audio && demoAudioContext) {
+            try {
+              const audioBuffer = await decodeAudioData(
+                base64ToUint8Array(base64Audio),
+                demoAudioContext
+              );
+
+              const source = demoAudioContext.createBufferSource();
+              source.buffer = audioBuffer;
+              source.connect(demoAudioContext.destination);
+
+              const currentTime = demoAudioContext.currentTime;
+              if (demoNextStartTime < currentTime) {
+                demoNextStartTime = currentTime;
+              }
+
+              source.start(demoNextStartTime);
+              demoNextStartTime += audioBuffer.duration;
+
+              demoAudioQueue.push(source);
+              source.onended = () => {
+                const idx = demoAudioQueue.indexOf(source);
+                if (idx > -1) demoAudioQueue.splice(idx, 1);
+              };
+            } catch (error) {
+              console.error('Error playing demo audio:', error);
+            }
+          }
+
+          // Check if done
+          if (serverContent?.turnComplete) {
+            setTimeout(() => {
+              // Only resolve if this is still the active session
+              if (sessionId === activeSessionId && demoResolveCallback) {
+                demoResolveCallback();
+                demoResolveCallback = null;
+              }
+            }, 200);
+          }
+        },
+        onclose: () => {
+          console.log(`Demo voice session closed (${voice}) [${sessionId.slice(-6)}]`);
+          if (sessionId === activeSessionId) {
+            activeSession = null;
+          }
+        },
+        onerror: (error) => {
+          console.error(`Demo voice error (${voice}) [${sessionId.slice(-6)}]:`, error);
+          // Only handle errors for active session
+          if (sessionId === activeSessionId && demoResolveCallback) {
+            demoResolveCallback();
+          }
+        }
+      },
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+          languageCode: 'en-US'
+        },
+        systemInstruction: `You are a voice actor reading a script.
+Read the exact text provided naturally and expressively.
+Do NOT add any commentary, just speak the text.
+Use natural pacing and emotion appropriate for the dialogue.`
+      }
+    });
+
+    // Track this session
+    activeSession = session;
+
+    // Send text and wait for completion
+    const success = await new Promise<boolean>((resolve) => {
+      const timeout = setTimeout(() => {
+        console.warn(`Demo voice timeout (${voice}) [${sessionId.slice(-6)}]`);
+        // Only handle timeout if still active session
+        if (sessionId === activeSessionId) {
+          demoResolveCallback = null;
+          try { session.close(); } catch {}
+          if (activeSession === session) {
+            activeSession = null;
+          }
+        }
+        resolve(false);
+      }, 20000);
+
+      demoResolveCallback = () => {
+        clearTimeout(timeout);
+        try { session.close(); } catch {}
+        if (activeSession === session) {
+          activeSession = null;
+        }
+        resolve(true);
+      };
+
+      try {
+        session.sendClientContent({
+          turns: [{
+            role: 'user',
+            parts: [{ text: `Read this line aloud: "${text}"` }]
+          }],
+          turnComplete: true
+        });
+      } catch (error) {
+        console.error(`Error sending demo text (${voice}) [${sessionId.slice(-6)}]:`, error);
+        clearTimeout(timeout);
+        try { session.close(); } catch {}
+        if (activeSession === session) {
+          activeSession = null;
+        }
+        resolve(false);
+      }
+    });
+
+    if (success) {
+      console.log(`✅ Demo voice success (${voice}) [${sessionId.slice(-6)}]`);
+      onEnd?.();
+      return true;
+    } else {
+      console.log(`⚠️ Demo voice failed (${voice}) [${sessionId.slice(-6)}]`);
+      onError?.('Demo voice failed');
+      return false;
+    }
+  } catch (error) {
+    console.error(`Demo voice error (${voice}) [${sessionId.slice(-6)}]:`, error);
+    onError?.(error instanceof Error ? error.message : 'Unknown error');
+    return false;
+  }
+};
+
+/**
+ * Stop demo voice playback - fully cleans up all state
+ */
+export const stopDemoVoice = (): void => {
+  console.log('🛑 Stopping demo voice playback');
+
+  // Close active session
+  if (activeSession) {
+    try { activeSession.close(); } catch {}
+    activeSession = null;
+  }
+
+  // Invalidate session ID to ignore any pending callbacks
+  activeSessionId = null;
+
+  // Stop all playing audio
+  demoAudioQueue.forEach(s => { try { s.stop(); } catch {} });
+  demoAudioQueue = [];
+
+  // Reset timing
+  demoNextStartTime = 0;
+
+  // Clear callbacks
+  demoResolveCallback = null;
+};
+
 // Legacy exports
 export const speakWithGemini = agnesVoiceSpeak;
 export const stopGeminiSpeaking = agnesVoiceStop;
