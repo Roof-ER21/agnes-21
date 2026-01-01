@@ -894,6 +894,7 @@ let demoAiClient: GoogleGenAI | null = null;
 // Session tracking to prevent race conditions
 let activeSession: any = null;
 let activeSessionId: string | null = null;
+let demoWasStopped = false; // Track if stopped manually (to prevent callbacks)
 
 /**
  * Speak text with a specific voice for demo roleplay
@@ -916,6 +917,9 @@ export const speakWithDemoVoice = async (
 
   // Generate unique session ID for this call
   const sessionId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+  // Clear the stopped flag - we're starting fresh
+  demoWasStopped = false;
 
   try {
     // CRITICAL: Cancel any active session first to prevent overlapping audio
@@ -1088,6 +1092,12 @@ Use natural pacing and emotion appropriate for the dialogue.`
       }
     });
 
+    // Check if we were manually stopped - if so, don't trigger callbacks
+    if (demoWasStopped) {
+      console.log(`⏹️ Demo voice was stopped (${voice}) [${sessionId.slice(-6)}]`);
+      return false; // Return false but don't trigger onEnd/onError
+    }
+
     if (success) {
       console.log(`✅ Demo voice success (${voice}) [${sessionId.slice(-6)}]`);
       onEnd?.();
@@ -1110,6 +1120,9 @@ Use natural pacing and emotion appropriate for the dialogue.`
 export const stopDemoVoice = (): void => {
   console.log('🛑 Stopping demo voice playback');
 
+  // Set stopped flag FIRST - this prevents callbacks from firing
+  demoWasStopped = true;
+
   // Close active session
   if (activeSession) {
     try { activeSession.close(); } catch {}
@@ -1126,8 +1139,12 @@ export const stopDemoVoice = (): void => {
   // Reset timing
   demoNextStartTime = 0;
 
-  // Clear callbacks
-  demoResolveCallback = null;
+  // CRITICAL: Resolve any pending promise to unblock awaiting code
+  // This allows the old playCurrentLine call to complete instead of hanging
+  if (demoResolveCallback) {
+    demoResolveCallback();
+    demoResolveCallback = null;
+  }
 };
 
 // Legacy exports
