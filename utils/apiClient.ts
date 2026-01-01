@@ -309,6 +309,7 @@ export const analyticsApi = {
       name: string;
       email?: string;
       role: string;
+      division?: string;
       avatar: string;
       totalXp: number;
       currentLevel: number;
