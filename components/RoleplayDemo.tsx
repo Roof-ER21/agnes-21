@@ -1,9 +1,10 @@
 /**
  * RoleplayDemo Component
- * Plays pre-generated AI-to-AI roleplay demonstrations showing different quality levels
+ * Plays AI-generated roleplay demonstrations showing different quality levels
+ * Uses Gemini TTS for dynamic audio generation
  */
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Play,
   Pause,
@@ -23,6 +24,7 @@ import {
   Search,
   Filter
 } from 'lucide-react';
+import { agnesVoiceSpeak, agnesVoiceStop } from '../utils/geminiTTS';
 
 // Demo division type
 type DemoDivision = 'insurance' | 'retail';
@@ -202,113 +204,87 @@ const OBJECTION_LEVELS = [
   }
 ];
 
-// Demo scripts with transcript - Expanded with multiple objections and handling techniques
+// Demo scripts with transcript - Full demonstrations using Gemini TTS
+// Each demo shows the complete pitch flow to demonstrate why it earns that score
 const DEMO_SCRIPTS: Record<string, Array<{ speaker: 'salesperson' | 'homeowner'; text: string; emotion?: string; note?: string }>> = {
   excellent: [
-    // Opening with rapport building (1-4)
-    { speaker: 'salesperson', text: "Good morning! My name is Marcus with Roof-ER. How are you doing today?", note: "Friendly intro with name and company" },
+    // Opening - Hits all 5 non-negotiables perfectly (50 pts)
+    { speaker: 'salesperson', text: "Good morning! My name is Marcus with Roof-ER. How are you doing today?", note: "Non-negotiable #1 & #2: Name + Company intro" },
     { speaker: 'homeowner', text: "I'm alright, just busy with the kids right now." },
     { speaker: 'salesperson', text: "Oh I totally get it - I've got two little ones myself! I'll keep this super quick, I promise.", note: "Builds rapport, acknowledges their time" },
     { speaker: 'homeowner', text: "Okay, what's this about?" },
-
-    // Value proposition with social proof (5-8)
-    { speaker: 'salesperson', text: "We're out here doing free storm damage inspections after last Tuesday's hail. Your neighbor across the street, the Johnsons at 1842, just had us out and we found damage their insurance is covering 100%.", note: "Specific neighbor reference, insurance benefit" },
+    // Value proposition with social proof
+    { speaker: 'salesperson', text: "We're out here doing free storm damage inspections after last Tuesday's hail. Your neighbor across the street, the Johnsons at 1842, just had us out and we found damage their insurance is covering 100%.", note: "Non-negotiable #3 & #4: Storm context + Free inspection offer" },
     { speaker: 'homeowner', text: "Really? I didn't even know we had hail." },
     { speaker: 'salesperson', text: "Yeah, it came through around 2am - most people slept right through it. But it hit this area pretty hard.", note: "Provides context, establishes expertise" },
-    { speaker: 'homeowner', text: "Hmm, our roof is only like 8 years old though...", emotion: 'hesitant' },
-
-    // First objection - Roof age (9-10)
-    { speaker: 'salesperson', text: "That's actually when it matters most! Newer roofs can still get damaged, and you want to catch it before your warranty runs out or it causes leaks. An 8-year-old roof has plenty of life left if we protect it now.", note: "Turns objection into benefit" },
-    { speaker: 'homeowner', text: "I don't know... we've got a guy we usually use for stuff like this.", emotion: 'hesitant' },
-
-    // Second objection - Have a guy (11-14)
-    { speaker: 'salesperson', text: "That's great you have someone! Here's the thing though - this inspection is completely free, takes about 10 minutes, and I'll show you exactly what I find with photos on your phone. If there's nothing, you'll have peace of mind. And if there is damage, you can have your guy do the work - no pressure from me.", note: "Removes risk, offers value regardless" },
+    { speaker: 'homeowner', text: "Hmm, our roof is only like 8 years old though..." },
+    // Handles objection smoothly
+    { speaker: 'salesperson', text: "That's actually when it matters most! Newer roofs can still get damaged, and you want to catch it before your warranty runs out. An 8-year-old roof has plenty of life left if we protect it now.", note: "Turns objection into benefit (+10 objection handling)" },
+    { speaker: 'homeowner', text: "I don't know... we've got a guy we usually use for stuff like this." },
+    // Second objection - still smooth
+    { speaker: 'salesperson', text: "That's great you have someone! Here's the thing - this inspection is completely free, takes about 10 minutes, and I'll show you exactly what I find with photos. If there's nothing, you'll have peace of mind. And if there is damage, you can have your guy do the work - no pressure from me.", note: "Removes risk, offers value regardless (+10 objection handling)" },
     { speaker: 'homeowner', text: "So you're not going to try to sell me something?" },
-    { speaker: 'salesperson', text: "Look, here's my card. My job today is just to document any storm damage and show you what I find. If your roof is fine, I shake your hand and move on. If there's damage, I'll explain your options and you can decide what makes sense for your family.", note: "Transparent, gives control to homeowner" },
+    { speaker: 'salesperson', text: "My job today is just to document any storm damage and show you what I find. If your roof is fine, I shake your hand and move on. If there's damage, I'll explain your options and you decide what makes sense for your family.", note: "Transparent, gives control to homeowner" },
     { speaker: 'homeowner', text: "That's... actually fair. How long did you say it takes?" },
-
-    // Close with convenience (15-18)
-    { speaker: 'salesperson', text: "About 10 minutes tops. I can do it right now while you get back to the kids, and I'll knock when I'm done to show you the photos.", note: "Makes it easy, respects their time" },
-    { speaker: 'homeowner', text: "And it's really free? What's the catch?" },
-    { speaker: 'salesperson', text: "No catch - we're here because insurance companies are paying for storm damage repairs right now. The more roofs we inspect, the more families we can help. If we find something, you file a claim; if not, you're all set.", note: "Explains the business model honestly" },
-    { speaker: 'homeowner', text: "Alright, go ahead and take a look.", emotion: 'positive' },
-
-    // Confirmation and next steps (19-20)
-    { speaker: 'salesperson', text: "Perfect! I'll head up now. One quick thing - is there a ladder in the backyard or should I use mine?", note: "Practical, professional transition" },
-    { speaker: 'homeowner', text: "There's one by the garage. Thanks for being upfront about everything.", emotion: 'positive' }
+    // Close - Gets the yes
+    { speaker: 'salesperson', text: "About 10 minutes tops. I can do it right now while you get back to the kids, and I'll knock when I'm done to show you the photos. Sound good?", note: "Non-negotiable #5: Goes for the close" },
+    { speaker: 'homeowner', text: "Alright, go ahead and take a look. Thanks for being upfront about everything.", emotion: 'positive' }
   ],
 
   good: [
-    // Opening - adequate but less warm (1-4)
-    { speaker: 'salesperson', text: "Hi there! I'm Marcus from Roof-ER. We're out doing roof inspections in the neighborhood.", note: "Good intro, could be warmer" },
+    // Opening - Hits most non-negotiables but less warmth
+    { speaker: 'salesperson', text: "Hi there! I'm Marcus from Roof-ER. We're out doing roof inspections in the neighborhood after last week's storm.", note: "Good intro but could be warmer" },
     { speaker: 'homeowner', text: "Okay... what for?" },
     { speaker: 'salesperson', text: "Well, there was a storm last week and we're checking for damage. Your neighbor mentioned they might have some issues so we're going around to help everyone out.", note: "Good reason, vague neighbor reference" },
-    { speaker: 'homeowner', text: "I see. We haven't noticed anything wrong with our roof.", emotion: 'hesitant' },
-
-    // Handling initial skepticism (5-8)
+    { speaker: 'homeowner', text: "I see. We haven't noticed anything wrong with our roof." },
+    // Handles skepticism adequately
     { speaker: 'salesperson', text: "That's actually normal - most storm damage isn't visible from the ground. That's why we do the inspection.", note: "Good response but could be more conversational" },
     { speaker: 'homeowner', text: "How long does it take?" },
     { speaker: 'salesperson', text: "About 10 minutes. We take photos and show you exactly what we find.", note: "Good details" },
     { speaker: 'homeowner', text: "I'm not sure... we're kind of busy today." },
-
-    // Handling time objection (9-12)
+    // Handles time objection
     { speaker: 'salesperson', text: "I understand. Would it help if I just did a quick visual check from the ground first? That way you don't have to wait around.", note: "Good flexibility" },
-    { speaker: 'homeowner', text: "I guess that would be okay." },
-    { speaker: 'salesperson', text: "Great. And if I see anything concerning, I can come back when it's more convenient for a full inspection.", note: "Respects their time" },
     { speaker: 'homeowner', text: "What exactly are you looking for?" },
-
-    // Building credibility (13-16)
     { speaker: 'salesperson', text: "Mainly hail damage - dents in the shingles, cracked tiles, things like that. The storm last week was significant enough that a lot of homes in this zip code are getting new roofs through insurance.", note: "Good specifics" },
     { speaker: 'homeowner', text: "And this is all free?" },
     { speaker: 'salesperson', text: "Completely free. We only make money if you decide to use us for repairs, and that's your choice.", note: "Honest and direct" },
-    { speaker: 'homeowner', text: "Okay, go ahead and take a look then.", emotion: 'neutral' },
-
-    // Wrap up (17-18)
-    { speaker: 'salesperson', text: "Thanks! I'll be quick and come back to show you what I find.", note: "Good professional close" },
-    { speaker: 'homeowner', text: "Sounds good.", emotion: 'neutral' }
+    { speaker: 'homeowner', text: "Okay, go ahead and take a look then.", emotion: 'neutral' }
   ],
 
   bad: [
-    // Weak opening (1-4)
-    { speaker: 'salesperson', text: "Hey there. So we're doing roof inspections today. You interested?", note: "No introduction, too casual" },
+    // Weak opening - misses non-negotiables
+    { speaker: 'salesperson', text: "Hey there. So we're doing roof inspections today. You interested?", note: "No introduction, too casual - loses 20 pts" },
     { speaker: 'homeowner', text: "Uh, who are you with?" },
     { speaker: 'salesperson', text: "Oh yeah, Roof-ER. Anyway, there was a storm and your roof probably has damage. Can I check it out?", note: "Skipped rapport, assumed damage" },
     { speaker: 'homeowner', text: "I don't know, we're pretty busy right now..." },
-
-    // Poor objection handling (5-8)
-    { speaker: 'salesperson', text: "It'll only take a few minutes. You really should get it looked at before it gets worse.", note: "Pushy, doesn't acknowledge their concern" },
+    // Poor objection handling
+    { speaker: 'salesperson', text: "It'll only take a few minutes. You really should get it looked at before it gets worse.", note: "Pushy, doesn't acknowledge their concern - loses 10 pts" },
     { speaker: 'homeowner', text: "What company did you say you were with?", emotion: 'suspicious' },
     { speaker: 'salesperson', text: "Roof-ER. We do a lot of work in this area. So can I get up there or...?", note: "Impatient, skipping trust building" },
     { speaker: 'homeowner', text: "I'm not comfortable with that. We don't even know if there's damage." },
-
-    // Getting defensive (9-12)
-    { speaker: 'salesperson', text: "There's definitely damage. Every house on this street got hit by the storm.", note: "Making claims without evidence" },
+    // Getting defensive
+    { speaker: 'salesperson', text: "There's definitely damage. Every house on this street got hit by the storm.", note: "Making claims without evidence - loses trust" },
     { speaker: 'homeowner', text: "How do you know our roof is damaged?", emotion: 'skeptical' },
-    { speaker: 'salesperson', text: "Because the storm was really bad. Look, I'm just trying to help you out here.", note: "Getting defensive" },
+    { speaker: 'salesperson', text: "Because the storm was really bad. Look, I'm just trying to help you out here.", note: "Getting defensive - loses 10 pts" },
     { speaker: 'homeowner', text: "I appreciate it, but we'll call someone if we notice any issues." },
-
-    // Losing the appointment (13-16)
-    { speaker: 'salesperson', text: "By then it might be too late. Water damage can cost thousands.", note: "Fear tactics" },
-    { speaker: 'homeowner', text: "That's a bit dramatic. I think we're good.", emotion: 'annoyed' },
-    { speaker: 'salesperson', text: "Okay, but don't say I didn't warn you. Here's my card at least.", note: "Poor exit" },
-    { speaker: 'homeowner', text: "Maybe another time.", emotion: 'dismissive' }
+    // Uses fear tactics instead of value
+    { speaker: 'salesperson', text: "By then it might be too late. Water damage can cost thousands.", note: "Fear tactics - loses 15 pts" },
+    { speaker: 'homeowner', text: "That's a bit dramatic. I think we're good. Maybe another time.", emotion: 'dismissive' }
   ],
 
   awful: [
-    // Terrible opening (1-4)
-    { speaker: 'salesperson', text: "Hey, you need a new roof. We're the best company around.", note: "No intro, immediate pressure" },
+    // Terrible opening - aggressive
+    { speaker: 'salesperson', text: "Hey, you need a new roof. We're the best company around.", note: "No intro, immediate pressure - loses all 20 pts" },
     { speaker: 'homeowner', text: "Excuse me? Who are you?" },
-    { speaker: 'salesperson', text: "Doesn't matter. Your roof is definitely damaged. Everyone in this neighborhood is getting work done. Sign up now before spots fill up.", note: "High pressure, making false claims" },
+    { speaker: 'salesperson', text: "Doesn't matter. Your roof is definitely damaged. Everyone in this neighborhood is getting work done. Sign up now before spots fill up.", note: "High pressure, false claims" },
     { speaker: 'homeowner', text: "No thanks, I'm not interested.", emotion: 'annoyed' },
-
-    // Ignoring clear no (5-8)
-    { speaker: 'salesperson', text: "Come on, everyone's doing it. You'd be crazy to pass this up. Your roof is definitely damaged, trust me.", note: "Pushy, manipulative language" },
+    // Ignores clear no - pushy
+    { speaker: 'salesperson', text: "Come on, everyone's doing it. You'd be crazy to pass this up. Your roof is definitely damaged, trust me.", note: "Pushy, manipulative - loses 30 pts" },
     { speaker: 'homeowner', text: "I said no. We're not interested.", emotion: 'angry' },
     { speaker: 'salesperson', text: "Look, I'm doing you a favor here. Your neighbors already signed up. Don't be the one house on the block with a leaky roof.", note: "Peer pressure tactics" },
     { speaker: 'homeowner', text: "Please leave. I'm not going to ask again.", emotion: 'angry' },
-
-    // Complete failure (9-12)
-    { speaker: 'salesperson', text: "Fine, but when your roof caves in, don't come crying to me.", note: "Insulting response" },
+    // Complete failure - insulting
+    { speaker: 'salesperson', text: "Fine, but when your roof caves in, don't come crying to me.", note: "Insulting response - automatic fail" },
     { speaker: 'homeowner', text: "Get off my property.", emotion: 'angry' },
     { speaker: 'salesperson', text: "Whatever. You're making a huge mistake.", note: "Burning bridges" },
     { speaker: 'homeowner', text: "[Door slams]", emotion: 'door_slam' }
@@ -739,17 +715,12 @@ interface Props {
   onBack?: () => void;
 }
 
-// Audio files only exist for quality demos (excellent, good, bad, awful)
+// All demos now use Gemini TTS - no pre-recorded audio files needed
 const QUALITY_DEMO_IDS = ['excellent', 'good', 'bad', 'awful'];
 
-// Helper to check if audio is available for a demo
-const hasAudioFiles = (level: string): boolean => {
+// Helper to check if this is a quality demo (has voice audio)
+const hasVoiceAudio = (level: string): boolean => {
   return QUALITY_DEMO_IDS.includes(level);
-};
-
-// Helper to get audio file path for a script line
-const getAudioPath = (level: string, speaker: 'salesperson' | 'homeowner', index: number): string => {
-  return `/demos/${level}_${speaker}_${index + 1}.wav`;
 };
 
 type CategoryFilter = 'all' | 'quality' | 'objection';
@@ -762,8 +733,6 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [audioError, setAudioError] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const speakerCountRef = useRef<{ salesperson: number; homeowner: number }>({ salesperson: 0, homeowner: 0 });
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -815,22 +784,78 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
     setAudioError(null);
   };
 
-  // Play audio for current line (or advance without audio for objection demos)
-  const playCurrentLine = (lineIndex: number) => {
+  // Play audio for current line using Gemini TTS
+  const playCurrentLine = async (lineIndex: number) => {
     if (!selectedLevel || lineIndex >= script.length) {
       setIsPlaying(false);
       return;
     }
 
     const line = script[lineIndex];
-    const speaker = line.speaker;
+    setCurrentLine(lineIndex);
+    setProgress(((lineIndex + 1) / script.length) * 100);
 
-    // For objection demos (no audio files), just auto-advance through lines
-    if (!hasAudioFiles(selectedLevel)) {
-      setCurrentLine(lineIndex);
-      setProgress(((lineIndex + 1) / script.length) * 100);
+    // Skip door slam sound effect
+    if (line.text === '[Door slams]') {
+      setTimeout(() => {
+        const nextLine = lineIndex + 1;
+        if (nextLine < script.length) {
+          playCurrentLine(nextLine);
+        } else {
+          setIsPlaying(false);
+          setProgress(100);
+        }
+      }, 1000);
+      return;
+    }
 
-      // Auto-advance to next line after a delay (simulating reading time)
+    // For demos with voice audio, use Gemini TTS
+    if (hasVoiceAudio(selectedLevel) && !isMuted) {
+      console.log(`🎤 Speaking line ${lineIndex + 1}: "${line.text.substring(0, 50)}..."`);
+
+      try {
+        await agnesVoiceSpeak(line.text, 'en', {
+          onEnd: () => {
+            // Move to next line after speech completes
+            const nextLine = lineIndex + 1;
+            if (nextLine < script.length) {
+              // Small pause between lines
+              setTimeout(() => {
+                playCurrentLine(nextLine);
+              }, 500);
+            } else {
+              setIsPlaying(false);
+              setProgress(100);
+            }
+          },
+          onError: (error) => {
+            console.error('TTS error:', error);
+            setAudioError(`Speech failed: ${error}`);
+            // Continue anyway
+            const nextLine = lineIndex + 1;
+            if (nextLine < script.length) {
+              setTimeout(() => playCurrentLine(nextLine), 500);
+            } else {
+              setIsPlaying(false);
+            }
+          }
+        });
+      } catch (error) {
+        console.error('TTS exception:', error);
+        // Fallback to timed advance if TTS fails
+        const readingTime = Math.max(2000, line.text.length * 50);
+        setTimeout(() => {
+          const nextLine = lineIndex + 1;
+          if (nextLine < script.length) {
+            playCurrentLine(nextLine);
+          } else {
+            setIsPlaying(false);
+            setProgress(100);
+          }
+        }, readingTime);
+      }
+    } else {
+      // For muted or non-voice demos, just auto-advance
       const readingTime = Math.max(2000, line.text.length * 50); // ~50ms per character, min 2s
       setTimeout(() => {
         const nextLine = lineIndex + 1;
@@ -841,76 +866,20 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
           setProgress(100);
         }
       }, readingTime);
-      return;
     }
-
-    // Count how many times this speaker has spoken (for file indexing)
-    let speakerIndex = 0;
-    for (let i = 0; i <= lineIndex; i++) {
-      if (script[i].speaker === speaker) {
-        speakerIndex++;
-      }
-    }
-
-    const audioPath = getAudioPath(selectedLevel, speaker, speakerIndex - 1);
-    console.log(`Playing audio: ${audioPath}`);
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-
-    const audio = new Audio(audioPath);
-    audio.muted = isMuted;
-    audioRef.current = audio;
-
-    audio.onended = () => {
-      const nextLine = lineIndex + 1;
-      if (nextLine < script.length) {
-        setCurrentLine(nextLine);
-        setProgress((nextLine / script.length) * 100);
-        playCurrentLine(nextLine);
-      } else {
-        setIsPlaying(false);
-        setProgress(100);
-      }
-    };
-
-    audio.onerror = (e) => {
-      console.error(`Audio error for ${audioPath}:`, e);
-      setAudioError(`Could not load audio: ${audioPath}`);
-      // Continue to next line even on error
-      const nextLine = lineIndex + 1;
-      if (nextLine < script.length) {
-        setTimeout(() => {
-          setCurrentLine(nextLine);
-          setProgress((nextLine / script.length) * 100);
-          playCurrentLine(nextLine);
-        }, 500);
-      } else {
-        setIsPlaying(false);
-      }
-    };
-
-    audio.play().catch(err => {
-      console.error('Audio play failed:', err);
-      setAudioError(`Playback failed: ${err.message}`);
-    });
   };
 
-  // Handle mute changes
+  // Handle mute changes - stop TTS if muted mid-playback
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.muted = isMuted;
+    if (isMuted) {
+      agnesVoiceStop();
     }
   }, [isMuted]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
+      agnesVoiceStop();
     };
   }, []);
 
@@ -924,21 +893,17 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
 
   const handlePause = () => {
     setIsPlaying(false);
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+    agnesVoiceStop();
   };
 
   const handleResume = () => {
-    if (audioRef.current && audioRef.current.paused) {
-      setIsPlaying(true);
-      audioRef.current.play().catch(console.error);
-    } else {
-      handlePlay();
-    }
+    // Resume from current line
+    setIsPlaying(true);
+    playCurrentLine(currentLine);
   };
 
   const handleRestart = () => {
+    agnesVoiceStop();
     setAudioError(null);
     setCurrentLine(0);
     setProgress(0);
@@ -947,9 +912,7 @@ const RoleplayDemo: React.FC<Props> = ({ onBack }) => {
   };
 
   const handleSkip = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+    agnesVoiceStop();
     const nextLine = Math.min(currentLine + 1, script.length - 1);
     setCurrentLine(nextLine);
     setProgress((nextLine / script.length) * 100);
