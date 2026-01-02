@@ -69,7 +69,18 @@ ${text}`;
     );
 
     if (!response.ok) {
-      throw new Error(`Translation failed: ${response.statusText}`);
+      const status = response.status;
+      // Provide specific error messages for common API errors
+      if (status === 429) {
+        throw new Error('Rate limit exceeded - too many translation requests. Please wait a moment.');
+      } else if (status === 401) {
+        throw new Error('Invalid API key - translation service unavailable');
+      } else if (status === 403) {
+        throw new Error('API access forbidden - check quota or permissions');
+      } else if (status === 500 || status === 503) {
+        throw new Error('Translation service temporarily unavailable. Please try again.');
+      }
+      throw new Error(`Translation failed (${status}): ${response.statusText}`);
     }
 
     const data = await response.json();
@@ -168,7 +179,18 @@ ${text}`;
     );
 
     if (!response.ok) {
-      throw new Error(`Language detection failed: ${response.statusText}`);
+      const status = response.status;
+      // Provide specific error messages for common API errors
+      if (status === 429) {
+        console.warn('Rate limit exceeded for language detection');
+        return null; // Return null instead of throwing to allow fallback
+      } else if (status === 401 || status === 403) {
+        throw new Error('API access issue - language detection unavailable');
+      } else if (status === 500 || status === 503) {
+        console.warn('Language detection service temporarily unavailable');
+        return null; // Return null instead of throwing to allow fallback
+      }
+      throw new Error(`Language detection failed (${status}): ${response.statusText}`);
     }
 
     const data = await response.json();

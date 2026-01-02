@@ -523,6 +523,7 @@ type SpeechRecognitionCallback = (result: SpeechRecognitionResult) => void;
 type SpeechRecognitionErrorCallback = (error: string) => void;
 
 let recognition: SpeechRecognition | null = null;
+let recognitionInstanceId: number = 0; // Track instance to prevent race conditions
 
 /**
  * Check if speech recognition is supported
@@ -576,6 +577,10 @@ export const startListening = (
   // Stop any existing recognition
   stopListening();
 
+  // Increment instance ID to track this specific recognition session
+  recognitionInstanceId++;
+  const currentInstanceId = recognitionInstanceId;
+
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   recognition = new SpeechRecognition();
 
@@ -588,7 +593,12 @@ export const startListening = (
   recognition.maxAlternatives = 3; // Get multiple alternatives for better accuracy
 
   recognition.onresult = (event) => {
+    // Ignore results from stale instances
+    if (currentInstanceId !== recognitionInstanceId) return;
+
     const result = event.results[event.results.length - 1];
+    if (!result || !result[0]) return; // Bounds checking
+
     const transcript = result[0].transcript;
     const confidence = result[0].confidence;
 
@@ -618,6 +628,9 @@ export const startListening = (
   };
 
   recognition.onerror = (event) => {
+    // Ignore errors from stale instances
+    if (currentInstanceId !== recognitionInstanceId) return;
+
     // Don't report 'no-speech' or 'aborted' as errors - these are normal
     if (event.error === 'no-speech' || event.error === 'aborted') {
       console.log(`Speech recognition: ${event.error}`);
@@ -627,17 +640,26 @@ export const startListening = (
   };
 
   recognition.onend = () => {
-    recognition = null;
+    // Only clean up if this is still the active instance
+    if (currentInstanceId === recognitionInstanceId) {
+      recognition = null;
+    }
     options?.onEnd?.();
   };
 
   // Use a slight delay to ensure audio context is ready
   setTimeout(() => {
+    // Only start if this is still the active instance
+    if (currentInstanceId !== recognitionInstanceId) {
+      console.log('Recognition instance was superseded, not starting');
+      return;
+    }
     try {
       recognition?.start();
       console.log(`Started listening in ${langConfig?.voiceCode || 'en-US'}`);
     } catch (e) {
       console.error('Failed to start recognition:', e);
+      onError('Failed to start recognition');
     }
   }, 100);
 };
@@ -679,6 +701,10 @@ export const detectLanguageFromSpeech = (
 
   stopListening();
 
+  // Increment instance ID to track this specific recognition session
+  recognitionInstanceId++;
+  const currentInstanceId = recognitionInstanceId;
+
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   recognition = new SpeechRecognition();
 
@@ -689,20 +715,45 @@ export const detectLanguageFromSpeech = (
   recognition.maxAlternatives = 1;
 
   const timeoutId = setTimeout(() => {
-    stopListening();
-    onResult(null, '');
+    // Only handle timeout if this is still the active instance
+    if (currentInstanceId === recognitionInstanceId) {
+      stopListening();
+      onResult(null, '');
+    }
   }, timeout);
 
   recognition.onresult = (event) => {
+    // Ignore results from stale instances
+    if (currentInstanceId !== recognitionInstanceId) return;
+
     clearTimeout(timeoutId);
-    const transcript = event.results[0][0].transcript;
-    // We'll use Gemini for actual language detection
-    onResult(null, transcript);
+    if (event.results[0] && event.results[0][0]) {
+      const transcript = event.results[0][0].transcript;
+      // We'll use Gemini for actual language detection
+      onResult(null, transcript);
+    } else {
+      onResult(null, '');
+    }
   };
 
   recognition.onerror = (event) => {
+    // Ignore errors from stale instances
+    if (currentInstanceId !== recognitionInstanceId) return;
+
     clearTimeout(timeoutId);
+    // Clean up recognition on error
+    if (currentInstanceId === recognitionInstanceId) {
+      recognition = null;
+    }
     onError(event.error);
+  };
+
+  // Add onend handler to properly clean up
+  recognition.onend = () => {
+    // Only clean up if this is still the active instance
+    if (currentInstanceId === recognitionInstanceId) {
+      recognition = null;
+    }
   };
 
   recognition.start();

@@ -22,6 +22,7 @@ class GeminiEnglishTTS {
   private isInitialized: boolean = false;
   private nextStartTime: number = 0;
   private isStopped: boolean = false; // Flag to prevent audio after stop
+  private speakSessionId: number = 0; // Track speak session to prevent stale callbacks
 
   async init(): Promise<boolean> {
     if (this.isInitialized) return true;
@@ -148,12 +149,19 @@ Speak clearly and warmly like a professional translator.`
   }
 
   async speak(text: string): Promise<boolean> {
-    // Reset stop flag when starting new speech
+    // Reset stop flag and increment session ID when starting new speech
     this.isStopped = false;
+    this.speakSessionId++;
+    const currentSessionId = this.speakSessionId;
 
     if (!this.isInitialized) {
       const ok = await this.init();
       if (!ok) return false;
+    }
+
+    // Check if stopped during init
+    if (this.isStopped || this.speakSessionId !== currentSessionId) {
+      return false;
     }
 
     const connected = await this.connect();
@@ -162,18 +170,31 @@ Speak clearly and warmly like a professional translator.`
       return false;
     }
 
+    // Check if stopped during connect
+    if (this.isStopped || this.speakSessionId !== currentSessionId) {
+      return false;
+    }
+
     console.log(`🔊 Gemini speaking: "${text.substring(0, 50)}..."`);
 
     return new Promise((resolve) => {
+      let resolved = false; // Prevent double resolution
+
       const timeout = setTimeout(() => {
-        console.warn('Gemini speech timeout');
-        this.resolveCallback = null;
-        resolve(false);
+        if (!resolved && this.speakSessionId === currentSessionId) {
+          resolved = true;
+          console.warn('Gemini speech timeout');
+          this.resolveCallback = null;
+          resolve(false);
+        }
       }, 15000);
 
       this.resolveCallback = () => {
-        clearTimeout(timeout);
-        resolve(true);
+        if (!resolved && this.speakSessionId === currentSessionId) {
+          resolved = true;
+          clearTimeout(timeout);
+          resolve(true);
+        }
       };
 
       try {
@@ -185,9 +206,12 @@ Speak clearly and warmly like a professional translator.`
           turnComplete: true
         });
       } catch (error) {
-        console.error('Error sending to Gemini:', error);
-        clearTimeout(timeout);
-        resolve(false);
+        if (!resolved) {
+          resolved = true;
+          console.error('Error sending to Gemini:', error);
+          clearTimeout(timeout);
+          resolve(false);
+        }
       }
     });
   }
@@ -342,6 +366,7 @@ class GeminiMultiLanguageTTS {
   private isInitialized: boolean = false;
   private nextStartTime: number = 0;
   private isStopped: boolean = false; // Flag to prevent audio after stop
+  private speakSessionId: number = 0; // Track speak session to prevent stale callbacks
 
   async init(): Promise<boolean> {
     if (this.isInitialized) return true;
@@ -489,12 +514,19 @@ Use natural pacing and intonation for the language.`
    * Speak text in any supported language with retry support
    */
   async speak(text: string, langCode: string, retryCount: number = 0): Promise<boolean> {
-    // Reset stop flag when starting new speech
+    // Reset stop flag and increment session ID when starting new speech
     this.isStopped = false;
+    this.speakSessionId++;
+    const currentSessionId = this.speakSessionId;
 
     if (!this.isInitialized) {
       const ok = await this.init();
       if (!ok) return false;
+    }
+
+    // Check if stopped during init
+    if (this.isStopped || this.speakSessionId !== currentSessionId) {
+      return false;
     }
 
     // Check if language is supported
@@ -514,21 +546,34 @@ Use natural pacing and intonation for the language.`
       return false;
     }
 
+    // Check if stopped during session creation
+    if (this.isStopped || this.speakSessionId !== currentSessionId) {
+      return false;
+    }
+
     console.log(`🔊 Gemini speaking in ${langCode}: "${text.substring(0, 50)}..."${retryCount > 0 ? ` (retry ${retryCount})` : ''}`);
 
     // Use longer timeout for non-English languages (30s vs 15s)
     const timeoutMs = langCode === 'en' ? 15000 : 30000;
 
     const success = await new Promise<boolean>((resolve) => {
+      let resolved = false; // Prevent double resolution
+
       const timeout = setTimeout(() => {
-        console.warn(`Gemini speech timeout for ${langCode}`);
-        this.resolveCallback = null;
-        resolve(false);
+        if (!resolved && this.speakSessionId === currentSessionId) {
+          resolved = true;
+          console.warn(`Gemini speech timeout for ${langCode}`);
+          this.resolveCallback = null;
+          resolve(false);
+        }
       }, timeoutMs);
 
       this.resolveCallback = () => {
-        clearTimeout(timeout);
-        resolve(true);
+        if (!resolved && this.speakSessionId === currentSessionId) {
+          resolved = true;
+          clearTimeout(timeout);
+          resolve(true);
+        }
       };
 
       try {
@@ -540,14 +585,17 @@ Use natural pacing and intonation for the language.`
           turnComplete: true
         });
       } catch (error) {
-        console.error(`Error sending to Gemini for ${langCode}:`, error);
-        clearTimeout(timeout);
-        resolve(false);
+        if (!resolved) {
+          resolved = true;
+          console.error(`Error sending to Gemini for ${langCode}:`, error);
+          clearTimeout(timeout);
+          resolve(false);
+        }
       }
     });
 
-    // Retry once for non-English languages if failed
-    if (!success && retryCount < 1 && langCode !== 'en') {
+    // Retry once for non-English languages if failed (but not if stopped)
+    if (!success && retryCount < 1 && langCode !== 'en' && !this.isStopped && this.speakSessionId === currentSessionId) {
       console.log(`🔄 Retrying Gemini TTS for ${langCode}...`);
       return this.speak(text, langCode, retryCount + 1);
     }

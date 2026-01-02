@@ -84,6 +84,10 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage | null>(null);
   const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null);
 
+  // Capture user ID and session start time at session creation (not at save time)
+  const sessionUserIdRef = useRef<string | null>(null);
+  const sessionStartTimeRef = useRef<Date | null>(null);
+
   // Transcript
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [interimText, setInterimText] = useState<string>('');
@@ -370,17 +374,22 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       currentSpeakerRef.current = nextSpeaker;
       setCurrentSpeaker(nextSpeaker);
 
-      // Release turn lock BEFORE calling next turn
-      activeTurnRef.current = false;
-
       // Continue with next turn after natural pause (check pause state)
+      // Keep turn lock until we're done with this turn's work
       if (sessionActiveRef.current && !isPausedRef.current) {
         await naturalPause(400);
+        // Release lock AFTER pause, right before starting next turn
+        activeTurnRef.current = false;
         handleSingleTurn();
+      } else {
+        // Release lock if not continuing
+        activeTurnRef.current = false;
       }
 
     } catch (error) {
       console.error('❌ Turn error:', error);
+
+      // Release turn lock in catch
       activeTurnRef.current = false;
 
       // On timeout or error, retry listening for same speaker (check pause state)
@@ -580,11 +589,15 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
     setIsPaused(false);
     isPausedRef.current = false;
 
+    // Capture user ID and start time NOW (not at save time)
+    sessionUserIdRef.current = user?.id || null;
+    sessionStartTimeRef.current = new Date();
+
     // Show language selection modal immediately
     setAgnesState('activating');
     setShowLanguageSelect(true);
 
-  }, [speechSupported]);
+  }, [speechSupported, user?.id]);
 
   // ============================================
   // End Session
@@ -618,12 +631,12 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
     setIsPaused(false);
     isPausedRef.current = false;
 
-    // Save session if we have transcript
-    if (transcript.length > 0 && user?.id) {
+    // Save session if we have transcript (use captured user ID, not current)
+    if (transcript.length > 0 && sessionUserIdRef.current) {
       saveTranslationSession({
         id: sessionId,
-        userId: user.id,
-        startTime: new Date().toISOString(),
+        userId: sessionUserIdRef.current,
+        startTime: sessionStartTimeRef.current?.toISOString() || new Date().toISOString(),
         endTime: new Date().toISOString(),
         targetLanguage: selectedLanguage || 'es',
         messages: transcript.map(t => ({
@@ -646,7 +659,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       selectedLangRef.current = null;
       setDetectionResult(null);
     }, 2000);
-  }, [transcript, user?.id, sessionId, selectedLanguage]);
+  }, [transcript, sessionId, selectedLanguage]);
 
   // ============================================
   // Quick Phrase Handler
@@ -654,6 +667,12 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
   const handleQuickPhrase = useCallback(async (phrase: string) => {
     if (!sessionActiveRef.current || !selectedLangRef.current) return;
+
+    // Don't allow quick phrases while paused
+    if (isPausedRef.current) {
+      console.log('⚠️ Quick phrase blocked - conversation is paused');
+      return;
+    }
 
     setShowQuickPhrases(false);
     const targetLang = selectedLangRef.current;
