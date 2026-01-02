@@ -115,6 +115,15 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   const selectedLangRef = useRef<SupportedLanguage | null>(null);
   const currentSpeakerRef = useRef<'rep' | 'homeowner'>('homeowner');
 
+  // NEW: Turn locking to prevent concurrent turns
+  const activeTurnRef = useRef<boolean>(false);
+
+  // NEW: Abort controller for cancelling agnesSpeak
+  const speakAbortRef = useRef<boolean>(false);
+
+  // NEW: Timeout ref for cleanup
+  const listenTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // ============================================
   // Speech Recognition Check
   // ============================================
@@ -157,6 +166,12 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       return;
     }
 
+    // Check if we were aborted before starting
+    if (speakAbortRef.current) {
+      console.log('🛑 agnesSpeak aborted before starting');
+      return;
+    }
+
     setAgnesMessage(text);
     console.log(`🔊 Agnes speaking in ${lang} (Gemini Kore): "${text.substring(0, 80)}..."`);
 
@@ -164,16 +179,25 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       // Use Gemini Live TTS for high-quality natural voice
       await agnesVoiceSpeak(text, lang, {
         onEnd: () => {
-          console.log('✅ Agnes finished speaking (Gemini)');
+          if (!speakAbortRef.current) {
+            console.log('✅ Agnes finished speaking (Gemini)');
+          }
         },
         onError: (error) => {
-          console.error('❌ Gemini TTS error:', error);
+          if (!speakAbortRef.current) {
+            console.error('❌ Gemini TTS error:', error);
+          }
         },
       });
     } catch (error) {
-      console.error('❌ Agnes speak error:', error);
+      if (!speakAbortRef.current) {
+        console.error('❌ Agnes speak error:', error);
+      }
     } finally {
-      setAgnesMessage('');
+      // Only clear message if not aborted (prevents race conditions)
+      if (!speakAbortRef.current) {
+        setAgnesMessage('');
+      }
     }
   }, []);
 
@@ -190,8 +214,14 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
       console.log(`Listening for ${speaker} in ${listenLang}`);
 
+      // Clear any existing timeout
+      if (listenTimeoutRef.current) {
+        clearTimeout(listenTimeoutRef.current);
+      }
+
       // Set timeout for silence (45 seconds for longer conversations)
-      const timeout = setTimeout(() => {
+      listenTimeoutRef.current = setTimeout(() => {
+        listenTimeoutRef.current = null;
         stopListening();
         setInterimText('');
         reject(new Error('Listening timeout'));
@@ -203,7 +233,10 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
           setInterimText(result.transcript);
 
           if (result.isFinal && result.transcript.trim()) {
-            clearTimeout(timeout);
+            if (listenTimeoutRef.current) {
+              clearTimeout(listenTimeoutRef.current);
+              listenTimeoutRef.current = null;
+            }
             stopListening();
             setInterimText('');
             console.log(`${speaker} said: "${result.transcript}"`);
@@ -211,7 +244,10 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
           }
         },
         (error) => {
-          clearTimeout(timeout);
+          if (listenTimeoutRef.current) {
+            clearTimeout(listenTimeoutRef.current);
+            listenTimeoutRef.current = null;
+          }
           setInterimText('');
           console.error('Listen error:', error);
           reject(error);
@@ -264,6 +300,13 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       return;
     }
 
+    // TURN LOCKING: Prevent concurrent turns
+    if (activeTurnRef.current) {
+      console.log('⚠️ handleSingleTurn: turn already active, skipping');
+      return;
+    }
+    activeTurnRef.current = true;
+
     const speaker = currentSpeakerRef.current;
     const homeownerLang = selectedLangRef.current;
 
@@ -275,11 +318,20 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       // Natural pause before listening
       await naturalPause(300);
 
+      // Check again in case we were stopped during pause
+      if (!sessionActiveRef.current || isPausedRef.current) {
+        activeTurnRef.current = false;
+        return;
+      }
+
       // Listen for current speaker
       console.log(`👂 Listening for ${speaker}...`);
       const text = await listenForSpeaker(speaker);
 
-      if (!sessionActiveRef.current) return;
+      if (!sessionActiveRef.current) {
+        activeTurnRef.current = false;
+        return;
+      }
 
       console.log(`💬 ${speaker} said: "${text}"`);
 
@@ -294,14 +346,17 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
       console.log(`📝 Translation: "${translation}"`);
 
-      if (!sessionActiveRef.current) return;
+      if (!sessionActiveRef.current) {
+        activeTurnRef.current = false;
+        return;
+      }
 
       // Add to transcript
       addToTranscript(speaker, text, sourceLang, translation, targetLang);
 
       // Speak translation if auto-speak is on
       console.log(`🔊 Auto-speak is ${autoSpeak ? 'ON' : 'OFF'}`);
-      if (autoSpeak) {
+      if (autoSpeak && !isPausedRef.current) {
         setAgnesState('speaking');
         // Natural pause before speaking
         await naturalPause(200);
@@ -315,6 +370,9 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
       currentSpeakerRef.current = nextSpeaker;
       setCurrentSpeaker(nextSpeaker);
 
+      // Release turn lock BEFORE calling next turn
+      activeTurnRef.current = false;
+
       // Continue with next turn after natural pause (check pause state)
       if (sessionActiveRef.current && !isPausedRef.current) {
         await naturalPause(400);
@@ -323,6 +381,8 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
     } catch (error) {
       console.error('❌ Turn error:', error);
+      activeTurnRef.current = false;
+
       // On timeout or error, retry listening for same speaker (check pause state)
       if (sessionActiveRef.current && !isPausedRef.current) {
         console.log('🔄 Retrying...');
@@ -362,11 +422,28 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
   // Start conversation with selected language/dialect
   const startConversationWithLanguage = useCallback(async (lang: SupportedLanguage, dialect?: SupportedDialect) => {
+    console.log(`Language selected: ${lang}${dialect ? ` (${dialect})` : ''}`);
+
+    // CLEANUP: If there's already an active session, clean it up first
+    if (sessionActiveRef.current) {
+      console.log('🧹 Cleaning up previous session before starting new language');
+      speakAbortRef.current = true;
+      if (listenTimeoutRef.current) {
+        clearTimeout(listenTimeoutRef.current);
+        listenTimeoutRef.current = null;
+      }
+      stopListening();
+      agnesVoiceStop();
+      activeTurnRef.current = false;
+      setInterimText('');
+      setAgnesMessage('');
+      await naturalPause(150); // Brief pause for cleanup
+      speakAbortRef.current = false;
+    }
+
     setSelectedLanguage(lang);
     selectedLangRef.current = lang;
     setShowLanguageSelect(false);
-
-    console.log(`Language selected: ${lang}${dialect ? ` (${dialect})` : ''}`);
 
     try {
       // Agnes greets rep first
@@ -402,28 +479,79 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // Conversation Control Handlers
   // ============================================
 
-  const handlePauseConversation = useCallback(() => {
+  // Helper to fully stop all audio and listening
+  const stopAllAudioAndListening = useCallback(() => {
+    // Set abort flag FIRST to prevent callbacks from running
+    speakAbortRef.current = true;
+
+    // Clear any pending listen timeout
+    if (listenTimeoutRef.current) {
+      clearTimeout(listenTimeoutRef.current);
+      listenTimeoutRef.current = null;
+    }
+
+    // Stop listening and audio
     stopListening();
     agnesVoiceStop();
+
+    // Clear UI state
+    setInterimText('');
+    setAgnesMessage('');
+
+    // Release turn lock
+    activeTurnRef.current = false;
+
+    // Reset abort flag after a brief delay (allows cleanup to complete)
+    setTimeout(() => {
+      speakAbortRef.current = false;
+    }, 100);
+  }, []);
+
+  const handlePauseConversation = useCallback(() => {
+    console.log('⏸️ Pausing conversation');
+    stopAllAudioAndListening();
     setIsPaused(true);
     isPausedRef.current = true;
     setAgnesState('idle');
-  }, []);
+  }, [stopAllAudioAndListening]);
 
   const handleResumeConversation = useCallback(async () => {
+    console.log('▶️ Resuming conversation');
     setIsPaused(false);
     isPausedRef.current = false;
+    speakAbortRef.current = false; // Ensure abort is cleared
     await naturalPause(300);
     handleSingleTurn();
   }, [handleSingleTurn]);
 
   const handleSkipTurn = useCallback(async () => {
+    console.log('⏭️ Skipping turn');
+
+    // Stop current audio/listening but DON'T pause
+    speakAbortRef.current = true;
+
+    if (listenTimeoutRef.current) {
+      clearTimeout(listenTimeoutRef.current);
+      listenTimeoutRef.current = null;
+    }
+
     stopListening();
     agnesVoiceStop();
+    setInterimText('');
+    setAgnesMessage('');
+
+    // Release turn lock so next turn can start
+    activeTurnRef.current = false;
+
     // Switch speaker
     const nextSpeaker = currentSpeakerRef.current === 'rep' ? 'homeowner' : 'rep';
     currentSpeakerRef.current = nextSpeaker;
     setCurrentSpeaker(nextSpeaker);
+
+    // Reset abort flag before starting next turn
+    speakAbortRef.current = false;
+
+    // Wait a moment then start next turn (if session still active)
     await naturalPause(300);
     if (sessionActiveRef.current && !isPausedRef.current) {
       handleSingleTurn();
@@ -463,11 +591,27 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // ============================================
 
   const endSession = useCallback(() => {
+    console.log('🛑 Ending session');
+
+    // Set session inactive FIRST
     sessionActiveRef.current = false;
+
+    // Full cleanup of all audio and listening
+    speakAbortRef.current = true;
+
+    if (listenTimeoutRef.current) {
+      clearTimeout(listenTimeoutRef.current);
+      listenTimeoutRef.current = null;
+    }
+
     agnesVoiceStop(); // Stop Gemini + Web Speech
     stopListening();
+    activeTurnRef.current = false;
+
+    // Update UI state
     setAgnesState('ended');
     setInterimText('');
+    setAgnesMessage('');
     setShowLanguageSelect(false);
     setShowDialectPicker(false);
     setPendingLanguage(null);
@@ -496,6 +640,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
     // Reset after a moment
     setTimeout(() => {
+      speakAbortRef.current = false; // Reset abort flag
       setAgnesState('idle');
       setSelectedLanguage(null);
       selectedLangRef.current = null;

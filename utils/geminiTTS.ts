@@ -21,6 +21,7 @@ class GeminiEnglishTTS {
   private resolveCallback: (() => void) | null = null;
   private isInitialized: boolean = false;
   private nextStartTime: number = 0;
+  private isStopped: boolean = false; // Flag to prevent audio after stop
 
   async init(): Promise<boolean> {
     if (this.isInitialized) return true;
@@ -108,7 +109,8 @@ Speak clearly and warmly like a professional translator.`
   }
 
   private async playAudioChunk(base64Audio: string): Promise<void> {
-    if (!this.audioContext) return;
+    // Don't play audio if we've been stopped
+    if (this.isStopped || !this.audioContext) return;
 
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
@@ -119,6 +121,9 @@ Speak clearly and warmly like a professional translator.`
         base64ToUint8Array(base64Audio),
         this.audioContext
       );
+
+      // Double check we weren't stopped during decode
+      if (this.isStopped) return;
 
       const source = this.audioContext.createBufferSource();
       source.buffer = audioBuffer;
@@ -143,6 +148,9 @@ Speak clearly and warmly like a professional translator.`
   }
 
   async speak(text: string): Promise<boolean> {
+    // Reset stop flag when starting new speech
+    this.isStopped = false;
+
     if (!this.isInitialized) {
       const ok = await this.init();
       if (!ok) return false;
@@ -185,16 +193,32 @@ Speak clearly and warmly like a professional translator.`
   }
 
   stop(): void {
+    // Set stopped flag FIRST to prevent any pending audio from playing
+    this.isStopped = true;
+
+    // Stop all queued audio
     this.audioQueue.forEach(s => { try { s.stop(); } catch {} });
     this.audioQueue = [];
     this.nextStartTime = 0;
+
+    // Resolve any pending promise
     this.resolveCallback?.();
     this.resolveCallback = null;
+
+    // Close the session to prevent more audio chunks
+    if (this.session) {
+      try {
+        this.session.close();
+        console.log('🔌 Closed Gemini English session');
+      } catch (e) {
+        // Ignore close errors
+      }
+      this.session = null;
+    }
   }
 
   async cleanup(): Promise<void> {
     this.stop();
-    this.session = null;
     if (this.audioContext && this.audioContext.state !== 'closed') {
       await this.audioContext.close();
     }
@@ -317,6 +341,7 @@ class GeminiMultiLanguageTTS {
   private resolveCallback: (() => void) | null = null;
   private isInitialized: boolean = false;
   private nextStartTime: number = 0;
+  private isStopped: boolean = false; // Flag to prevent audio after stop
 
   async init(): Promise<boolean> {
     if (this.isInitialized) return true;
@@ -415,7 +440,8 @@ Use natural pacing and intonation for the language.`
   }
 
   private async playAudioChunk(base64Audio: string): Promise<void> {
-    if (!this.audioContext) return;
+    // Don't play audio if we've been stopped
+    if (this.isStopped || !this.audioContext) return;
 
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
@@ -426,6 +452,9 @@ Use natural pacing and intonation for the language.`
         base64ToUint8Array(base64Audio),
         this.audioContext
       );
+
+      // Double check we weren't stopped during decode
+      if (this.isStopped) return;
 
       const source = this.audioContext.createBufferSource();
       source.buffer = audioBuffer;
@@ -460,6 +489,9 @@ Use natural pacing and intonation for the language.`
    * Speak text in any supported language with retry support
    */
   async speak(text: string, langCode: string, retryCount: number = 0): Promise<boolean> {
+    // Reset stop flag when starting new speech
+    this.isStopped = false;
+
     if (!this.isInitialized) {
       const ok = await this.init();
       if (!ok) return false;
@@ -524,16 +556,37 @@ Use natural pacing and intonation for the language.`
   }
 
   stop(): void {
+    // Set stopped flag FIRST to prevent any pending audio from playing
+    this.isStopped = true;
+
+    // Stop all queued audio
     this.audioQueue.forEach(s => { try { s.stop(); } catch {} });
     this.audioQueue = [];
     this.nextStartTime = 0;
+
+    // Resolve any pending promise
     this.resolveCallback?.();
     this.resolveCallback = null;
+
+    // Close all active sessions to prevent more audio chunks
+    this.sessions.forEach((session, langCode) => {
+      try {
+        session.close();
+        console.log(`🔌 Closed Gemini session for ${langCode}`);
+      } catch (e) {
+        // Ignore close errors
+      }
+    });
+    this.sessions.clear();
+  }
+
+  // Reset stopped flag (called before speaking)
+  resetStopFlag(): void {
+    this.isStopped = false;
   }
 
   async cleanup(): Promise<void> {
     this.stop();
-    this.sessions.clear();
     if (this.audioContext && this.audioContext.state !== 'closed') {
       await this.audioContext.close();
     }

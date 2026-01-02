@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agnes-21 Training Guide - Retail Division</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 0;
+    }
+    .header {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      padding: 30px 20px;
+      text-align: center;
+      border-radius: 0 0 20px 20px;
+    }
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+      color: white;
+    }
+    .header .subtitle {
+      font-size: 16px;
+      opacity: 0.9;
+      color: white;
+    }
+    .badge {
+      display: inline-block;
+      background: #92400e;
+      color: white;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-top: 12px;
+    }
+    .content { padding: 20px; }
+
+    .section {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      border: 1px solid #334155;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .section-icon {
+      font-size: 32px;
+    }
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+    .section-number {
+      background: #f59e0b;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .step-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #0f172a;
+      padding: 16px;
+      border-radius: 12px;
+      margin: 12px 0;
+      font-size: 24px;
+    }
+    .step-flow .arrow { color: #64748b; }
+
+    .url-box {
+      background: #0f172a;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 14px;
+      color: #f59e0b;
+      text-align: center;
+      margin: 12px 0;
+      word-break: break-all;
+    }
+
+    .mode-card {
+      background: #0f172a;
+      padding: 14px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .mode-icon { font-size: 28px; }
+    .mode-content h4 {
+      font-size: 16px;
+      color: #f1f5f9;
+      margin-bottom: 4px;
+    }
+    .mode-content p {
+      font-size: 14px;
+      color: #94a3b8;
+    }
+
+    .script-list {
+      list-style: none;
+    }
+    .script-list li {
+      padding: 10px 12px;
+      background: #0f172a;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .script-list li::before {
+      content: "📜";
+    }
+
+    .phase-card {
+      background: #0f172a;
+      padding: 14px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      border-left: 4px solid #f59e0b;
+    }
+    .phase-card .phase-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .phase-card .phase-number {
+      background: #f59e0b;
+      color: white;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .phase-card .phase-name {
+      font-weight: 700;
+      font-size: 16px;
+      color: #f1f5f9;
+    }
+    .phase-card .phase-example {
+      color: #94a3b8;
+      font-size: 14px;
+      font-style: italic;
+    }
+
+    .objection-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      background: #0f172a;
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+    .objection-card .stop-sign {
+      background: #ef4444;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .objection-card .objection-text {
+      color: #f1f5f9;
+    }
+
+    .mini-module {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background: #0f172a;
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+    .mini-module .name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mini-module .time {
+      color: #64748b;
+      font-size: 13px;
+    }
+    .mini-module .xp {
+      background: #22c55e;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .bonus-box {
+      background: linear-gradient(135deg, #22c55e20 0%, #16a34a20 100%);
+      border: 2px solid #22c55e;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      margin-top: 12px;
+    }
+    .bonus-box .emoji { font-size: 28px; }
+    .bonus-box .text {
+      font-weight: 600;
+      color: #22c55e;
+      margin-top: 8px;
+    }
+
+    .tip-box {
+      background: #22c55e15;
+      border-left: 4px solid #22c55e;
+      padding: 14px;
+      border-radius: 0 10px 10px 0;
+      margin: 12px 0;
+    }
+    .tip-box .label {
+      color: #22c55e;
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tip-box p {
+      font-size: 14px;
+      color: #cbd5e1;
+    }
+
+    .warning-box {
+      background: #f59e0b15;
+      border-left: 4px solid #f59e0b;
+      padding: 14px;
+      border-radius: 0 10px 10px 0;
+      margin: 12px 0;
+    }
+    .warning-box .label {
+      color: #f59e0b;
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .quote-box {
+      background: #0f172a;
+      border-radius: 10px;
+      padding: 14px;
+      margin: 8px 0;
+      font-style: italic;
+      color: #94a3b8;
+      border-left: 3px solid #f59e0b;
+    }
+    .quote-box .correct {
+      color: #22c55e;
+      font-style: normal;
+      font-weight: 600;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .feature-item {
+      background: #0f172a;
+      padding: 14px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    .feature-item .emoji { font-size: 28px; display: block; margin-bottom: 8px; }
+    .feature-item .name { font-size: 13px; color: #94a3b8; }
+
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .product-item {
+      background: #0f172a;
+      padding: 12px 8px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .product-item .emoji { font-size: 24px; display: block; margin-bottom: 4px; }
+    .product-item .name { font-size: 11px; color: #94a3b8; }
+
+    .footer {
+      text-align: center;
+      padding: 30px 20px;
+      color: #64748b;
+      font-size: 13px;
+    }
+    .footer .logo { font-size: 24px; margin-bottom: 8px; }
+
+    .cta-button {
+      display: block;
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: white;
+      text-decoration: none;
+      padding: 16px 24px;
+      border-radius: 12px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 18px;
+      margin: 20px 0;
+    }
+
+    .three-steps {
+      background: #f59e0b15;
+      border: 2px solid #f59e0b;
+      border-radius: 12px;
+      padding: 16px;
+      margin: 12px 0;
+    }
+    .three-steps .header-text {
+      color: #f59e0b;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .three-steps .steps {
+      display: flex;
+      justify-content: space-around;
+      text-align: center;
+    }
+    .three-steps .step-item .num {
+      background: #f59e0b;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .three-steps .step-item .text {
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🏠 Agnes-21 Training Guide</h1>
+      <p class="subtitle">Your AI Sales Coach</p>
+      <div class="badge">🛒 RETAIL DIVISION</div>
+    </div>
+
+    <div class="content">
+      <!-- Section 1: Getting Started -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-number">1</span>
+          <span class="section-title">Getting Started</span>
+        </div>
+
+        <p style="margin-bottom: 12px;">Open the app in your browser:</p>
+        <div class="url-box">https://livea21.up.railway.app/</div>
+
+        <p style="margin-bottom: 12px;">Login with your name and 4-digit PIN:</p>
+        <div class="step-flow">
+          <span>🌐</span>
+          <span class="arrow">→</span>
+          <span>🔐</span>
+          <span class="arrow">→</span>
+          <span>✅</span>
+        </div>
+
+        <div class="tip-box">
+          <div class="label">💡 PRO TIP</div>
+          <p>Add to your home screen for quick access! On iPhone: tap Share → Add to Home Screen</p>
+        </div>
+      </div>
+
+      <!-- Section 2: Your Dashboard -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-number">2</span>
+          <span class="section-title">Your Dashboard</span>
+        </div>
+
+        <p style="margin-bottom: 16px;">When you log in, you'll see your stats:</p>
+
+        <div class="feature-grid">
+          <div class="feature-item">
+            <span class="emoji">🔥</span>
+            <span class="name">Current Streak</span>
+          </div>
+          <div class="feature-item">
+            <span class="emoji">📊</span>
+            <span class="name">Avg Score</span>
+          </div>
+          <div class="feature-item">
+            <span class="emoji">⭐</span>
+            <span class="name">Your Level</span>
+          </div>
+          <div class="feature-item">
+            <span class="emoji">💎</span>
+            <span class="name">Total XP</span>
+          </div>
+        </div>
+
+        <div class="tip-box">
+          <div class="label">💡 GOAL</div>
+          <p>Train 5 times per week to keep your streak alive!</p>
+        </div>
+      </div>
+
+      <!-- Section 3: Training Modes -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-number">3</span>
+          <span class="section-title">Training Modes</span>
+        </div>
+
+        <p style="margin-bottom: 16px;">Tap <strong>"Start Training"</strong> and choose your mode:</p>
+
+        <div class="mode-card">
+          <span class="mode-icon">🎯</span>
+          <div class="mode-content">
+            <h4>Feedback Mode</h4>
+            <p>Agnes coaches you in real-time as you practice your pitch. Great for learning!</p>
+          </div>
+        </div>
+
+        <div class="mode-card">
+          <span class="mode-icon">🎭</span>
+          <div class="mode-content">
+            <h4>Roleplay Mode</h4>
+            <p>Practice a full conversation with Agnes playing the homeowner. Most realistic!</p>
+          </div>
+        </div>
+
+        <div class="mode-card">
+          <span class="mode-icon">👂</span>
+          <div class="mode-content">
+            <h4>Just Listen</h4>
+            <p>Run through your pitch without interruption. Scored at the end.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 4: Retail Scripts -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-number">4</span>
+          <span class="section-title">Retail Scripts</span>
+        </div>
+
+        <p style="margin-bottom: 16px;">Your division-specific training scripts:</p>
+
+        <ul class="script-list">
+          <li><strong>The Power Retail Pitch</strong> - Complete 5-phase flow</li>
+          <li><strong>Power Pitch Stop Signs</strong> - Handle the 7 objections</li>
+          <li><strong>The "Sticky" Rehash</strong> - Lock in appointments</li>
+          <li><strong>Product Qualifiers</strong> - Visual cue pivots</li>
+        </ul>
+
+        <div class="product-grid">
+          <div class="product-item">
+            <span class="emoji">🪟</span>
+            <span class="name">Windows</span>
+          </div>
+          <div class="product-item">
+            <span class="emoji">🏠</span>
+            <span class="name">Siding</span>
+          </div>
+          <div class="product-item">
+            <span class="emoji">🔨</span>
+            <span class="name">Roofing</span>
+          </div>
+          <div class="product-item">
+            <span class="emoji">☀️</span>
+            <span class="name">Solar</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 5: The 5-Phase Power Pitch -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-number">5</span>
+          <span class="section-title">The 5-Phase Power Pitch</span>
+        </div>
+
+        <p style="margin-bottom: 16px;">Master this flow to set more appointments:</p>
+
+        <div class="phase-card">
+          <div class="phase-header">
+            <span class="phase-number">1</span>
+            <span class="phase-name">HOOK</span>
+          </div>
+          <p class="phase-example">"I'm just giving the neighbors a heads up - our company Roof E-R is about to do the windows for the Miller's right there..." (POINT!)</p>
+        </div>
+
+        <div class="phase-card">
+          <div class="phase-header">
+            <span class="phase-number">2</span>
+            <span class="phase-name">PIVOT</span>
+          </div>
+          <p class="phase-example">"We do a lot more than just roofs - windows, siding, doors, solar, gutters..."</p>
+        </div>
+
+        <div class="phase-card">
+          <div class="phase-header">
+            <span class="phase-number">3</span>
+            <span class="phase-name">CLOSE</span>
+          </div>
+          <p class="phase-example">"So far we're coming by for everybody in the afternoons - or are the evenings better for you?"</p>
+        </div>
+
+        <div class="phase-card">
+          <div class="phase-header">
+            <span class="phase-number">4</span>
+            <span class="phase-name">STOP SIGNS</span>
+          </div>
+          <p class="phase-example">Handle objections with official Roof E-R rebuttals</p>
+        </div>
+
+        <div class="phase-card">
+          <div class="phase-header">
+            <span class="phase-number">5</span>
+            <span class="phase-name">REHASH</span>
+          </div>
+          <p class="phase-example">Lock in the appointment so they don't cancel!</p>
+        </div>
+      </div>
+
+      <!-- Section 6: The 7 Stop Signs -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-number">6</span>
+          <span class="section-title">The 7 "Stop Signs"</span>
+        </div>
+
+        <p style="margin-bottom: 16px;">Common objections you'll hear at the door:</p>
+
+        <div class="objection-card">
+          <span class="stop-sign">STOP</span>
+          <span class="objection-text">"I'm busy right now"</span>
+        </div>
+        <div class="objection-card">
+          <span class="stop-sign">STOP</span>
+          <span class="objection-text">"I don't have the money"</span>
+        </div>
+        <div class="objection-card">
+          <span class="stop-sign">STOP</span>
+          <span class="objection-text">"Not interested"</span>
+        </div>
+        <div class="objection-card">
+          <span class="stop-sign">STOP</span>
+          <span class="objection-text">"I already have a guy"</span>
+        </div>
+        <div class="objection-card">
+          <span class="stop-sign">STOP</span>
+          <span class="objection-text">"Need to talk to my spouse"</span>
+        </div>
+        <div class="objection-card">
+          <span class="stop-sign">STOP</span>
+          <span class="objection-text">"Just getting ideas right now"</span>
+        </div>
+        <div class="objection-card">
+          <span class="stop-sign">STOP</span>
+          <span class="objection-text">"Already getting quotes"</span>
+        </div>
+
+        <div class="three-steps">
+          <div class="header-text">🔑 THE 3-STEP REBUTTAL</div>
+          <div class="steps">
+            <div class="step-item">
+              <div class="num">1</div>
+              <div class="text">Get Name</div>
+            </div>
+            <div class="step-item">
+              <div class="num">2</div>
+              <div class="text">Find Time</div>
+            </div>
+            <div class="step-item">
+              <div class="num">3</div>
+              <div class="text">Leave Flyer</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quote-box">
+          <span class="correct">✅ SAY:</span> "My job is really simple: I just get your name, find a time that ACTUALLY works, and leave you with a flyer."
+        </div>
+      </div>
+
+      <!-- Section 7: Quick Practice -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-number">7</span>
+          <span class="section-title">Quick Practice ⚡</span>
+        </div>
+
+        <p style="margin-bottom: 16px;">Short drills to sharpen specific skills:</p>
+
+        <div class="mini-module">
+          <div class="name">
+            <span>🎤</span>
+            <span>Retail Opening</span>
+          </div>
+          <span class="time">30 sec</span>
+          <span class="xp">+25 XP</span>
+        </div>
+
+        <div class="mini-module">
+          <div class="name">
+            <span>🥊</span>
+            <span>Retail Objections</span>
+          </div>
+          <span class="time">2 min</span>
+          <span class="xp">+50 XP</span>
+        </div>
+
+        <div class="mini-module">
+          <div class="name">
+            <span>📅</span>
+            <span>Set the Appointment</span>
+          </div>
+          <span class="time">1 min</span>
+          <span class="xp">+35 XP</span>
+        </div>
+
+        <div class="mini-module">
+          <div class="name">
+            <span>💬</span>
+            <span>Quick Connect</span>
+          </div>
+          <span class="time">45 sec</span>
+          <span class="xp">+30 XP</span>
+        </div>
+
+        <div class="bonus-box">
+          <span class="emoji">🏆</span>
+          <p class="text">Complete all 4 in one day = +100 BONUS XP!</p>
+        </div>
+      </div>
+
+      <!-- Section 8: Demo Library -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-number">8</span>
+          <span class="section-title">Demo Library 🎬</span>
+        </div>
+
+        <p style="margin-bottom: 16px;">Watch example pitches at 4 quality levels:</p>
+
+        <div class="mini-module">
+          <div class="name">
+            <span>🌟</span>
+            <span>Excellent (95/100)</span>
+          </div>
+        </div>
+        <div class="mini-module">
+          <div class="name">
+            <span>👍</span>
+            <span>Good (70/100)</span>
+          </div>
+        </div>
+        <div class="mini-module">
+          <div class="name">
+            <span>⚠️</span>
+            <span>Needs Work (40/100)</span>
+          </div>
+        </div>
+        <div class="mini-module">
+          <div class="name">
+            <span>🚪</span>
+            <span>Door Slam (15/100)</span>
+          </div>
+        </div>
+
+        <div class="tip-box">
+          <div class="label">💡 WATCH THE REBUTTALS</div>
+          <p>Pay attention to how the Excellent demos handle Stop Signs - these are the official Roof E-R rebuttals!</p>
+        </div>
+      </div>
+
+      <!-- Section 9: Field Translator -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-number">9</span>
+          <span class="section-title">Field Translator 🌍</span>
+        </div>
+
+        <p style="margin-bottom: 12px;">Speaking to a non-English homeowner? Agnes translates for you!</p>
+
+        <div class="step-flow">
+          <span>🗣️ You</span>
+          <span class="arrow">→</span>
+          <span>🌍 Agnes</span>
+          <span class="arrow">→</span>
+          <span>🏠 Homeowner</span>
+        </div>
+
+        <p style="margin-top: 12px; color: #94a3b8; font-size: 14px;">Supports 20+ languages including Spanish, Chinese, Vietnamese, Korean, Arabic, and more!</p>
+      </div>
+
+      <!-- Section 10: Key Phrases -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-number">10</span>
+          <span class="section-title">Key Retail Phrases</span>
+        </div>
+
+        <p style="margin-bottom: 16px;">Memorize these for the door:</p>
+
+        <div class="quote-box">
+          <span class="correct">✅</span> "I'm just giving the neighbors a heads up..."
+        </div>
+
+        <div class="quote-box">
+          <span class="correct">✅</span> "We're not looking to rip out anyone's windows today!"
+        </div>
+
+        <div class="quote-box">
+          <span class="correct">✅</span> "That way when you ARE ready, you'll have a price on file."
+        </div>
+
+        <div class="quote-box">
+          <span class="correct">✅</span> "Afternoons or evenings - which works better for you?"
+        </div>
+
+        <div class="warning-box">
+          <div class="label">⚡ REMEMBER</div>
+          <p>Always POINT to the neighbor's house when you mention them. The point sells it!</p>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <a href="https://livea21.up.railway.app/" class="cta-button">
+        🚀 Start Training Now
+      </a>
+
+      <!-- Footer -->
+      <div class="footer">
+        <div class="logo">🏠</div>
+        <p>Roof E-R • Agnes-21 Training Platform</p>
+        <p style="margin-top: 8px;">Questions? Ask your manager!</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
