@@ -1,42 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <!-- Background gradient -->
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#171717;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#000000;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="red-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#ef4444;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
     </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
     <filter id="shadow">
-      <feDropShadow dx="0" dy="3.84" stdDeviation="5.76" flood-opacity="0.3"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#ef4444" flood-opacity="0.4"/>
     </filter>
   </defs>
-
-  <!-- Background -->
-  <rect width="192" height="192" fill="url(#bg-gradient)" rx="28.799999999999997"/>
-
-  <!-- Text -->
-  <text
-    x="50%"
-    y="50%"
-    font-family="Arial, sans-serif"
-    font-size="67.19999999999999"
-    font-weight="bold"
-    fill="white"
-    text-anchor="middle"
-    dominant-baseline="central"
-    filter="url(#shadow)">
-    A21
-  </text>
-
-  <!-- Small subtitle -->
-  <text
-    x="50%"
-    y="144"
-    font-family="Arial, sans-serif"
-    font-size="23.04"
-    font-weight="normal"
-    fill="rgba(255,255,255,0.8)"
-    text-anchor="middle"
-    dominant-baseline="central">
-    TRAINING
-  </text>
+  <rect width="512" height="512" fill="url(#bg-gradient)" rx="102"/>
+  <rect width="508" height="508" x="2" y="2" fill="none" stroke="url(#red-gradient)" stroke-width="2" rx="100" opacity="0.3"/>
+  <text x="50%" y="52%" font-family="-apple-system, BlinkMacSystemFont, SF Pro Display, Segoe UI, Roboto, sans-serif" font-size="180" font-weight="800" fill="white" text-anchor="middle" dominant-baseline="central" letter-spacing="-8" filter="url(#shadow)">a21</text>
+  <rect x="126" y="340" width="260" height="8" rx="4" fill="url(#red-gradient)" filter="url(#glow)"/>
 </svg>
