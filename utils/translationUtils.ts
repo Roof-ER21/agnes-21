@@ -13,6 +13,39 @@ import {
 } from '../types';
 
 // ============================================
+// API Timeout Configuration
+// ============================================
+
+const API_TIMEOUT_MS = 15000; // 15 second timeout for API calls
+
+/**
+ * Fetch with timeout using AbortController
+ */
+const fetchWithTimeout = async (
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = API_TIMEOUT_MS
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+// ============================================
 // Translation with Gemini
 // ============================================
 
@@ -24,6 +57,13 @@ export const translateText = async (
   targetLang: SupportedLanguage,
   sourceLang?: SupportedLanguage
 ): Promise<string> => {
+  // Validate input text
+  const trimmedText = text?.trim();
+  if (!trimmedText) {
+    console.warn('translateText called with empty text');
+    return '';
+  }
+
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY not configured');
@@ -47,7 +87,7 @@ Text to translate:
 ${text}`;
 
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
@@ -65,7 +105,8 @@ ${text}`;
             maxOutputTokens: 1000,
           },
         }),
-      }
+      },
+      API_TIMEOUT_MS
     );
 
     if (!response.ok) {
@@ -115,8 +156,15 @@ export const detectLanguage = async (text: string): Promise<SupportedLanguage | 
  * Uses caching for high-confidence results
  */
 export const detectLanguageWithDialect = async (text: string): Promise<DetectionResult | null> => {
+  // Validate input text
+  const trimmedText = text?.trim();
+  if (!trimmedText) {
+    console.warn('detectLanguageWithDialect called with empty text');
+    return null;
+  }
+
   // Check cache first
-  const cached = getCachedDetection(text);
+  const cached = getCachedDetection(trimmedText);
   if (cached) {
     return cached;
   }
@@ -157,7 +205,7 @@ Text to analyze:
 ${text}`;
 
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
@@ -175,7 +223,8 @@ ${text}`;
             maxOutputTokens: 100,
           },
         }),
-      }
+      },
+      API_TIMEOUT_MS
     );
 
     if (!response.ok) {
@@ -462,15 +511,24 @@ export const translateWithCache = async (
   targetLang: SupportedLanguage,
   sourceLang?: SupportedLanguage
 ): Promise<string> => {
+  // Validate input text early
+  const trimmedText = text?.trim();
+  if (!trimmedText) {
+    console.warn('translateWithCache called with empty text');
+    return '';
+  }
+
   // Check cache first
-  const cached = getCachedTranslation(text, targetLang);
+  const cached = getCachedTranslation(trimmedText, targetLang);
   if (cached) {
     return cached;
   }
 
   // Translate and cache
-  const translation = await translateText(text, targetLang, sourceLang);
-  cacheTranslation(text, targetLang, translation);
+  const translation = await translateText(trimmedText, targetLang, sourceLang);
+  if (translation) {
+    cacheTranslation(trimmedText, targetLang, translation);
+  }
   return translation;
 };
 
@@ -481,36 +539,58 @@ export const translateWithCache = async (
 const BATCH_CONCURRENCY_LIMIT = 3; // Max parallel API calls
 
 /**
- * Run promises with concurrency limit
+ * Run promises with concurrency limit (proper semaphore pattern)
  */
 const limitConcurrency = async <T>(
   tasks: (() => Promise<T>)[],
   limit: number
 ): Promise<T[]> => {
-  const results: T[] = [];
-  const executing: Promise<void>[] = [];
+  const results: T[] = new Array(tasks.length);
+  let currentIndex = 0;
+  let completedCount = 0;
 
-  for (const task of tasks) {
-    const p = Promise.resolve().then(() => task()).then(result => {
-      results.push(result);
-    });
+  return new Promise((resolve, reject) => {
+    // Track active workers
+    let activeWorkers = 0;
 
-    executing.push(p);
-
-    if (executing.length >= limit) {
-      await Promise.race(executing);
-      // Remove completed promises
-      for (let i = executing.length - 1; i >= 0; i--) {
-        if (executing[i] === p) {
-          executing.splice(i, 1);
-          break;
+    const startNext = () => {
+      // If all tasks are started, just wait for completion
+      if (currentIndex >= tasks.length) {
+        if (completedCount >= tasks.length) {
+          resolve(results);
         }
+        return;
       }
-    }
-  }
 
-  await Promise.all(executing);
-  return results;
+      // Start new tasks up to the limit
+      while (activeWorkers < limit && currentIndex < tasks.length) {
+        const taskIndex = currentIndex++;
+        activeWorkers++;
+
+        tasks[taskIndex]()
+          .then(result => {
+            results[taskIndex] = result;
+          })
+          .catch(error => {
+            // Store error but continue with other tasks
+            console.error(`Task ${taskIndex} failed:`, error);
+            results[taskIndex] = undefined as T; // Mark as failed
+          })
+          .finally(() => {
+            activeWorkers--;
+            completedCount++;
+            startNext();
+          });
+      }
+    };
+
+    // Kick off initial batch
+    if (tasks.length === 0) {
+      resolve([]);
+    } else {
+      startNext();
+    }
+  });
 };
 
 /**

@@ -117,6 +117,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   // Refs for async operations
   const sessionActiveRef = useRef<boolean>(false);
   const selectedLangRef = useRef<SupportedLanguage | null>(null);
+  const selectedDialectRef = useRef<SupportedDialect | null>(null); // Track dialect for TTS
   const currentSpeakerRef = useRef<'rep' | 'homeowner'>('homeowner');
 
   // NEW: Turn locking to prevent concurrent turns
@@ -364,8 +365,12 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
         setAgnesState('speaking');
         // Natural pause before speaking
         await naturalPause(200);
-        console.log(`🗣️ Speaking translation in ${targetLang}...`);
-        await agnesSpeak(translation, targetLang);
+        // Use dialect for TTS if available (for accent), otherwise use base language
+        const speakLang = targetLang === homeownerLang && selectedDialectRef.current
+          ? selectedDialectRef.current
+          : targetLang;
+        console.log(`🗣️ Speaking translation in ${speakLang}...`);
+        await agnesSpeak(translation, speakLang);
         console.log(`✅ Done speaking`);
       }
 
@@ -452,6 +457,8 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
 
     setSelectedLanguage(lang);
     selectedLangRef.current = lang;
+    // Store dialect preference for TTS accent selection
+    selectedDialectRef.current = dialect || null;
     setShowLanguageSelect(false);
 
     try {
@@ -536,7 +543,7 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
   const handleSkipTurn = useCallback(async () => {
     console.log('⏭️ Skipping turn');
 
-    // Stop current audio/listening but DON'T pause
+    // Stop current audio/listening
     speakAbortRef.current = true;
 
     if (listenTimeoutRef.current) {
@@ -560,9 +567,17 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
     // Reset abort flag before starting next turn
     speakAbortRef.current = false;
 
+    // If we were paused, skip auto-resumes (skip implies user wants to continue)
+    const wasPaused = isPausedRef.current;
+    if (wasPaused) {
+      console.log('⏭️ Skip auto-resuming from paused state');
+      setIsPaused(false);
+      isPausedRef.current = false;
+    }
+
     // Wait a moment then start next turn (if session still active)
     await naturalPause(300);
-    if (sessionActiveRef.current && !isPausedRef.current) {
+    if (sessionActiveRef.current) {
       handleSingleTurn();
     }
   }, [handleSingleTurn]);
@@ -686,7 +701,9 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
     if (autoSpeak) {
       setAgnesState('speaking');
       await naturalPause(200);
-      await agnesSpeak(translation, targetLang);
+      // Use dialect for TTS if available (for accent)
+      const speakLang = selectedDialectRef.current || targetLang;
+      await agnesSpeak(translation, speakLang);
     }
 
     // After quick phrase, listen for homeowner response
@@ -1069,11 +1086,10 @@ const FieldTranslator: React.FC<FieldTranslatorProps> = ({ onBack }) => {
               )}
             </button>
 
-            {/* Skip Turn Button */}
+            {/* Skip Turn Button - always enabled, auto-resumes if paused */}
             <button
               onClick={handleSkipTurn}
-              disabled={isPaused}
-              className="flex items-center gap-2 px-4 py-2.5 bg-neutral-700 hover:bg-neutral-600 rounded-xl text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2.5 bg-neutral-700 hover:bg-neutral-600 rounded-xl text-white font-medium transition-colors"
             >
               <SkipForward className="w-4 h-4" />
               <span className="text-sm">Skip Turn</span>
