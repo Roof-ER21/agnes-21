@@ -119,6 +119,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const [showScoreLoadingModal, setShowScoreLoadingModal] = useState(false);
   const lastInputTranscriptRef = useRef('');
   const lastOutputTranscriptRef = useRef('');
+  const lastModelTextRef = useRef('');
   const lastScoreCommandAtRef = useRef(0);
 
   // NEW: Silence timeout tracking (10 seconds for roleplay/feedback to allow thinking pauses)
@@ -483,20 +484,34 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
               // Handle Text Output (for transcript and custom voice)
               const outputTranscription = serverContent?.outputTranscription;
-              const outputText = outputTranscription?.text;
-              let textContent = serverContent?.modelTurn?.parts?.[0]?.text || '';
-              if (outputText) {
-                const previousText = lastOutputTranscriptRef.current;
-                let deltaText = outputText;
-                if (previousText && outputText.startsWith(previousText)) {
-                  deltaText = outputText.slice(previousText.length);
-                }
-                lastOutputTranscriptRef.current = outputText;
-                textContent = deltaText;
+              const outputText = outputTranscription?.text || '';
+              const parts = serverContent?.modelTurn?.parts || [];
+              const modelText = parts
+                .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+                .filter(Boolean)
+                .join('');
+
+              const getDelta = (current: string, previous: string) => {
+                if (!current) return '';
+                if (!previous) return current;
+                if (current.startsWith(previous)) return current.slice(previous.length);
+                return current;
+              };
+
+              const modelDelta = getDelta(modelText, lastModelTextRef.current);
+              if (modelText) {
+                lastModelTextRef.current = modelText;
               }
 
-              const detectionText = outputText || textContent;
+              const outputDelta = getDelta(outputText, lastOutputTranscriptRef.current);
+              if (outputText) {
+                lastOutputTranscriptRef.current = outputText;
+              }
+
+              const detectionText = outputText || modelText;
+              const detectionDelta = outputText ? outputDelta : modelDelta;
               const isTurnComplete = Boolean(serverContent?.turnComplete || outputTranscription?.finished);
+              const transcriptText = modelText || outputText;
 
               if (detectionText) {
                 // CRITICAL: Capture score request state BEFORE any changes
@@ -523,7 +538,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
                 // Skip transcript updates during score accumulation - we'll add the complete response later
                 // Only update currentScore and transcript for non-score messages
-                if (!wasRequestingScore && textContent.trim()) {
+                if (!wasRequestingScore && isTurnComplete && transcriptText.trim()) {
                   if (score !== null) {
                     setCurrentScore(score);
                     console.log('Score detected in regular message:', score);
@@ -532,7 +547,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   // Add to transcript for non-score messages only
                   setTranscript(prev => [...prev, {
                     role: 'agnes',
-                    text: textContent,
+                    text: transcriptText,
                     timestamp: new Date(),
                     score: score !== null ? score : undefined
                   }]);
@@ -582,7 +597,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   }
 
                   // Accumulate text chunks for complete response
-                  scoreAccumulatorRef.current += textContent;
+                  scoreAccumulatorRef.current += detectionDelta;
                   const accumulated = scoreAccumulatorRef.current;
 
                   // Check if we have a complete score
@@ -653,14 +668,15 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   return;
                 }
                 // For regular messages (not score requests), use custom voice if enabled
-                else if (useCustomVoiceRef.current && sessionActiveRef.current) {
-                  speakWithCustomVoice(textContent);
+                else if (useCustomVoiceRef.current && sessionActiveRef.current && transcriptText.trim() && isTurnComplete) {
+                  speakWithCustomVoice(transcriptText);
                 }
               }
 
               // Handle Audio Output (only if session is still active, custom voice is disabled, AND NOT scoring)
               // During scoring, we want silence - the ScoreReviewModal handles TTS separately
-              const base64Audio = serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+              const audioPart = serverContent?.modelTurn?.parts?.find((part: any) => part?.inlineData?.data);
+              const base64Audio = audioPart?.inlineData?.data;
               if (base64Audio && sessionActiveRef.current && !useCustomVoiceRef.current && !isRequestingScoreRef.current && !showScoreReviewModalRef.current) {
                 await playAudioChunk(base64Audio);
               }
@@ -697,9 +713,10 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
             }
           },
           config: {
-            responseModalities: [Modality.AUDIO],
+            responseModalities: [Modality.AUDIO, Modality.TEXT],
             speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
+              voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+              languageCode: 'en-US'
             },
             inputAudioTranscription: {},
             outputAudioTranscription: {},
@@ -884,6 +901,8 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       scoreTimeoutRef.current = null;
     }
     scoreAccumulatorRef.current = '';
+    lastOutputTranscriptRef.current = '';
+    lastModelTextRef.current = '';
 
     // Set both state and ref for score request tracking
     setIsRequestingScore(true);
