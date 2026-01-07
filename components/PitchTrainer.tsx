@@ -519,29 +519,39 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   }, 1500);
                 };
 
-                // SCORE DETECTION: Detect score content in response (voice command OR button click)
-                // This handles both explicit score requests AND when user says "score me" verbally
-                const containsScoreContent = /AGNES SCORE:?\s*\d+/i.test(textContent) ||
-                  /(?:final\s+)?score:?\s*\d+\s*(?:\/\s*100)/i.test(textContent);
+                // SCORE DETECTION: Detect when Agnes acknowledges a score request
+                // This triggers auto-mute so Agnes can read the score uninterrupted
+                const scoringTriggers = [
+                  /simulation\s*complete/i,
+                  /AGNES SCORE:?\s*\d+/i,
+                  /(?:final\s+)?score:?\s*\d+\s*(?:\/\s*100)/i,
+                  /session\s*(?:is\s*)?(?:now\s*)?(?:complete|over|ending)/i,
+                  /preparing\s*(?:your|the)\s*(?:final\s*)?(?:score|evaluation)/i,
+                  /let\s*me\s*(?:provide|give)\s*(?:you|your)\s*(?:final\s*)?(?:score|evaluation)/i
+                ];
+                const containsScoreContent = scoringTriggers.some(p => p.test(textContent));
 
                 // Route to score modal if: 1) We explicitly requested score, OR 2) Response contains score content
                 if (wasRequestingScore || containsScoreContent) {
                   // If user said "score me" verbally (not via button), set up scoring mode now
                   if (!wasRequestingScore && containsScoreContent) {
-                    console.log('Voice command detected: Score content found in response');
+                    console.log('Voice command detected: Agnes acknowledging score request');
                     isRequestingScoreRef.current = true;
                     setIsRequestingScore(true);
                     setAgnesState(AgnesState.SCORING);
 
-                    // Stop ongoing audio and suspend mic for clean score delivery
+                    // Stop ongoing audio for clean score delivery
                     audioSourcesRef.current.forEach(source => {
                       try { source.stop(); } catch (e) { /* ignore */ }
                     });
                     audioSourcesRef.current.clear();
 
+                    // AUTO-MUTE: Suspend mic AND update UI state so Agnes can't be interrupted
                     if (inputAudioContextRef.current?.state === 'running') {
                       inputAudioContextRef.current.suspend().catch(() => {});
                     }
+                    setIsMuted(true);
+                    console.log('🔇 Microphone auto-muted for uninterrupted scoring');
                   }
 
                   // Show loading indicator if not already showing
@@ -990,6 +1000,10 @@ This is my FINAL score. Be thorough and complete in your evaluation.`
     setScoreReviewText('');
     scoreAccumulatorRef.current = '';
     setShowScoreLoadingModal(false);
+
+    // UNMUTE: Reset mic state when closing score modal
+    setIsMuted(false);
+    console.log('🔊 Microphone unmuted after score review');
 
     // ALWAYS end session when closing score modal
     // Score Me = session complete, regardless of which button is clicked
