@@ -480,23 +480,22 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                 // Validate score is in reasonable range (0-100)
                 const score = (parsedScore !== null && parsedScore >= 0 && parsedScore <= 100) ? parsedScore : null;
 
-                // Only update currentScore if we explicitly requested scoring
-                if (score !== null && wasRequestingScore) {
-                  setCurrentScore(score);
-                  // DON'T clear flags here - clear them AFTER audio finishes
-                  console.log('Score received:', score);
-                } else if (wasRequestingScore && score === null && textContent.length > 50) {
-                  // We requested a score but couldn't parse it - log warning
-                  console.warn('Score request returned feedback but no parseable score in:', textContent.substring(0, 100));
-                }
+                // Skip transcript updates during score accumulation - we'll add the complete response later
+                // Only update currentScore and transcript for non-score messages
+                if (!wasRequestingScore) {
+                  if (score !== null) {
+                    setCurrentScore(score);
+                    console.log('Score detected in regular message:', score);
+                  }
 
-                // Add to transcript (always add, mark with score if detected)
-                setTranscript(prev => [...prev, {
-                  role: 'agnes',
-                  text: textContent,
-                  timestamp: new Date(),
-                  score: score !== null ? score : undefined
-                }]);
+                  // Add to transcript for non-score messages only
+                  setTranscript(prev => [...prev, {
+                    role: 'agnes',
+                    text: textContent,
+                    timestamp: new Date(),
+                    score: score !== null ? score : undefined
+                  }]);
+                }
 
                 // Helper function to schedule score cleanup (with delay for multi-chunk responses)
                 const scheduleScoreCleanup = () => {
@@ -596,9 +595,10 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                 }
               }
 
-              // Handle Audio Output (only if session is still active AND custom voice is disabled)
+              // Handle Audio Output (only if session is still active, custom voice is disabled, AND NOT scoring)
+              // During scoring, we want silence - the ScoreReviewModal handles TTS separately
               const base64Audio = serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-              if (base64Audio && sessionActiveRef.current && !useCustomVoiceRef.current) {
+              if (base64Audio && sessionActiveRef.current && !useCustomVoiceRef.current && !isRequestingScoreRef.current && !showScoreReviewModalRef.current) {
                 await playAudioChunk(base64Audio);
               }
             },
