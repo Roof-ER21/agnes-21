@@ -508,10 +508,11 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                 lastOutputTranscriptRef.current = outputText;
               }
 
-              const detectionText = outputText || modelText;
-              const detectionDelta = outputText ? outputDelta : modelDelta;
+              const hasModelText = Boolean(modelText.trim());
+              const detectionText = hasModelText ? modelText : outputText;
+              const detectionDelta = hasModelText ? modelDelta : outputDelta;
               const isTurnComplete = Boolean(serverContent?.turnComplete || outputTranscription?.finished);
-              const transcriptText = modelText || outputText;
+              const transcriptText = hasModelText ? modelText : outputText;
 
               if (detectionText) {
                 // CRITICAL: Capture score request state BEFORE any changes
@@ -576,6 +577,9 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                     isRequestingScoreRef.current = true;
                     setIsRequestingScore(true);
                     setAgnesState(AgnesState.SCORING);
+                    scoreAccumulatorRef.current = '';
+                    lastOutputTranscriptRef.current = '';
+                    lastModelTextRef.current = '';
 
                     // Stop ongoing audio for clean score delivery
                     audioSourcesRef.current.forEach(source => {
@@ -595,6 +599,9 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   if (!showScoreLoadingModal && !showScoreReviewModal) {
                     setShowScoreLoadingModal(true);
                   }
+
+                  // Refresh the timeout while score chunks arrive
+                  scheduleScoreTimeout();
 
                   // Accumulate text chunks for complete response
                   scoreAccumulatorRef.current += detectionDelta;
@@ -890,6 +897,32 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
   // Timeout ref for score request failsafe
   const scoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const SCORE_REQUEST_TIMEOUT_MS = 90000;
+
+  const scheduleScoreTimeout = (timeoutMs: number = SCORE_REQUEST_TIMEOUT_MS) => {
+    if (scoreTimeoutRef.current) {
+      clearTimeout(scoreTimeoutRef.current);
+      scoreTimeoutRef.current = null;
+    }
+
+    scoreTimeoutRef.current = setTimeout(() => {
+      if (isRequestingScoreRef.current && !showScoreReviewModalRef.current) {
+        console.warn(`Score request timed out after ${Math.round(timeoutMs / 1000)} seconds`);
+        setIsRequestingScore(false);
+        isRequestingScoreRef.current = false;
+        setShowScoreLoadingModal(false);
+        scoreAccumulatorRef.current = '';
+        setError('⏱️ Score request timed out. The session may have disconnected. Please try ending the session.');
+        setAgnesState(AgnesState.LISTENING);
+        setIsMuted(false);
+
+        // Resume microphone
+        if (inputAudioContextRef.current?.state === 'suspended') {
+          inputAudioContextRef.current.resume().catch(() => {});
+        }
+      }
+    }, timeoutMs);
+  };
 
   // NEW: Handle Score Me button - requests score from Agnes
   const handleScoreMe = async () => {
@@ -935,24 +968,8 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       }
     }
 
-    // Set timeout failsafe - if no score after 45 seconds, reset and show error
-    scoreTimeoutRef.current = setTimeout(() => {
-      if (isRequestingScoreRef.current && !showScoreReviewModalRef.current) {
-        console.warn('Score request timed out after 45 seconds');
-        setIsRequestingScore(false);
-        isRequestingScoreRef.current = false;
-        setShowScoreLoadingModal(false);
-        scoreAccumulatorRef.current = '';
-        setError('⏱️ Score request timed out. The session may have disconnected. Please try ending the session.');
-        setAgnesState(AgnesState.LISTENING);
-        setIsMuted(false);
-
-        // Resume microphone
-        if (inputAudioContextRef.current?.state === 'suspended') {
-          inputAudioContextRef.current.resume().catch(() => {});
-        }
-      }
-    }, 45000);
+    // Set timeout failsafe - extend while score response streams
+    scheduleScoreTimeout();
 
     try {
       // Send a text message to Gemini asking for scoring
