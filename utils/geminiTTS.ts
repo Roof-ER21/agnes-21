@@ -894,8 +894,8 @@ const speakWithWebSpeech = async (
 // ============================================
 
 /**
- * Agnes speaks - uses Gemini TTS for all supported languages with premium quality
- * Falls back to Web Speech API when Gemini is unavailable
+ * Agnes speaks - uses Gemini TTS (Kore voice) ONLY
+ * NO Web Speech fallback - for voice consistency across the app
  */
 export const agnesVoiceSpeak = async (
   text: string,
@@ -914,26 +914,26 @@ export const agnesVoiceSpeak = async (
 
   console.log(`🔊 Agnes speaking in ${lang}: "${text.substring(0, 50)}..."`);
 
-  // Try Gemini TTS for all supported languages (premium quality)
+  // Try Gemini TTS (Kore voice) - NO FALLBACK to Web Speech
   if (geminiMultiLang.isLanguageSupported(lang)) {
-    const success = await geminiMultiLang.speak(text, lang);
-    if (success) {
-      console.log(`✅ Gemini TTS success for ${lang}`);
-      onEnd?.();
-      return;
+    try {
+      const success = await geminiMultiLang.speak(text, lang);
+      if (success) {
+        console.log(`✅ Gemini TTS (Kore) success for ${lang}`);
+        onEnd?.();
+        return; // SUCCESS - exit here
+      }
+    } catch (error) {
+      console.warn('Gemini TTS error:', error);
+      geminiMultiLang.stop();
     }
-    // CRITICAL: Stop any Gemini audio that might still be playing before falling back
-    geminiMultiLang.stop();
-    console.log(`⚠️ Gemini TTS failed for ${lang}, falling back to Web Speech`);
-  } else {
-    console.log(`ℹ️ Language ${lang} not in Gemini TTS, using Web Speech`);
   }
 
-  // Extract base language for Web Speech API
-  const baseLang = lang.includes('-') ? lang.split('-')[0] as SupportedLanguage : lang as SupportedLanguage;
-
-  // Use Web Speech for unsupported languages or as fallback
-  await speakWithWebSpeech(text, baseLang, onEnd, onError);
+  // REMOVED: Web Speech fallback (causes dual voice and inconsistent quality)
+  // If Gemini fails, show error message instead of robotic voice
+  console.error(`❌ Gemini TTS not available for ${lang} - voice playback skipped`);
+  onError?.('Voice not available');
+  onEnd?.(); // Still call onEnd to resolve promise
 };
 
 /**

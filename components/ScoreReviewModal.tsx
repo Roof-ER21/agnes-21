@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Trophy, VolumeX, Volume2 } from 'lucide-react';
-import { agnesVoiceSpeak, agnesVoiceStop, isAgnesSpeaking } from '../utils/geminiTTS';
+import { agnesVoiceSpeak, agnesVoiceStop } from '../utils/geminiTTS';
 
 interface ScoreReviewModalProps {
   show: boolean;
@@ -25,7 +25,7 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
   const [ttsStatus, setTtsStatus] = useState<'idle' | 'speaking' | 'complete' | 'unavailable'>('idle');
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const localAudioContextRef = useRef<AudioContext | null>(null);
-  const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null);
+  // REMOVED: speechSynthRef - no longer using Web Speech API
 
   // Get score color based on value
   const getScoreColor = (score: number) => {
@@ -69,7 +69,7 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
     return () => clearInterval(interval);
   }, [show, scoreText]);
 
-  // TTS playback when modal shows - Gemini TTS (Kore voice) with Web Speech fallback
+  // TTS playback when modal shows - Gemini TTS (Kore voice) ONLY - no Web Speech fallback
   useEffect(() => {
     if (!show || !scoreText) return;
 
@@ -84,66 +84,20 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
       setTtsStatus('speaking');
       setTtsError(null);
 
-      // Try Agnes Voice (Gemini Kore) first
-      try {
-        await agnesVoiceSpeak(cleanText, 'en');
-        setIsSpeaking(false);
-        setTtsStatus('complete');
-        console.log('Score read with Agnes voice (Gemini Kore)');
-        return; // Success - exit early
-      } catch (error) {
-        console.warn('Agnes voice failed, falling back to Web Speech:', error);
-      }
-
-      // Fallback to Web Speech API
-      if ('speechSynthesis' in window) {
-        try {
-          // Cancel any ongoing speech
-          window.speechSynthesis.cancel();
-
-          const utterance = new SpeechSynthesisUtterance(cleanText);
-          utterance.rate = 1.0;
-          utterance.pitch = 1.0;
-          utterance.volume = 1.0;
-
-          // Try to find a good voice
-          const voices = window.speechSynthesis.getVoices();
-          const preferredVoice = voices.find(v =>
-            v.name.includes('Samantha') ||
-            v.name.includes('Google') ||
-            v.lang.startsWith('en')
-          );
-          if (preferredVoice) {
-            utterance.voice = preferredVoice;
-          }
-
-          utterance.onend = () => {
-            setIsSpeaking(false);
-            setTtsStatus('complete');
-            speechSynthRef.current = null;
-          };
-
-          utterance.onerror = (e) => {
-            console.error('Web Speech error:', e);
-            setIsSpeaking(false);
-            setTtsStatus('complete');
-            setTtsError('Voice playback failed');
-          };
-
-          speechSynthRef.current = utterance;
-          window.speechSynthesis.speak(utterance);
-          console.log('Playing score audio with Web Speech API fallback');
-        } catch (error) {
-          console.error('Web Speech API error:', error);
+      // Use Agnes Voice (Gemini Kore) - NO Web Speech fallback for voice consistency
+      await agnesVoiceSpeak(cleanText, 'en', {
+        onEnd: () => {
+          setIsSpeaking(false);
+          setTtsStatus('complete');
+          console.log('Score read with Agnes voice (Gemini Kore)');
+        },
+        onError: (error) => {
+          console.error('Agnes voice error:', error);
           setIsSpeaking(false);
           setTtsStatus('unavailable');
-          setTtsError('Voice not available');
+          setTtsError('Voice not available - read text above');
         }
-      } else {
-        console.log('No TTS available - text only mode');
-        setIsSpeaking(false);
-        setTtsStatus('unavailable');
-      }
+      });
     };
 
     // Small delay to let modal animation complete
@@ -178,11 +132,7 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
       }
       audioSourceRef.current = null;
     }
-    // Stop Web Speech API
-    if (speechSynthRef.current) {
-      window.speechSynthesis.cancel();
-      speechSynthRef.current = null;
-    }
+    // REMOVED: Web Speech API stop - no longer using Web Speech
     setIsSpeaking(false);
     if (ttsStatus === 'speaking') {
       setTtsStatus('complete');

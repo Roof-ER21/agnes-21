@@ -129,6 +129,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const [isPTTActive, setIsPTTActive] = useState(false);
   const isPTTActiveRef = useRef(false); // Ref for async callbacks
   const voiceModeRef = useRef<VoiceMode>('continuous'); // Ref for async callbacks
+  const isMutedRef = useRef(false); // Ref for async callbacks (fixes closure bug)
 
   // NEW: Reconnection logic
   const [isReconnecting, setIsReconnecting] = useState(false);
@@ -331,7 +332,8 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   useEffect(() => {
     isPTTActiveRef.current = isPTTActive;
     voiceModeRef.current = voiceMode;
-  }, [isPTTActive, voiceMode]);
+    isMutedRef.current = isMuted; // Sync muted state for audio processor callback
+  }, [isPTTActive, voiceMode, isMuted]);
 
   // Reconnection function
   const attemptReconnect = async () => {
@@ -519,16 +521,19 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   }, 1500);
                 };
 
-                // SCORE DETECTION: Detect when Agnes acknowledges a score request
-                // This triggers auto-mute so Agnes can read the score uninterrupted
+                // STRICT SCORE DETECTION: Only match when Agnes is EXPLICITLY ending the session
+                // Avoid false positives from mid-conversation feedback like "your score on that point"
                 const scoringTriggers = [
-                  /simulation\s*complete/i,
-                  /AGNES SCORE:?\s*\d+/i,
-                  /(?:final\s+)?score:?\s*\d+\s*(?:\/\s*100)/i,
-                  /session\s*(?:is\s*)?(?:now\s*)?(?:complete|over|ending)/i,
-                  /preparing\s*(?:your|the)\s*(?:final\s*)?(?:score|evaluation)/i,
-                  /let\s*me\s*(?:provide|give)\s*(?:you|your)\s*(?:final\s*)?(?:score|evaluation)/i
+                  /simulation\s*complete/i,                                    // Explicit session end signal
+                  /AGNES\s*SCORE:?\s*\d+/i,                                   // Explicit Agnes score format
+                  /your\s*(?:final\s+)?(?:overall\s+)?score\s*(?:is|:)\s*\d+/i, // "Your final score is 85"
+                  /session\s*(?:is\s*)?(?:now\s*)?(?:complete|over|ended)/i,   // Session end phrases
+                  /(?:here\s*is|presenting)\s*your\s*(?:final\s*)?(?:score|evaluation)/i // Score presentation
                 ];
+                // REMOVED overly broad patterns that caused false positives:
+                // - /(?:final\s+)?score:?\s*\d+\s*(?:\/\s*100)/i - Too broad, matches "score: 85" anywhere
+                // - /preparing\s*(?:your|the)\s*(?:final\s*)?/ - Triggers too early
+                // - /let\s*me\s*(?:provide|give)/ - Could match normal conversation
                 const containsScoreContent = scoringTriggers.some(p => p.test(textContent));
 
                 // Route to score modal if: 1) We explicitly requested score, OR 2) Response contains score content
@@ -1219,8 +1224,8 @@ This is my FINAL score. Be thorough and complete in your evaluation.`
     processor.onaudioprocess = (e) => {
       // In PTT mode, only send audio when button is held
       if (voiceModeRef.current === 'push-to-talk' && !isPTTActiveRef.current) return;
-      // In continuous mode, respect mute state
-      if (voiceModeRef.current === 'continuous' && isMuted) return;
+      // In continuous mode, respect mute state (use ref to avoid closure bug)
+      if (voiceModeRef.current === 'continuous' && isMutedRef.current) return;
 
       const inputData = e.inputBuffer.getChannelData(0);
       const pcmBlob = createPcmBlob(inputData);
