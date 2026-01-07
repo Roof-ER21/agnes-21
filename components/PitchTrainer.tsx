@@ -114,6 +114,10 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const [scoreReviewNumeric, setScoreReviewNumeric] = useState<number | null>(null);
   const showScoreReviewModalRef = useRef(false); // Ref for VAD check
 
+  // NEW: Score accumulation - wait for complete response before showing modal
+  const scoreAccumulatorRef = useRef('');
+  const [showScoreLoadingModal, setShowScoreLoadingModal] = useState(false);
+
   // NEW: Silence timeout tracking (10 seconds for roleplay/feedback to allow thinking pauses)
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const SILENCE_TIMEOUT_MS = 10000; // 10 seconds of silence = end of speech (for longer roleplay responses)
@@ -516,24 +520,75 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   }, 1500);
                 };
 
-                // SCORE REVIEW MODAL: Route score responses to dedicated modal for uninterrupted delivery
-                if (wasRequestingScore) {
-                  // Store score data for modal
-                  setCurrentScore(score);
-                  setScoreReviewText(textContent);
-                  setScoreReviewNumeric(score);
+                // SCORE DETECTION: Detect score content in response (voice command OR button click)
+                // This handles both explicit score requests AND when user says "score me" verbally
+                const containsScoreContent = /AGNES SCORE:?\s*\d+/i.test(textContent) ||
+                  /(?:final\s+)?score:?\s*\d+\s*(?:\/\s*100)/i.test(textContent);
 
-                  // Show the Score Review Modal
-                  setShowScoreReviewModal(true);
-                  showScoreReviewModalRef.current = true;
+                // Route to score modal if: 1) We explicitly requested score, OR 2) Response contains score content
+                if (wasRequestingScore || containsScoreContent) {
+                  // If user said "score me" verbally (not via button), set up scoring mode now
+                  if (!wasRequestingScore && containsScoreContent) {
+                    console.log('Voice command detected: Score content found in response');
+                    isRequestingScoreRef.current = true;
+                    setIsRequestingScore(true);
+                    setAgnesState(AgnesState.SCORING);
 
-                  // Clear score request flags - modal handles everything now
-                  isRequestingScoreRef.current = false;
-                  setIsRequestingScore(false);
+                    // Stop ongoing audio and suspend mic for clean score delivery
+                    audioSourcesRef.current.forEach(source => {
+                      try { source.stop(); } catch (e) { /* ignore */ }
+                    });
+                    audioSourcesRef.current.clear();
 
-                  console.log('Score response routed to Score Review Modal');
-                  // DON'T play audio here - modal handles TTS internally
-                  // DON'T resume microphone here - modal handles it on close
+                    if (inputAudioContextRef.current?.state === 'running') {
+                      inputAudioContextRef.current.suspend().catch(() => {});
+                    }
+                  }
+
+                  // Show loading indicator if not already showing
+                  if (!showScoreLoadingModal && !showScoreReviewModal) {
+                    setShowScoreLoadingModal(true);
+                  }
+
+                  // Accumulate text chunks for complete response
+                  scoreAccumulatorRef.current += textContent;
+                  const accumulated = scoreAccumulatorRef.current;
+
+                  // Check if we have a complete score (has score number AND sufficient content)
+                  const hasScore = scorePatterns.some(p => p.test(accumulated));
+                  const isComplete = hasScore && accumulated.length > 300;
+
+                  if (isComplete) {
+                    // Hide loading modal
+                    setShowScoreLoadingModal(false);
+
+                    // Parse final score from accumulated text
+                    let finalScore = null;
+                    for (const pattern of scorePatterns) {
+                      const match = accumulated.match(pattern);
+                      if (match) {
+                        finalScore = parseInt(match[1]);
+                        break;
+                      }
+                    }
+
+                    // Show Score Review Modal with complete feedback
+                    setCurrentScore(finalScore);
+                    setScoreReviewText(accumulated);
+                    setScoreReviewNumeric(finalScore);
+                    setShowScoreReviewModal(true);
+                    showScoreReviewModalRef.current = true;
+
+                    // Clear accumulator and flags
+                    scoreAccumulatorRef.current = '';
+                    isRequestingScoreRef.current = false;
+                    setIsRequestingScore(false);
+
+                    console.log('Complete score response routed to Score Review Modal');
+                  }
+
+                  // Don't process further during score accumulation
+                  return;
                 }
                 // For regular messages (not score requests), use custom voice if enabled
                 else if (useCustomVoiceRef.current && sessionActiveRef.current) {
@@ -794,11 +849,21 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       };
       setTranscript(prev => [...prev, scoreRequestMsg]);
 
-      // Send the scoring request to Gemini
+      // Send the scoring request to Gemini - FINAL session score
       session.sendClientContent({
         turns: [{
           role: 'user',
-          parts: [{ text: 'Agnes, please score my performance now. Provide your AGNES SCORE out of 100 and detailed feedback on what I did well and what I can improve.' }]
+          parts: [{
+            text: `Agnes, this training session is now ENDING. Please provide my FINAL performance evaluation.
+
+REQUIRED FORMAT:
+1. Start with "AGNES SCORE: [number]" where number is 0-100
+2. Provide detailed feedback on what I did well
+3. Provide specific areas for improvement
+4. End with encouragement for my next session
+
+This is my FINAL score. Be thorough and complete in your evaluation.`
+          }]
         }],
         turnComplete: true
       });
@@ -852,33 +917,19 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     confirmEndSession();
   };
 
-  // NEW: Score Review Modal handlers - for uninterrupted score delivery
-  const handleScoreReviewContinue = () => {
-    // Close the modal
+  // NEW: Score Review Modal handler - closes modal and ALWAYS ends session
+  const handleScoreReviewClose = () => {
+    // Close the modal and clear state
     setShowScoreReviewModal(false);
     showScoreReviewModalRef.current = false;
     setScoreReviewText('');
+    scoreAccumulatorRef.current = '';
+    setShowScoreLoadingModal(false);
 
-    // Resume microphone for continued training
-    if (inputAudioContextRef.current?.state === 'suspended') {
-      inputAudioContextRef.current.resume().catch(e => console.warn('Failed to resume mic:', e));
-      console.log('Microphone resumed after score review');
-    }
-
-    // Reset Agnes state to listening
-    setAgnesState(AgnesState.LISTENING);
-    console.log('Score review complete, continuing training');
-  };
-
-  const handleScoreReviewEndSession = () => {
-    // Close the modal
-    setShowScoreReviewModal(false);
-    showScoreReviewModalRef.current = false;
-    setScoreReviewText('');
-
-    // End the session
+    // ALWAYS end session when closing score modal
+    // Score Me = session complete, regardless of which button is clicked
     confirmEndSession();
-    console.log('Score review complete, ending session');
+    console.log('Score review closed, ending session');
   };
 
   // NEW: Confirm and save session
@@ -2003,16 +2054,23 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         userId={user?.id}
       />
 
+      {/* Score Loading Modal - Shows while accumulating score response */}
+      {showScoreLoadingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm">
+          <div className="bg-neutral-900 rounded-2xl border-2 border-yellow-500/50 p-8 max-w-md text-center">
+            <div className="animate-spin w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-white mb-2">Agnes is analyzing your performance...</h3>
+            <p className="text-neutral-400">Preparing your detailed evaluation</p>
+          </div>
+        </div>
+      )}
+
       {/* Score Review Modal - Dedicated UI for uninterrupted score delivery */}
       <ScoreReviewModal
         show={showScoreReviewModal}
         scoreText={scoreReviewText}
         numericScore={scoreReviewNumeric}
-        onContinue={handleScoreReviewContinue}
-        onEndSession={handleScoreReviewEndSession}
-        ttsAvailable={ttsAvailable ?? false}
-        outputAudioContext={outputAudioContextRef.current}
-        analyser={analyserRef.current}
+        onClose={handleScoreReviewClose}
       />
 
       {/* Celebration Animations */}

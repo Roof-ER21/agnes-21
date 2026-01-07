@@ -1,27 +1,21 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Trophy, VolumeX, Volume2, ArrowRight, X } from 'lucide-react';
-import { generateSpeech, DEFAULT_FEEDBACK_VOICE } from '../utils/chatterboxTTS';
+import { Trophy, VolumeX, Volume2 } from 'lucide-react';
+
+// Gemini TTS instance (lazy loaded)
+let geminiTTSInstance: any = null;
 
 interface ScoreReviewModalProps {
   show: boolean;
   scoreText: string;
   numericScore: number | null;
-  onContinue: () => void;
-  onEndSession: () => void;
-  ttsAvailable: boolean;
-  outputAudioContext: AudioContext | null;
-  analyser: AnalyserNode | null;
+  onClose: () => void;  // Single action - always ends session
 }
 
 const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
   show,
   scoreText,
   numericScore,
-  onContinue,
-  onEndSession,
-  ttsAvailable,
-  outputAudioContext,
-  analyser
+  onClose
 }) => {
   // Typewriter state
   const [displayedText, setDisplayedText] = useState('');
@@ -77,7 +71,7 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
     return () => clearInterval(interval);
   }, [show, scoreText]);
 
-  // TTS playback when modal shows - with Web Speech API fallback
+  // TTS playback when modal shows - Gemini TTS (Kore voice) with Web Speech fallback
   useEffect(() => {
     if (!show || !scoreText) return;
 
@@ -92,48 +86,24 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
       setTtsStatus('speaking');
       setTtsError(null);
 
-      // Try Chatterbox TTS first if available
-      if (ttsAvailable) {
-        try {
-          const audioBuffer = await generateSpeech(cleanText, {
-            voice: DEFAULT_FEEDBACK_VOICE,
-            exaggeration: 0.4
-          });
-
-          const ctx = outputAudioContext || new (window.AudioContext || (window as any).webkitAudioContext)();
-          if (!outputAudioContext) {
-            localAudioContextRef.current = ctx;
-          }
-
-          if (ctx.state === 'suspended') {
-            await ctx.resume();
-          }
-
-          const audioData = await ctx.decodeAudioData(audioBuffer.slice(0));
-          const source = ctx.createBufferSource();
-          source.buffer = audioData;
-
-          if (analyser) {
-            source.connect(analyser);
-            analyser.connect(ctx.destination);
-          } else {
-            source.connect(ctx.destination);
-          }
-
-          audioSourceRef.current = source;
-          source.start();
-
-          source.onended = () => {
-            setIsSpeaking(false);
-            setTtsStatus('complete');
-            audioSourceRef.current = null;
-          };
-
-          console.log('Playing score audio with Chatterbox TTS');
-          return; // Success - exit early
-        } catch (error) {
-          console.warn('Chatterbox TTS failed, falling back to Web Speech:', error);
+      // Try Gemini TTS first (Agnes's Kore voice)
+      try {
+        // Lazy load GeminiEnglishTTS
+        if (!geminiTTSInstance) {
+          const { GeminiEnglishTTS } = await import('../utils/geminiTTS');
+          geminiTTSInstance = new GeminiEnglishTTS();
         }
+
+        const initialized = await geminiTTSInstance.init();
+        if (initialized) {
+          await geminiTTSInstance.speak(cleanText);
+          setIsSpeaking(false);
+          setTtsStatus('complete');
+          console.log('Score read with Gemini Kore voice');
+          return; // Success - exit early
+        }
+      } catch (error) {
+        console.warn('Gemini TTS failed, falling back to Web Speech:', error);
       }
 
       // Fallback to Web Speech API
@@ -190,7 +160,7 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
     // Small delay to let modal animation complete
     const timer = setTimeout(playScoreAudio, 300);
     return () => clearTimeout(timer);
-  }, [show, scoreText, ttsAvailable, outputAudioContext, analyser]);
+  }, [show, scoreText]);
 
   // Cleanup on unmount or hide
   useEffect(() => {
@@ -227,14 +197,9 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
     }
   };
 
-  const handleContinue = () => {
+  const handleClose = () => {
     handleStopSpeaking();
-    onContinue();
-  };
-
-  const handleEndSession = () => {
-    handleStopSpeaking();
-    onEndSession();
+    onClose();
   };
 
   if (!show) return null;
@@ -339,24 +304,18 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Button - Session Complete */}
         <div className="p-6 border-t border-neutral-800 bg-neutral-900/50">
-          <div className="flex gap-4">
-            <button
-              onClick={handleContinue}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 rounded-xl text-white font-semibold transition-all shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40"
-            >
-              <ArrowRight className="w-5 h-5" />
-              Continue Training
-            </button>
-            <button
-              onClick={handleEndSession}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 rounded-xl text-white font-semibold transition-all"
-            >
-              <X className="w-5 h-5" />
-              End Session
-            </button>
-          </div>
+          <button
+            onClick={handleClose}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 rounded-xl text-white font-semibold transition-all shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40"
+          >
+            <Trophy className="w-5 h-5" />
+            Session Complete
+          </button>
+          <p className="text-center text-neutral-500 text-sm mt-3">
+            Your score has been saved. Great training session!
+          </p>
         </div>
       </div>
     </div>
