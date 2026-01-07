@@ -1,8 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Trophy, VolumeX, Volume2 } from 'lucide-react';
-
-// Gemini TTS instance (lazy loaded)
-let geminiTTSInstance: any = null;
+import { agnesVoiceSpeak, agnesVoiceStop, isAgnesSpeaking } from '../utils/geminiTTS';
 
 interface ScoreReviewModalProps {
   show: boolean;
@@ -86,24 +84,15 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
       setTtsStatus('speaking');
       setTtsError(null);
 
-      // Try Gemini TTS first (Agnes's Kore voice)
+      // Try Agnes Voice (Gemini Kore) first
       try {
-        // Lazy load GeminiEnglishTTS
-        if (!geminiTTSInstance) {
-          const { GeminiEnglishTTS } = await import('../utils/geminiTTS');
-          geminiTTSInstance = new GeminiEnglishTTS();
-        }
-
-        const initialized = await geminiTTSInstance.init();
-        if (initialized) {
-          await geminiTTSInstance.speak(cleanText);
-          setIsSpeaking(false);
-          setTtsStatus('complete');
-          console.log('Score read with Gemini Kore voice');
-          return; // Success - exit early
-        }
+        await agnesVoiceSpeak(cleanText, 'en');
+        setIsSpeaking(false);
+        setTtsStatus('complete');
+        console.log('Score read with Agnes voice (Gemini Kore)');
+        return; // Success - exit early
       } catch (error) {
-        console.warn('Gemini TTS failed, falling back to Web Speech:', error);
+        console.warn('Agnes voice failed, falling back to Web Speech:', error);
       }
 
       // Fallback to Web Speech API
@@ -177,7 +166,10 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
   }, [show]);
 
   const handleStopSpeaking = () => {
-    // Stop AudioBufferSourceNode (Chatterbox TTS)
+    // Stop Agnes Voice (Gemini TTS)
+    agnesVoiceStop();
+
+    // Stop AudioBufferSourceNode (legacy)
     if (audioSourceRef.current) {
       try {
         audioSourceRef.current.stop();

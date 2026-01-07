@@ -553,9 +553,29 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   scoreAccumulatorRef.current += textContent;
                   const accumulated = scoreAccumulatorRef.current;
 
-                  // Check if we have a complete score (has score number AND sufficient content)
+                  // Check if we have a complete score
+                  // Must have: score pattern, sufficient length, AND completion indicators
                   const hasScore = scorePatterns.some(p => p.test(accumulated));
-                  const isComplete = hasScore && accumulated.length > 300;
+                  const hasEnoughContent = accumulated.length > 600;
+
+                  // Look for completion phrases that indicate the feedback is done
+                  const completionPhrases = [
+                    /good\s*luck/i,
+                    /next\s*session/i,
+                    /keep\s*(up\s*the|practicing|working|improving)/i,
+                    /great\s*(job|work|effort|session)/i,
+                    /well\s*done/i,
+                    /congratulations/i,
+                    /proud\s*of/i,
+                    /final\s*(?:score|evaluation|feedback)/i,
+                    /session\s*(?:complete|over|ended)/i,
+                    /until\s*next\s*time/i,
+                    /best\s*of\s*luck/i
+                  ];
+                  const hasCompletionPhrase = completionPhrases.some(p => p.test(accumulated));
+
+                  // Complete when: has score AND (has enough content OR has completion phrase)
+                  const isComplete = hasScore && (hasEnoughContent || (accumulated.length > 400 && hasCompletionPhrase));
 
                   if (isComplete) {
                     // Hide loading modal
@@ -2057,10 +2077,40 @@ This is my FINAL score. Be thorough and complete in your evaluation.`
       {/* Score Loading Modal - Shows while accumulating score response */}
       {showScoreLoadingModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm">
-          <div className="bg-neutral-900 rounded-2xl border-2 border-yellow-500/50 p-8 max-w-md text-center">
-            <div className="animate-spin w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full mx-auto mb-4" />
+          <div className="bg-neutral-900 rounded-2xl border-2 border-yellow-500/50 p-8 max-w-md w-full text-center">
+            {/* Animated Agnes Icon */}
+            <div className="relative w-16 h-16 mx-auto mb-4">
+              <div className="absolute inset-0 rounded-full bg-yellow-500/20 animate-ping" />
+              <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-yellow-600 to-red-600 flex items-center justify-center">
+                <span className="text-2xl font-black text-white">A</span>
+              </div>
+            </div>
+
             <h3 className="text-xl font-bold text-white mb-2">Agnes is analyzing your performance...</h3>
-            <p className="text-neutral-400">Preparing your detailed evaluation</p>
+            <p className="text-neutral-400 mb-6">Preparing your detailed evaluation</p>
+
+            {/* Progress Bar */}
+            <div className="w-full h-2 bg-neutral-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-yellow-600 via-yellow-500 to-yellow-400 rounded-full animate-progress-fill"
+                style={{
+                  animation: 'progressFill 8s ease-out forwards',
+                }}
+              />
+            </div>
+            <p className="text-xs text-neutral-500 mt-2">This may take a few seconds...</p>
+
+            {/* CSS for progress animation */}
+            <style>{`
+              @keyframes progressFill {
+                0% { width: 5%; }
+                20% { width: 25%; }
+                40% { width: 45%; }
+                60% { width: 65%; }
+                80% { width: 85%; }
+                100% { width: 95%; }
+              }
+            `}</style>
           </div>
         </div>
       )}
