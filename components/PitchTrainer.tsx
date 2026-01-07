@@ -53,6 +53,7 @@ interface TranscriptMessage {
 const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMiniModuleComplete }) => {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
+  const isConnectedRef = useRef(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   // We track active audio chunks to keep the visualizer synced with actual playback
@@ -121,6 +122,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const lastOutputTranscriptRef = useRef('');
   const lastModelTextRef = useRef('');
   const lastScoreCommandAtRef = useRef(0);
+  const [sessionNonce, setSessionNonce] = useState(0);
 
   // NEW: Silence timeout tracking (10 seconds for roleplay/feedback to allow thinking pauses)
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -339,12 +341,34 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     isMutedRef.current = isMuted; // Sync muted state for audio processor callback
   }, [isPTTActive, voiceMode, isMuted]);
 
+  // Sync connection ref with state
+  useEffect(() => {
+    isConnectedRef.current = isConnected;
+  }, [isConnected]);
+
+  const waitForConnection = (timeoutMs: number) => {
+    return new Promise<boolean>((resolve) => {
+      const start = Date.now();
+      const interval = setInterval(() => {
+        if (isConnectedRef.current) {
+          clearInterval(interval);
+          resolve(true);
+          return;
+        }
+        if (Date.now() - start >= timeoutMs) {
+          clearInterval(interval);
+          resolve(false);
+        }
+      }, 200);
+    });
+  };
+
   // Reconnection function
   const attemptReconnect = async () => {
     if (isReconnecting) return;
 
     setIsReconnecting(true);
-    let attempts = connectionAttempts;
+    let attempts = 0;
 
     while (attempts < MAX_RECONNECT_ATTEMPTS) {
       attempts++;
@@ -355,9 +379,11 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         // Wait before retry
         await new Promise(resolve => setTimeout(resolve, RECONNECT_DELAY_MS));
 
-        // Attempt to reinitialize the session
-        if (aiClientRef.current && streamRef.current) {
-          // Try to reconnect using existing resources
+        // Trigger a full re-init of the live session
+        setSessionNonce(prev => prev + 1);
+
+        const connected = await waitForConnection(8000);
+        if (connected) {
           setError(null);
           setIsReconnecting(false);
           setConnectionAttempts(0);
@@ -371,12 +397,17 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
     // All attempts failed
     setIsReconnecting(false);
+    setConnectionAttempts(0);
     setError('🌐 Connection failed after multiple attempts. Please refresh the page.');
   };
 
   useEffect(() => {
     const initSession = async () => {
       try {
+        sessionActiveRef.current = true;
+        isConnectedRef.current = false;
+        setIsConnected(false);
+
         // 1. Setup Client
         const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
         if (!apiKey) {
@@ -443,6 +474,12 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
             onopen: () => {
               console.log('Gemini Live Session Opened');
               setIsConnected(true);
+              isConnectedRef.current = true;
+              if (isReconnecting) {
+                setIsReconnecting(false);
+                setConnectionAttempts(0);
+                setError(null);
+              }
               startAudioInput();
               startVideoInput();
               startRecording(); // Start video recording
@@ -691,6 +728,8 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
             onclose: () => {
               console.log('Gemini Live Session Closed');
               setIsConnected(false);
+              isConnectedRef.current = false;
+              sessionPromiseRef.current = null;
 
               // Attempt reconnection if session was active and not intentionally closed
               if (sessionActiveRef.current && !isReconnecting) {
@@ -761,11 +800,13 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
       cleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config]);
+  }, [config, sessionNonce]);
 
   const cleanup = () => {
     // CRITICAL: Disable session FIRST to prevent new audio from playing
     sessionActiveRef.current = false;
+    isConnectedRef.current = false;
+    sessionPromiseRef.current = null;
 
     // Clear score cleanup timeout if pending
     if (scoreCleanupTimeoutRef.current) {
@@ -1288,6 +1329,7 @@ This is my FINAL score. Be thorough and complete in your evaluation.`
       if (voiceModeRef.current === 'push-to-talk' && !isPTTActiveRef.current) return;
       // In continuous mode, respect mute state (use ref to avoid closure bug)
       if (voiceModeRef.current === 'continuous' && isMutedRef.current) return;
+      if (!sessionPromiseRef.current || !isConnectedRef.current || !sessionActiveRef.current) return;
 
       const inputData = e.inputBuffer.getChannelData(0);
       const pcmBlob = createPcmBlob(inputData);
