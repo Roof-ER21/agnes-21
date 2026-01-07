@@ -553,8 +553,10 @@ Use natural pacing and intonation for the language.`
 
     console.log(`🔊 Gemini speaking in ${langCode}: "${text.substring(0, 50)}..."${retryCount > 0 ? ` (retry ${retryCount})` : ''}`);
 
-    // Use longer timeout for non-English languages (30s vs 15s)
-    const timeoutMs = langCode === 'en' ? 15000 : 30000;
+    // Dynamic timeout based on text length: ~5 seconds per 100 characters, minimum 20s, max 60s
+    const baseTimeout = langCode === 'en' ? 20000 : 30000;
+    const textLengthBonus = Math.floor(text.length / 100) * 5000; // 5s per 100 chars
+    const timeoutMs = Math.min(60000, baseTimeout + textLengthBonus);
 
     const success = await new Promise<boolean>((resolve) => {
       let resolved = false; // Prevent double resolution
@@ -920,6 +922,8 @@ export const agnesVoiceSpeak = async (
       onEnd?.();
       return;
     }
+    // CRITICAL: Stop any Gemini audio that might still be playing before falling back
+    geminiMultiLang.stop();
     console.log(`⚠️ Gemini TTS failed for ${lang}, falling back to Web Speech`);
   } else {
     console.log(`ℹ️ Language ${lang} not in Gemini TTS, using Web Speech`);
