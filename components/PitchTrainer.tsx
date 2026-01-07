@@ -117,6 +117,9 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   // NEW: Score accumulation - wait for complete response before showing modal
   const scoreAccumulatorRef = useRef('');
   const [showScoreLoadingModal, setShowScoreLoadingModal] = useState(false);
+  const lastInputTranscriptRef = useRef('');
+  const lastOutputTranscriptRef = useRef('');
+  const lastScoreCommandAtRef = useRef(0);
 
   // NEW: Silence timeout tracking (10 seconds for roleplay/feedback to allow thinking pauses)
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -457,9 +460,45 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                 return;
               }
 
+              // Voice command detection via input transcription
+              const inputTranscription = serverContent?.inputTranscription;
+              if (inputTranscription?.text && inputTranscription.finished) {
+                const normalizedInput = inputTranscription.text.trim();
+                if (normalizedInput && normalizedInput !== lastInputTranscriptRef.current) {
+                  lastInputTranscriptRef.current = normalizedInput;
+                  const scoreCommandRegex = /\b(agnes\s+)?score\s+me\b|\bgive\s+me\s+my\s+score\b|\bscore\s+my\s+session\b/i;
+                  const now = Date.now();
+                  if (
+                    scoreCommandRegex.test(normalizedInput) &&
+                    !isRequestingScoreRef.current &&
+                    !showScoreReviewModalRef.current &&
+                    now - lastScoreCommandAtRef.current > 2000
+                  ) {
+                    lastScoreCommandAtRef.current = now;
+                    console.log('🎯 Voice command detected: score me');
+                    handleScoreMe();
+                  }
+                }
+              }
+
               // Handle Text Output (for transcript and custom voice)
-              const textContent = serverContent?.modelTurn?.parts?.[0]?.text;
-              if (textContent) {
+              const outputTranscription = serverContent?.outputTranscription;
+              const outputText = outputTranscription?.text;
+              let textContent = serverContent?.modelTurn?.parts?.[0]?.text || '';
+              if (outputText) {
+                const previousText = lastOutputTranscriptRef.current;
+                let deltaText = outputText;
+                if (previousText && outputText.startsWith(previousText)) {
+                  deltaText = outputText.slice(previousText.length);
+                }
+                lastOutputTranscriptRef.current = outputText;
+                textContent = deltaText;
+              }
+
+              const detectionText = outputText || textContent;
+              const isTurnComplete = Boolean(serverContent?.turnComplete || outputTranscription?.finished);
+
+              if (detectionText) {
                 // CRITICAL: Capture score request state BEFORE any changes
                 // This ensures we know if this message is part of a score response
                 const wasRequestingScore = isRequestingScoreRef.current;
@@ -475,7 +514,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
                 let scoreMatch: RegExpMatchArray | null = null;
                 for (const pattern of scorePatterns) {
-                  scoreMatch = textContent.match(pattern);
+                  scoreMatch = detectionText.match(pattern);
                   if (scoreMatch) break;
                 }
                 const parsedScore = scoreMatch ? parseInt(scoreMatch[1]) : null;
@@ -484,7 +523,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
                 // Skip transcript updates during score accumulation - we'll add the complete response later
                 // Only update currentScore and transcript for non-score messages
-                if (!wasRequestingScore) {
+                if (!wasRequestingScore && textContent.trim()) {
                   if (score !== null) {
                     setCurrentScore(score);
                     console.log('Score detected in regular message:', score);
@@ -499,28 +538,6 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   }]);
                 }
 
-                // Helper function to schedule score cleanup (with delay for multi-chunk responses)
-                const scheduleScoreCleanup = () => {
-                  // Clear any existing timeout
-                  if (scoreCleanupTimeoutRef.current) {
-                    clearTimeout(scoreCleanupTimeoutRef.current);
-                  }
-
-                  // Schedule cleanup after 1.5 seconds of no new score chunks
-                  scoreCleanupTimeoutRef.current = setTimeout(() => {
-                    console.log('Score cleanup: clearing flags after delay');
-                    isRequestingScoreRef.current = false;
-                    setIsRequestingScore(false);
-                    setAgnesState(AgnesState.LISTENING);
-
-                    // Resume microphone
-                    if (inputAudioContextRef.current?.state === 'suspended') {
-                      inputAudioContextRef.current.resume().catch(e => console.warn('Failed to resume mic:', e));
-                      console.log('Microphone resumed after score cleanup');
-                    }
-                  }, 1500);
-                };
-
                 // STRICT SCORE DETECTION: Only match when Agnes is EXPLICITLY ending the session
                 // Avoid false positives from mid-conversation feedback like "your score on that point"
                 const scoringTriggers = [
@@ -534,7 +551,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                 // - /(?:final\s+)?score:?\s*\d+\s*(?:\/\s*100)/i - Too broad, matches "score: 85" anywhere
                 // - /preparing\s*(?:your|the)\s*(?:final\s*)?/ - Triggers too early
                 // - /let\s*me\s*(?:provide|give)/ - Could match normal conversation
-                const containsScoreContent = scoringTriggers.some(p => p.test(textContent));
+                const containsScoreContent = scoringTriggers.some(p => p.test(detectionText));
 
                 // Route to score modal if: 1) We explicitly requested score, OR 2) Response contains score content
                 if (wasRequestingScore || containsScoreContent) {
@@ -590,7 +607,11 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   const hasCompletionPhrase = completionPhrases.some(p => p.test(accumulated));
 
                   // Complete when: has score AND (has enough content OR has completion phrase)
-                  const isComplete = hasScore && (hasEnoughContent || (accumulated.length > 400 && hasCompletionPhrase));
+                  const isComplete = hasScore && (
+                    hasEnoughContent ||
+                    (accumulated.length > 400 && hasCompletionPhrase) ||
+                    (isTurnComplete && accumulated.length > 120)
+                  );
 
                   if (isComplete) {
                     // Hide loading modal
@@ -680,6 +701,8 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
             speechConfig: {
               voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
             },
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
             systemInstruction: systemInstruction,
           }
         });
@@ -853,13 +876,14 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
   // NEW: Handle Score Me button - requests score from Agnes
   const handleScoreMe = async () => {
-    if (!sessionPromiseRef.current || isRequestingScore) return;
+    if (!sessionPromiseRef.current || isRequestingScoreRef.current || showScoreReviewModalRef.current) return;
 
     // Clear any existing timeout
     if (scoreTimeoutRef.current) {
       clearTimeout(scoreTimeoutRef.current);
       scoreTimeoutRef.current = null;
     }
+    scoreAccumulatorRef.current = '';
 
     // Set both state and ref for score request tracking
     setIsRequestingScore(true);
@@ -870,6 +894,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
 
     // Update Agnes state to SCORING (dedicated scoring state)
     setAgnesState(AgnesState.SCORING);
+    setIsMuted(true);
 
     // STOP ALL ONGOING AUDIO - Agnes should stop talking immediately
     audioSourcesRef.current.forEach(source => {
@@ -901,6 +926,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         scoreAccumulatorRef.current = '';
         setError('⏱️ Score request timed out. The session may have disconnected. Please try ending the session.');
         setAgnesState(AgnesState.LISTENING);
+        setIsMuted(false);
 
         // Resume microphone
         if (inputAudioContextRef.current?.state === 'suspended') {
@@ -1256,8 +1282,23 @@ This is my FINAL score. Be thorough and complete in your evaluation.`
     let lastSpeakingState = false;
 
     const checkVoiceActivity = () => {
-      // CRITICAL: Skip VAD entirely during score review to prevent interference
-      if (!micAnalyserRef.current || isRequestingScoreRef.current || showScoreReviewModalRef.current) return;
+      // CRITICAL: Keep VAD running but idle during scoring or mute to prevent false triggers
+      if (!micAnalyserRef.current) {
+        requestAnimationFrame(checkVoiceActivity);
+        return;
+      }
+      if (isRequestingScoreRef.current || showScoreReviewModalRef.current || isMutedRef.current || inputAudioContextRef.current?.state !== 'running') {
+        if (lastSpeakingState) {
+          lastSpeakingState = false;
+          setIsSpeaking(false);
+        }
+        if (silenceTimeoutRef.current) {
+          clearTimeout(silenceTimeoutRef.current);
+          silenceTimeoutRef.current = null;
+        }
+        requestAnimationFrame(checkVoiceActivity);
+        return;
+      }
 
       const dataArray = new Uint8Array(micAnalyserRef.current.frequencyBinCount);
       micAnalyserRef.current.getByteFrequencyData(dataArray);
@@ -1265,7 +1306,7 @@ This is my FINAL score. Be thorough and complete in your evaluation.`
       // Calculate average volume
       const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
 
-      const nowSpeaking = average > VOICE_THRESHOLD && !isMuted;
+      const nowSpeaking = average > VOICE_THRESHOLD;
 
       // If just started speaking, clear any silence timeout
       if (nowSpeaking && !lastSpeakingState) {
