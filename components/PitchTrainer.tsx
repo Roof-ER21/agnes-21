@@ -33,6 +33,7 @@ import { createVAD, startVAD, stopVAD, pauseVAD, createFallbackVAD } from '../ut
 import { Mic, MicOff, Video, VideoOff, X, ChevronDown, ChevronUp, Trophy, Skull, Shield, Zap, MessageSquare, Keyboard, Circle, Sparkles, AlertTriangle, Volume2, VolumeX, Wand2, Hand, Users, Headphones } from 'lucide-react';
 import XPBar from './XPBar';
 import LevelUpModal from './LevelUpModal';
+import ScoreReviewModal from './ScoreReviewModal';
 import { calculateSessionXP, awardXP, getUserProgress } from '../utils/gamification';
 import { getStreak } from '../utils/sessionStorage';
 
@@ -106,6 +107,12 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
   const isRequestingScoreRef = useRef(false); // Ref to track in async callbacks
   const isPlayingScoreAudioRef = useRef(false); // Ref to track when score audio is playing (prevents session end)
   const scoreCleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Delayed cleanup for multi-chunk scores
+
+  // NEW: Score Review Modal - dedicated UI for uninterrupted score delivery
+  const [showScoreReviewModal, setShowScoreReviewModal] = useState(false);
+  const [scoreReviewText, setScoreReviewText] = useState('');
+  const [scoreReviewNumeric, setScoreReviewNumeric] = useState<number | null>(null);
+  const showScoreReviewModalRef = useRef(false); // Ref for VAD check
 
   // NEW: Silence timeout tracking (10 seconds for roleplay/feedback to allow thinking pauses)
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -509,30 +516,28 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                   }, 1500);
                 };
 
-                // If custom voice enabled, speak with Chatterbox TTS (Reeses Piecies)
-                if (useCustomVoiceRef.current && sessionActiveRef.current) {
-                  // For score requests, await the audio to ensure it completes before session can end
-                  // Use captured state (wasRequestingScore) since we haven't cleared it yet
-                  if (wasRequestingScore) {
-                    isPlayingScoreAudioRef.current = true;
-                    try {
-                      await speakWithCustomVoice(textContent);
-                    } finally {
-                      isPlayingScoreAudioRef.current = false;
+                // SCORE REVIEW MODAL: Route score responses to dedicated modal for uninterrupted delivery
+                if (wasRequestingScore) {
+                  // Store score data for modal
+                  setCurrentScore(score);
+                  setScoreReviewText(textContent);
+                  setScoreReviewNumeric(score);
 
-                      // Schedule delayed cleanup for ALL score chunks (not just the one with score number)
-                      // This handles multi-chunk responses - each chunk extends the timeout
-                      console.log('Score chunk audio complete, scheduling/rescheduling cleanup');
-                      scheduleScoreCleanup();
-                    }
-                  } else {
-                    // For regular messages, don't block
-                    speakWithCustomVoice(textContent);
-                  }
-                } else if (wasRequestingScore && score !== null) {
-                  // Not using custom voice but got a score - schedule delayed cleanup
-                  console.log('Score received (no custom voice), scheduling cleanup');
-                  scheduleScoreCleanup();
+                  // Show the Score Review Modal
+                  setShowScoreReviewModal(true);
+                  showScoreReviewModalRef.current = true;
+
+                  // Clear score request flags - modal handles everything now
+                  isRequestingScoreRef.current = false;
+                  setIsRequestingScore(false);
+
+                  console.log('Score response routed to Score Review Modal');
+                  // DON'T play audio here - modal handles TTS internally
+                  // DON'T resume microphone here - modal handles it on close
+                }
+                // For regular messages (not score requests), use custom voice if enabled
+                else if (useCustomVoiceRef.current && sessionActiveRef.current) {
+                  speakWithCustomVoice(textContent);
                 }
               }
 
@@ -837,6 +842,35 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     confirmEndSession();
   };
 
+  // NEW: Score Review Modal handlers - for uninterrupted score delivery
+  const handleScoreReviewContinue = () => {
+    // Close the modal
+    setShowScoreReviewModal(false);
+    showScoreReviewModalRef.current = false;
+    setScoreReviewText('');
+
+    // Resume microphone for continued training
+    if (inputAudioContextRef.current?.state === 'suspended') {
+      inputAudioContextRef.current.resume().catch(e => console.warn('Failed to resume mic:', e));
+      console.log('Microphone resumed after score review');
+    }
+
+    // Reset Agnes state to listening
+    setAgnesState(AgnesState.LISTENING);
+    console.log('Score review complete, continuing training');
+  };
+
+  const handleScoreReviewEndSession = () => {
+    // Close the modal
+    setShowScoreReviewModal(false);
+    showScoreReviewModalRef.current = false;
+    setScoreReviewText('');
+
+    // End the session
+    confirmEndSession();
+    console.log('Score review complete, ending session');
+  };
+
   // NEW: Confirm and save session
   const confirmEndSession = async () => {
     setShowEndSessionModal(false);
@@ -1077,7 +1111,8 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     let lastSpeakingState = false;
 
     const checkVoiceActivity = () => {
-      if (!micAnalyserRef.current) return;
+      // CRITICAL: Skip VAD entirely during score review to prevent interference
+      if (!micAnalyserRef.current || isRequestingScoreRef.current || showScoreReviewModalRef.current) return;
 
       const dataArray = new Uint8Array(micAnalyserRef.current.frequencyBinCount);
       micAnalyserRef.current.getByteFrequencyData(dataArray);
@@ -1956,6 +1991,18 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         unlocksAtThisLevel={levelUpData.unlocks}
         onClose={() => setShowLevelUpModal(false)}
         userId={user?.id}
+      />
+
+      {/* Score Review Modal - Dedicated UI for uninterrupted score delivery */}
+      <ScoreReviewModal
+        show={showScoreReviewModal}
+        scoreText={scoreReviewText}
+        numericScore={scoreReviewNumeric}
+        onContinue={handleScoreReviewContinue}
+        onEndSession={handleScoreReviewEndSession}
+        ttsAvailable={ttsAvailable ?? false}
+        outputAudioContext={outputAudioContextRef.current}
+        analyser={analyserRef.current}
       />
 
       {/* Celebration Animations */}
