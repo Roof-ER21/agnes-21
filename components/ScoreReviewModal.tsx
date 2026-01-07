@@ -30,8 +30,10 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
   // TTS state
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [ttsError, setTtsError] = useState<string | null>(null);
+  const [ttsStatus, setTtsStatus] = useState<'idle' | 'speaking' | 'complete' | 'unavailable'>('idle');
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const localAudioContextRef = useRef<AudioContext | null>(null);
+  const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Get score color based on value
   const getScoreColor = (score: number) => {
@@ -75,69 +77,113 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
     return () => clearInterval(interval);
   }, [show, scoreText]);
 
-  // TTS playback when modal shows
+  // TTS playback when modal shows - with Web Speech API fallback
   useEffect(() => {
     if (!show || !scoreText) return;
 
     const playScoreAudio = async () => {
-      // Check if TTS is available
-      if (!ttsAvailable) {
-        console.log('TTS not available, skipping voice playback');
+      const cleanText = cleanTextForTTS(scoreText);
+      if (!cleanText) {
+        setTtsStatus('unavailable');
         return;
       }
 
       setIsSpeaking(true);
+      setTtsStatus('speaking');
       setTtsError(null);
 
-      try {
-        const cleanText = cleanTextForTTS(scoreText);
-        if (!cleanText) {
+      // Try Chatterbox TTS first if available
+      if (ttsAvailable) {
+        try {
+          const audioBuffer = await generateSpeech(cleanText, {
+            voice: DEFAULT_FEEDBACK_VOICE,
+            exaggeration: 0.4
+          });
+
+          const ctx = outputAudioContext || new (window.AudioContext || (window as any).webkitAudioContext)();
+          if (!outputAudioContext) {
+            localAudioContextRef.current = ctx;
+          }
+
+          if (ctx.state === 'suspended') {
+            await ctx.resume();
+          }
+
+          const audioData = await ctx.decodeAudioData(audioBuffer.slice(0));
+          const source = ctx.createBufferSource();
+          source.buffer = audioData;
+
+          if (analyser) {
+            source.connect(analyser);
+            analyser.connect(ctx.destination);
+          } else {
+            source.connect(ctx.destination);
+          }
+
+          audioSourceRef.current = source;
+          source.start();
+
+          source.onended = () => {
+            setIsSpeaking(false);
+            setTtsStatus('complete');
+            audioSourceRef.current = null;
+          };
+
+          console.log('Playing score audio with Chatterbox TTS');
+          return; // Success - exit early
+        } catch (error) {
+          console.warn('Chatterbox TTS failed, falling back to Web Speech:', error);
+        }
+      }
+
+      // Fallback to Web Speech API
+      if ('speechSynthesis' in window) {
+        try {
+          // Cancel any ongoing speech
+          window.speechSynthesis.cancel();
+
+          const utterance = new SpeechSynthesisUtterance(cleanText);
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+
+          // Try to find a good voice
+          const voices = window.speechSynthesis.getVoices();
+          const preferredVoice = voices.find(v =>
+            v.name.includes('Samantha') ||
+            v.name.includes('Google') ||
+            v.lang.startsWith('en')
+          );
+          if (preferredVoice) {
+            utterance.voice = preferredVoice;
+          }
+
+          utterance.onend = () => {
+            setIsSpeaking(false);
+            setTtsStatus('complete');
+            speechSynthRef.current = null;
+          };
+
+          utterance.onerror = (e) => {
+            console.error('Web Speech error:', e);
+            setIsSpeaking(false);
+            setTtsStatus('complete');
+            setTtsError('Voice playback failed');
+          };
+
+          speechSynthRef.current = utterance;
+          window.speechSynthesis.speak(utterance);
+          console.log('Playing score audio with Web Speech API fallback');
+        } catch (error) {
+          console.error('Web Speech API error:', error);
           setIsSpeaking(false);
-          return;
+          setTtsStatus('unavailable');
+          setTtsError('Voice not available');
         }
-
-        // Generate audio
-        const audioBuffer = await generateSpeech(cleanText, {
-          voice: DEFAULT_FEEDBACK_VOICE,
-          exaggeration: 0.4
-        });
-
-        // Use provided audio context or create local one
-        const ctx = outputAudioContext || new (window.AudioContext || (window as any).webkitAudioContext)();
-        if (!outputAudioContext) {
-          localAudioContextRef.current = ctx;
-        }
-
-        // Resume context if suspended
-        if (ctx.state === 'suspended') {
-          await ctx.resume();
-        }
-
-        // Decode and play
-        const audioData = await ctx.decodeAudioData(audioBuffer.slice(0));
-        const source = ctx.createBufferSource();
-        source.buffer = audioData;
-
-        // Connect to analyser if available, otherwise direct to destination
-        if (analyser) {
-          source.connect(analyser);
-          analyser.connect(ctx.destination);
-        } else {
-          source.connect(ctx.destination);
-        }
-
-        audioSourceRef.current = source;
-        source.start();
-
-        source.onended = () => {
-          setIsSpeaking(false);
-          audioSourceRef.current = null;
-        };
-
-      } catch (error) {
-        console.error('Score TTS error:', error);
-        setTtsError('Voice playback failed');
+      } else {
+        console.log('No TTS available - text only mode');
         setIsSpeaking(false);
+        setTtsStatus('unavailable');
       }
     };
 
@@ -155,10 +201,13 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
         localAudioContextRef.current.close().catch(() => {});
         localAudioContextRef.current = null;
       }
+      // Reset status
+      setTtsStatus('idle');
     }
   }, [show]);
 
   const handleStopSpeaking = () => {
+    // Stop AudioBufferSourceNode (Chatterbox TTS)
     if (audioSourceRef.current) {
       try {
         audioSourceRef.current.stop();
@@ -167,7 +216,15 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
       }
       audioSourceRef.current = null;
     }
+    // Stop Web Speech API
+    if (speechSynthRef.current) {
+      window.speechSynthesis.cancel();
+      speechSynthRef.current = null;
+    }
     setIsSpeaking(false);
+    if (ttsStatus === 'speaking') {
+      setTtsStatus('complete');
+    }
   };
 
   const handleContinue = () => {
@@ -252,10 +309,20 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
                   <VolumeX className="w-4 h-4 text-red-400" />
                   <span className="text-red-400 text-sm">{ttsError}</span>
                 </>
+              ) : ttsStatus === 'complete' ? (
+                <>
+                  <Volume2 className="w-4 h-4 text-green-500" />
+                  <span className="text-green-500 text-sm">Audio complete</span>
+                </>
+              ) : ttsStatus === 'unavailable' ? (
+                <>
+                  <VolumeX className="w-4 h-4 text-neutral-500" />
+                  <span className="text-neutral-500 text-sm">Voice unavailable - read above</span>
+                </>
               ) : (
                 <>
                   <Volume2 className="w-4 h-4 text-neutral-500" />
-                  <span className="text-neutral-500 text-sm">Audio complete</span>
+                  <span className="text-neutral-500 text-sm">Preparing audio...</span>
                 </>
               )}
             </div>

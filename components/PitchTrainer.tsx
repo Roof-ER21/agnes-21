@@ -762,6 +762,16 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     // Update Agnes state to SCORING (dedicated scoring state)
     setAgnesState(AgnesState.SCORING);
 
+    // STOP ALL ONGOING AUDIO - Agnes should stop talking immediately
+    audioSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch (e) { /* ignore */ }
+    });
+    audioSourcesRef.current.clear();
+    setActiveAudioCount(0);
+    nextStartTimeRef.current = 0;
+    setIsSpeakingCustom(false);
+    console.log('Stopped all ongoing audio for scoring');
+
     // Suspend microphone input during scoring to prevent voice interference
     if (inputAudioContextRef.current?.state === 'running') {
       try {
