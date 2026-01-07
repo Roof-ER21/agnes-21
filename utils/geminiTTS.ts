@@ -393,6 +393,38 @@ class GeminiMultiLanguageTTS {
   }
 
   /**
+   * Get language-specific system instruction to prevent language switching
+   */
+  private getSystemInstruction(langCode: string): string {
+    // For English: be VERY explicit to prevent accidental language switching
+    if (langCode === 'en') {
+      return `You are Agnes, a professional English voice assistant.
+IMPORTANT: You MUST speak ONLY in American English. Never switch to any other language.
+Your task is to read the exact text given aloud in clear American English.
+Do NOT add commentary, translate, or modify the text.
+Speak naturally with warm, professional intonation.
+Even if the text contains words from other languages, pronounce them with an American English accent.`;
+    }
+
+    // For other languages: be explicit about the target language
+    const languageNames: Record<string, string> = {
+      'es': 'Spanish', 'es-mx': 'Mexican Spanish', 'es-es': 'Castilian Spanish',
+      'fr': 'French', 'de': 'German', 'it': 'Italian', 'pt': 'Portuguese',
+      'zh': 'Mandarin Chinese', 'ja': 'Japanese', 'ko': 'Korean',
+      'hi': 'Hindi', 'ar': 'Arabic', 'ru': 'Russian', 'vi': 'Vietnamese',
+      'tl': 'Tagalog', 'th': 'Thai', 'bn': 'Bengali', 'pa': 'Punjabi',
+      'pl': 'Polish', 'uk': 'Ukrainian', 'fa': 'Persian', 'ht': 'Haitian Creole'
+    };
+    const langName = languageNames[langCode] || langCode.toUpperCase();
+
+    return `You are Agnes, a professional ${langName} voice assistant.
+IMPORTANT: You MUST speak ONLY in ${langName}. Do not switch to any other language.
+Your task is to read the exact text given aloud in clear ${langName}.
+Do NOT add commentary, translate to other languages, or modify the text.
+Speak naturally with warm, professional intonation appropriate for ${langName}.`;
+  }
+
+  /**
    * Get or create a session for a specific language
    */
   private async getSession(langCode: string): Promise<any> {
@@ -448,11 +480,7 @@ class GeminiMultiLanguageTTS {
             voiceConfig: { prebuiltVoiceConfig: { voiceName } },
             languageCode: geminiLangCode
           },
-          systemInstruction: `You are Agnes, a professional multilingual translator.
-Your task is to read text aloud naturally in the target language.
-Do NOT add commentary or translate - just speak the exact text given.
-Speak clearly and warmly like a professional translator.
-Use natural pacing and intonation for the language.`
+          systemInstruction: this.getSystemInstruction(langCode)
         }
       });
 
@@ -461,6 +489,22 @@ Use natural pacing and intonation for the language.`
     } catch (error) {
       console.error(`Failed to create Gemini session for ${langCode}:`, error);
       return null;
+    }
+  }
+
+  /**
+   * Force clear a specific language session (useful before critical operations)
+   */
+  clearSession(langCode: string): void {
+    const session = this.sessions.get(langCode);
+    if (session) {
+      try {
+        session.close();
+      } catch (e) {
+        // Already closed
+      }
+      this.sessions.delete(langCode);
+      console.log(`🗑️ Cleared session for ${langCode}`);
     }
   }
 
@@ -896,6 +940,12 @@ const speakWithWebSpeech = async (
 /**
  * Agnes speaks - uses Gemini TTS (Kore voice) ONLY
  * NO Web Speech fallback - for voice consistency across the app
+ *
+ * @param text - Text to speak
+ * @param lang - Language code (default: 'en')
+ * @param options.onEnd - Callback when speech completes
+ * @param options.onError - Callback on error
+ * @param options.forceNewSession - Force create fresh session (prevents language mixing)
  */
 export const agnesVoiceSpeak = async (
   text: string,
@@ -903,9 +953,10 @@ export const agnesVoiceSpeak = async (
   options?: {
     onEnd?: () => void;
     onError?: (error: string) => void;
+    forceNewSession?: boolean;
   }
 ): Promise<void> => {
-  const { onEnd, onError } = options || {};
+  const { onEnd, onError, forceNewSession } = options || {};
 
   if (!text || text.trim().length === 0) {
     onEnd?.();
@@ -913,6 +964,12 @@ export const agnesVoiceSpeak = async (
   }
 
   console.log(`🔊 Agnes speaking in ${lang}: "${text.substring(0, 50)}..."`);
+
+  // For English score reading, force fresh session to prevent language mixing
+  if (forceNewSession || lang === 'en') {
+    geminiMultiLang.clearSession(lang);
+    console.log(`🔄 Forced fresh session for ${lang} to ensure correct language`);
+  }
 
   // Try Gemini TTS (Kore voice) - NO FALLBACK to Web Speech
   if (geminiMultiLang.isLanguageSupported(lang)) {
@@ -934,6 +991,14 @@ export const agnesVoiceSpeak = async (
   console.error(`❌ Gemini TTS not available for ${lang} - voice playback skipped`);
   onError?.('Voice not available');
   onEnd?.(); // Still call onEnd to resolve promise
+};
+
+/**
+ * Force clear all TTS sessions - useful when switching contexts
+ */
+export const clearAllTTSSessions = (): void => {
+  geminiMultiLang.cleanup();
+  console.log('🗑️ Cleared all TTS sessions');
 };
 
 /**

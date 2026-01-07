@@ -84,12 +84,13 @@ const ScoreReviewModal: React.FC<ScoreReviewModalProps> = ({
       setTtsStatus('speaking');
       setTtsError(null);
 
-      // Use Agnes Voice (Gemini Kore) - NO Web Speech fallback for voice consistency
+      // Use Agnes Voice (Gemini Kore) - force fresh English session to prevent language mixing
       await agnesVoiceSpeak(cleanText, 'en', {
+        forceNewSession: true, // CRITICAL: Prevents wrong language from cached sessions
         onEnd: () => {
           setIsSpeaking(false);
           setTtsStatus('complete');
-          console.log('Score read with Agnes voice (Gemini Kore)');
+          console.log('Score read with Agnes voice (Gemini Kore - English)');
         },
         onError: (error) => {
           console.error('Agnes voice error:', error);
