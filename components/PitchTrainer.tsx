@@ -591,6 +591,12 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                       }
                     }
 
+                    // Clear the score timeout since we got a valid response
+                    if (scoreTimeoutRef.current) {
+                      clearTimeout(scoreTimeoutRef.current);
+                      scoreTimeoutRef.current = null;
+                    }
+
                     // Show Score Review Modal with complete feedback
                     setCurrentScore(finalScore);
                     setScoreReviewText(accumulated);
@@ -602,6 +608,7 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
                     scoreAccumulatorRef.current = '';
                     isRequestingScoreRef.current = false;
                     setIsRequestingScore(false);
+                    setShowScoreLoadingModal(false);
 
                     console.log('Complete score response routed to Score Review Modal');
                   }
@@ -826,13 +833,25 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
     setShowEndSessionModal(true);
   };
 
+  // Timeout ref for score request failsafe
+  const scoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // NEW: Handle Score Me button - requests score from Agnes
   const handleScoreMe = async () => {
     if (!sessionPromiseRef.current || isRequestingScore) return;
 
+    // Clear any existing timeout
+    if (scoreTimeoutRef.current) {
+      clearTimeout(scoreTimeoutRef.current);
+      scoreTimeoutRef.current = null;
+    }
+
     // Set both state and ref for score request tracking
     setIsRequestingScore(true);
     isRequestingScoreRef.current = true;
+
+    // Show loading modal immediately
+    setShowScoreLoadingModal(true);
 
     // Update Agnes state to SCORING (dedicated scoring state)
     setAgnesState(AgnesState.SCORING);
@@ -856,6 +875,24 @@ const PitchTrainer: React.FC<PitchTrainerProps> = ({ config, onEndSession, onMin
         console.warn('Failed to suspend mic:', e);
       }
     }
+
+    // Set timeout failsafe - if no score after 45 seconds, reset and show error
+    scoreTimeoutRef.current = setTimeout(() => {
+      if (isRequestingScoreRef.current && !showScoreReviewModalRef.current) {
+        console.warn('Score request timed out after 45 seconds');
+        setIsRequestingScore(false);
+        isRequestingScoreRef.current = false;
+        setShowScoreLoadingModal(false);
+        scoreAccumulatorRef.current = '';
+        setError('⏱️ Score request timed out. The session may have disconnected. Please try ending the session.');
+        setAgnesState(AgnesState.LISTENING);
+
+        // Resume microphone
+        if (inputAudioContextRef.current?.state === 'suspended') {
+          inputAudioContextRef.current.resume().catch(() => {});
+        }
+      }
+    }, 45000);
 
     try {
       // Send a text message to Gemini asking for scoring
@@ -888,11 +925,19 @@ This is my FINAL score. Be thorough and complete in your evaluation.`
         turnComplete: true
       });
 
+      console.log('Score request sent to Gemini');
+
     } catch (error) {
       console.error('Error requesting score:', error);
       // Reset on error
+      if (scoreTimeoutRef.current) {
+        clearTimeout(scoreTimeoutRef.current);
+        scoreTimeoutRef.current = null;
+      }
       setIsRequestingScore(false);
       isRequestingScoreRef.current = false;
+      setShowScoreLoadingModal(false);
+      setError('❌ Failed to request score. Please try ending the session.');
     }
     // Note: Flag is cleared when score is received in the message handler
   };
@@ -1775,37 +1820,7 @@ This is my FINAL score. Be thorough and complete in your evaluation.`
         </div>
       )}
 
-      {/* Scoring Overlay - Shows when Agnes is scoring */}
-      {isRequestingScore && (
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4">
-          <div className="bg-neutral-900/95 border border-yellow-500/30 rounded-xl sm:rounded-2xl p-4 sm:p-8 shadow-2xl shadow-yellow-500/10 max-w-[calc(100vw-2rem)] sm:max-w-md text-center animate-pulse">
-            <div className="flex justify-center mb-4">
-              <div className="relative">
-                <div className="absolute inset-0 w-16 h-16 bg-yellow-500/30 rounded-full animate-ping" />
-                <Trophy className="w-16 h-16 text-yellow-400 relative z-10" />
-              </div>
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">Agnes is Scoring</h3>
-            <p className="text-neutral-400 text-sm mb-4">
-              Analyzing your performance...
-            </p>
-            <div className="space-y-2 text-xs text-neutral-500">
-              <div className="flex items-center justify-center space-x-2">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span>Evaluating delivery</span>
-              </div>
-              <div className="flex items-center justify-center space-x-2">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span>Checking non-negotiables</span>
-              </div>
-              <div className="flex items-center justify-center space-x-2">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                <span>Assessing objection handling</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Scoring Overlay - Removed: Now using showScoreLoadingModal instead */}
 
       {/* Keyboard Shortcuts Panel */}
       {showKeyboardHints && (
